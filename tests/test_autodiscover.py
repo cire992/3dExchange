@@ -1,7 +1,6 @@
 import json
 
-from builders import unreal_project, write
-from conftest import copy_fixture
+from builders import copy_fixture, unreal_project, write
 from exchange.autodiscover import Places, discover_sources, parse_vdf
 
 
