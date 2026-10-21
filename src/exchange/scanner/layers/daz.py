@@ -5,8 +5,9 @@
   artists, its user-facing ``Assets`` (each with a Daz ``ContentType`` and figure
   ``Compatibility``) and its ``SupportAssets``. Assets whose ContentType maps to a dossier type
   (``content_types`` in the definition) become child dossiers; everything else listed stays a file
-  of the product. A listed file missing at its path but whose filename is found exactly once
-  elsewhere in the content directory is taken as *relocated*; hash matching comes later.
+  of the product. A listed file missing at its path but whose parent folder and filename are
+  found together exactly once elsewhere in the content directory (users reorganize libraries) is
+  taken as *relocated*; hash matching comes later.
 * **Daz Connect** installs each product into ``data/cloud/<n>_<SKU>/``, laid out like a content
   directory of its own; its files are typed by the dossier-type rules.
 
@@ -91,19 +92,20 @@ def identify(ctx: LayerContext) -> LayerResult:
     if empty:
         result.layer_config["empty_manifests"] = empty
 
-    # Files no manifest lists, by filename, for finding relocated files.
+    # Files no manifest lists, by folder + filename, for finding relocated files. The folder
+    # is part of the key because generic filenames (!Preload.duf) say nothing on their own.
     unlisted = [f.rel for f in ctx.files if fold(f.rel) not in listed_everywhere]
-    unlisted_names = Counter(fold(r.rsplit("/", 1)[-1]) for r in unlisted)
-    unlisted_by_name = {fold(r.rsplit("/", 1)[-1]): r for r in unlisted}
+    unlisted_tails = Counter(_tail(r) for r in unlisted)
+    unlisted_by_tail = {_tail(r): r for r in unlisted}
 
     def locate(path: str) -> tuple[str | None, bool]:
         """(root-relative path on disk, relocated?)"""
         for candidate in (path, unquote(path)):
             if fold(candidate) in by_key:
                 return by_key[fold(candidate)], False
-        name = fold(path.rsplit("/", 1)[-1])
-        if unlisted_names.get(name) == 1:
-            return unlisted_by_name[name], True
+        tail = _tail(path)
+        if "/" in tail and unlisted_tails.get(tail) == 1:
+            return unlisted_by_tail[tail], True
         return None, False
 
     per_manifest = Counter(f.rel for f, _ in parsed)
@@ -162,6 +164,11 @@ def identify(ctx: LayerContext) -> LayerResult:
             type_root=folder,
         ))
     return result
+
+
+def _tail(rel: str) -> str:
+    """The parent folder and filename, folded: ``a/b/Folder/File.duf`` -> ``folder/file.duf``."""
+    return fold("/".join(rel.split("/")[-2:]))
 
 
 def _listed(product: ManifestProduct) -> list[str]:
