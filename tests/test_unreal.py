@@ -1,6 +1,6 @@
 """Unreal Engine projects: detection, content packs, plugins and asset types."""
 
-from conftest import root_report
+from builders import root_report
 from exchange.scanner.detection import detect
 from exchange.scanner.discovery import discover
 

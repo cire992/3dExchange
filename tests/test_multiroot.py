@@ -2,7 +2,7 @@
 
 import shutil
 
-from conftest import env_report, root_report
+from builders import env_report, root_report
 from exchange.db import repository as repo
 from exchange.scanner.scan import run_rescan
 

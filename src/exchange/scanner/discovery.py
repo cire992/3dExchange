@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import stat
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -33,6 +34,7 @@ class Discovery:
     files: list[DiscoveredFile] = field(default_factory=list)
     dirs: list[str] = field(default_factory=list)  # every walked directory, relative
     links: list[str] = field(default_factory=list)  # symlinks and junctions, not followed
+    excluded: list[str] = field(default_factory=list)  # folders the user excluded, skipped
     errors: list[str] = field(default_factory=list)
 
 
@@ -45,9 +47,11 @@ def _is_link(entry: os.DirEntry[str]) -> bool:
     return tag in _LINK_TAGS
 
 
-def discover(root: Path) -> Discovery:
+def discover(root: Path, exclude: Iterable[str] = ()) -> Discovery:
+    """Walk ``root``; folders whose absolute path is in ``exclude`` are skipped entirely."""
     root = root.resolve()
     result = Discovery(root=root)
+    excluded = {fold(str(Path(p))) for p in exclude}
     stack: list[tuple[str, str]] = [("", os_path(root))]
     while stack:
         rel_dir, dir_path = stack.pop()
@@ -63,7 +67,9 @@ def discover(root: Path) -> Discovery:
                     if _is_link(entry):
                         result.links.append(rel)
                     elif entry.is_dir(follow_symlinks=False):
-                        if fold(entry.name) not in IGNORED_DIR_NAMES:
+                        if excluded and fold(str(root.joinpath(*rel.split("/")))) in excluded:
+                            result.excluded.append(rel)
+                        elif fold(entry.name) not in IGNORED_DIR_NAMES:
                             result.dirs.append(rel)
                             stack.append((rel, entry.path))
                     elif fold(entry.name) not in IGNORED_FILE_NAMES:

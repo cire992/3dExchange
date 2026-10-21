@@ -11,7 +11,6 @@ from PySide6.QtGui import QAction, QDesktopServices, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QButtonGroup,
-    QFileDialog,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -33,6 +32,7 @@ from exchange_ui.inspector import Inspector
 from exchange_ui.models import BRICK, KIND, BrowserModel, SidebarModel, filter_for
 from exchange_ui.scanning import ScanRunner
 from exchange_ui.service import Filter, LibraryService
+from exchange_ui.wizard import AddEnvironmentsDialog
 
 _PHASES = {1: "Discovery", 2: "Identification", 3: "Enrichment"}
 SEARCH_HINT = "Search assets — try  marius type:daz_morph  or  env:skyrim_se -is:product"
@@ -104,8 +104,8 @@ class MainWindow(QMainWindow):
         layout.addSpacing(16)
         self.add_button = QPushButton("+  Add environment")
         self.add_button.setObjectName("primary")
-        self.add_button.setToolTip("Choose a folder; Exchange detects the environments in it and scans them (read-only)")
-        self.add_button.clicked.connect(self.add_environment)
+        self.add_button.setToolTip("Find environments on this PC or in a folder, review them, then scan (read-only)")
+        self.add_button.clicked.connect(lambda: self.add_environment())
         self.rescan_button = QPushButton("Rescan changed")
         self.rescan_button.setToolTip("Rescan known environments; only what changed is reprocessed (F5)")
         self.rescan_button.clicked.connect(self.rescan)
@@ -383,10 +383,12 @@ class MainWindow(QMainWindow):
 
     # Scanning ---------------------------------------------------------------------------------
 
-    def add_environment(self) -> None:
-        folder = QFileDialog.getExistingDirectory(self, "Add environment: choose a folder")
-        if folder:
-            self.scan_folder(Path(folder))
+    def add_environment(self, places=None) -> AddEnvironmentsDialog:
+        """Open the add-environment wizard; a scan it starts continues after it closes."""
+        dialog = AddEnvironmentsDialog(self.service, self.runner, self, places=places)
+        dialog.reviewUnidentified.connect(lambda: self.unidentified_button.setChecked(True))
+        dialog.open()
+        return dialog
 
     def scan_folder(self, folder: Path) -> None:
         self.status.setText(f"Detecting environments in {folder} …")

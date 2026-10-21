@@ -8,7 +8,7 @@ import pytest
 
 from exchange.errors import ScanError
 
-from conftest import FIXTURES
+from builders import FIXTURES
 
 
 def snapshot(root: Path) -> dict[str, tuple]:
