@@ -222,10 +222,26 @@ def identify_root(
         stats.products += 1
         count(spec)
         claimed.update(f.id for f in primary + members)
+        explicit = {fold(c.rel): c for c in product.children}
         for m in members:
             if m.id in children:
                 continue
-            child = child_spec(m, container_key, product_id, product.type_root)
+            given = explicit.get(fold(m.rel))
+            if given is not None:
+                child = _Spec(
+                    key=f"file:{fold(rel_under(m.rel, container_key) if container_key else m.rel)}",
+                    type_id=given.type_id, name=m.rel.rsplit("/", 1)[-1].rsplit(".", 1)[0],
+                    confidence=given.confidence, signals=given.signals,
+                    container_id=container_ids[container_key], primary=[m], parent_id=product_id,
+                    fields=dict(given.fields))
+                if "variant" not in child.fields:
+                    variant = _dossier_variant(definition, rel_under(m.rel, container_key) if container_key else m.rel)
+                    if variant:
+                        child.fields["variant"] = variant
+            elif product.children_only:
+                continue
+            else:
+                child = child_spec(m, container_key, product_id, product.type_root)
             if child is not None:
                 writer.persist(child)
                 children.add(m.id)

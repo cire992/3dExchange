@@ -46,18 +46,26 @@ def test_daz_products_from_manifests(scan, daz_library, library):
     assert marius["container"] == ""  # container = the content directory
     f = fields(conn, marius["id"])
     assert f["daz_product_token"] == "12345"
-    assert f["authors"] == ["Jane Doe"]
-    assert (f["manifest_files_listed"], f["manifest_files_missing"]) == (5, 1)
+    assert f["authors"] == ["Jane Doe", "Daz 3D"]
+    assert (f["manifest_files_listed"], f["manifest_files_missing"]) == (10, 1)
+    assert f["daz_global_id"].startswith("0f1e2d3c")
     files = entry_files(conn, marius["id"])
     assert files["Runtime/Support/DAZ_3D_12345_Marius_HD-8K_for_Genesis_9.dsx"] == "primary"
     assert files["Runtime/Support/DAZ_3D_12345_Marius_HD-8K_for_Genesis_9.jpg"] == "support"
 
-    assert d["FHMMarius"]["type_id"] == "daz_morph"
-    assert d["FHMMarius"]["parent_name"] == "Marius HD-8K for Genesis 9"
-    assert fields(conn, d["FHMMarius"]["id"])["variant"] == "genesis_9"
+    # Children come from the manifest's assets, typed by their Daz ContentType.
+    head = d["Marius Head"]
+    assert (head["type_id"], head["confidence"]) == ("daz_morph", 0.85)
+    assert head["parent_name"] == "Marius HD-8K for Genesis 9"
+    head_fields = fields(conn, head["id"])
+    assert head_fields["variant"] == "genesis_9"  # from the asset's compatibility
+    assert head_fields["daz_content_type"] == "Preset/Morph/Apply/Head"
     assert d["Marius HD-8K"]["type_id"] == "daz_character_preset"
+    assert "Marius Pose" not in d  # a pose preset stays a file of the product
+    assert "FHMMarius" not in d  # morph data (.dsf) is a support file, not a dossier
+    assert files["data/DAZ 3D/Genesis 9/Base/Morphs/DAZ 3D/Marius/FHMMarius.dsf"] == "support"
 
-    dress = d["Summer Dress"]  # the Content/ prefix in DIM paths is stripped
+    dress = d["Summer Dress"]
     assert dress["type_id"] == "daz_wearable"
     assert dress["parent_name"] == "Summer Dress for Genesis 8 Female"
     assert fields(conn, dress["id"])["variant"] == "genesis_8"

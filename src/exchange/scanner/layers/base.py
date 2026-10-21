@@ -43,6 +43,17 @@ class ContainerSpec:
 
 
 @dataclass
+class ChildSpec:
+    """A member file the layer itself identified (e.g. from a manifest's asset list)."""
+
+    rel: str  # root-relative path
+    type_id: str
+    confidence: float
+    signals: list[str]
+    fields: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
 class ProductSpec:
     container_rel: str
     identity_key: str  # stable across rescans within the container
@@ -57,6 +68,10 @@ class ProductSpec:
     # Members are typed relative to this folder when inside it (a Daz Connect product folder
     # mirrors a content directory's layout); otherwise relative to the container.
     type_root: str = ""
+    # Members the layer identified itself. When ``children_only``, other members stay files of
+    # the product instead of being matched against dossier-type rules.
+    children: list[ChildSpec] = field(default_factory=list)
+    children_only: bool = False
 
 
 @dataclass

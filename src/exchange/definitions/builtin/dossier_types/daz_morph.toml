@@ -1,3 +1,4 @@
+# A user-facing morph preset (.duf). The morph data itself (.dsf under data/) is a support file.
 [dossier_type]
 id = "daz_morph"
 name = "Daz morph"
@@ -6,5 +7,5 @@ scope = "environment"
 environment = "daz_studio"
 
 [[identify]]
-glob = "data/**/Morphs/**/*.dsf"
-confidence = 0.7
+glob = "People/*/Morphs/**/*.duf"
+confidence = 0.5

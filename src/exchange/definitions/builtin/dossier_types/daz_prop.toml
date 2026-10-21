@@ -1,0 +1,11 @@
+[dossier_type]
+id = "daz_prop"
+name = "Daz prop"
+format_version = 1
+scope = "environment"
+environment = "daz_studio"
+extends = "mesh"
+
+[[identify]]
+glob = "Props/**/*.duf"
+confidence = 0.5

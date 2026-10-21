@@ -33,7 +33,8 @@ def test_free_text(indexed, definitions):
     assert names(indexed, definitions, "donut") == {
         "Donut01_Pink", "Donut01_Blue", "donut01", "donut01_pink", "Lard Lads Donuts"}  # prefix match
     assert names(indexed, definitions, "donut pink") == {"Donut01_Pink", "donut01_pink"}
-    assert names(indexed, definitions, "marius") >= {"Marius HD-8K", "FHMMarius", "Marius HD-8K for Genesis 9"}
+    assert names(indexed, definitions, "marius") == {"Marius HD-8K", "Marius Head", "Marius Body",
+                                                     "Marius HD-8K for Genesis 9"}
     assert names(indexed, definitions, "lard") >= {"Lard Lads Donuts", "donut01"}  # container names
 
 
@@ -42,7 +43,7 @@ def test_filters(indexed, definitions):
     assert names(indexed, definitions, "donut -env:skyrim_se -is:product") == {"Donut01_Pink", "Donut01_Blue"}
     assert "Teapot" in names(indexed, definitions, "type:mesh")  # includes static_mesh
     assert names(indexed, definitions, "type:mesh") >= {"Summer Dress", "donut01"}  # daz_wearable is a mesh
-    assert names(indexed, definitions, "type:daz_morph") == {"FHMMarius", "FBMMarius"}
+    assert names(indexed, definitions, "type:daz_morph") == {"Marius Head", "Marius Body"}
     assert names(indexed, definitions, 'author:"jane doe"') == {"Marius HD-8K for Genesis 9"}
     assert names(indexed, definitions, "variant:genesis_8") == {"Summer Dress"}
     assert names(indexed, definitions, "container:\"lard lads\" -is:product") == {"donut01"}
@@ -75,7 +76,7 @@ def test_retired_dossiers_are_hidden_by_default(scan, mixed, indexed, definition
 def test_grouping_and_paging(indexed, definitions):
     top = list_dossiers(indexed, definitions, group="product", limit=500)
     top_names = {b.name for b in top.items}
-    assert "Marius HD-8K for Genesis 9" in top_names and "FHMMarius" not in top_names
+    assert "Marius HD-8K for Genesis 9" in top_names and "Marius Head" not in top_names
     assert "Loose Boots" in top_names  # standalone
 
     by_type = list_dossiers(indexed, definitions, group="type", limit=500)
@@ -90,7 +91,7 @@ def test_grouping_and_paging(indexed, definitions):
     marius = next(b for b in top.items if b.name == "Marius HD-8K for Genesis 9")
     assert marius.children == 3 and marius.entries == 1 and marius.environments == ["Daz Studio"]
     kids = list_dossiers(indexed, definitions, parent_uid=marius.uid)
-    assert {b.name for b in kids.items} == {"FHMMarius", "FBMMarius", "Marius HD-8K"}
+    assert {b.name for b in kids.items} == {"Marius Head", "Marius Body", "Marius HD-8K"}
 
 
 def test_sidebar(indexed, definitions):
@@ -123,6 +124,7 @@ def test_dossier_detail(indexed, definitions, db_path):
     assert [x["reference"] for x in broken] == ["data/DAZ 3D/Genesis 9/Base/Genesis9.dsf"]
     assert [h["action"] for h in d["history"]] == ["entry_added", "set_field"]
 
-    morph = indexed.execute("SELECT uid FROM dossier WHERE name = 'FHMMarius'").fetchone()[0]
-    assert dossier_detail(indexed, definitions, morph)["required_by"] == [{"uid": uid, "name": "Marius HD-8K"}]
+    product = indexed.execute("SELECT uid FROM dossier WHERE name = 'Marius HD-8K for Genesis 9'").fetchone()[0]
+    required_by = dossier_detail(indexed, definitions, product)["required_by"]
+    assert [r["name"] for r in required_by] == ["Marius Body", "Marius HD-8K", "Marius Head"]
     assert dossier_detail(indexed, definitions, "nope") is None

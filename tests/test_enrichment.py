@@ -105,12 +105,13 @@ def test_daz_dependencies(scan, daz_library, library):
         "SELECT x.*, t.name AS target FROM dossier_dependency x LEFT JOIN dossier t ON t.id = x.target_dossier_id"
         " WHERE x.dossier_id = ?", (marius["id"],))}
     morph = deps["data/DAZ 3D/Genesis 9/Base/Morphs/DAZ 3D/Marius/FHMMarius.dsf"]
-    assert morph["status"] == "ok" and morph["target"] == "FHMMarius"
+    assert morph["status"] == "ok" and morph["target"] == "Marius HD-8K for Genesis 9"  # a support file
     texture = deps["Runtime/Textures/DAZ/Characters/Genesis9/Marius/Marius_Face_D_1001.jpg"]
     assert texture["status"] == "ok" and texture["target"] == "Marius HD-8K for Genesis 9"  # a product file
     assert deps["data/DAZ 3D/Genesis 9/Base/Genesis9.dsf"]["status"] == "broken"
 
-    assert fields(conn, "FHMMarius")["morph_deltas"] == 3  # read from a gzip-compressed .dsf
+    body_refs = fields(conn, "Marius Body")["references"]  # read from a gzip-compressed .duf
+    assert body_refs == ["data/DAZ 3D/Genesis 9/Base/Morphs/DAZ 3D/Marius/FBMMarius.dsf"]
     assert fields(conn, "Summer Dress")["references"] == ["data/DAZ 3D/Summer Dress/Summer Dress.dsf"]
 
 

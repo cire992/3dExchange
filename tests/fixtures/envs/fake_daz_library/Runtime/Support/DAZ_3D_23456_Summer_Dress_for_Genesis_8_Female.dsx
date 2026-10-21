@@ -1,10 +1,29 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<ProductSupport VERSION="0.1">
- <ProductToken VALUE="23456"/>
- <ProductName VALUE="Summer Dress for Genesis 8 Female"/>
- <ProductFiles>
-  <File VALUE="Content/People/Genesis 8 Female/Clothing/Summer Dress/Summer Dress.duf"/>
-  <File VALUE="Content/People/Genesis 8 Female/Clothing/Summer Dress/Summer Dress.duf.png"/>
-  <File VALUE="Content/data/DAZ 3D/Summer Dress/Summer Dress.dsf"/>
- </ProductFiles>
-</ProductSupport>
+<ContentDBInstall VERSION="1.0">
+ <Products>
+  <Product VALUE="Summer Dress for Genesis 8 Female">
+   <StoreID VALUE="DAZ 3D"/>
+   <GlobalID VALUE="0f1e2d3c-0000-4000-8000-000000023456"/>
+   <ProductToken VALUE="23456"/>
+   <Artists>
+    <Artist VALUE="Daz 3D"/>
+   </Artists>
+   <Assets>
+    <Asset VALUE="People/Genesis 8 Female/Clothing/Summer Dress/Summer Dress.duf">
+     <ContentType VALUE="Follower/Wardrobe/Dress"/>
+     <Audience VALUE="General"/>
+     <Categories>
+      <Category VALUE="/Default/Follower/Wardrobe/Dress"/>
+     </Categories>
+     <Compatibilities>
+      <Compatibility VALUE="/Genesis 8/Female"/>
+     </Compatibilities>
+    </Asset>
+   </Assets>
+   <SupportAssets>
+    <SupportAsset VALUE="/People/Genesis 8 Female/Clothing/Summer Dress/Summer Dress.duf.png"/>
+    <SupportAsset VALUE="/data/DAZ 3D/Summer Dress/Summer Dress.dsf"/>
+   </SupportAssets>
+  </Product>
+ </Products>
+</ContentDBInstall>

@@ -1,0 +1,11 @@
+[dossier_type]
+id = "daz_hair"
+name = "Daz hair"
+format_version = 1
+scope = "environment"
+environment = "daz_studio"
+extends = "skinned_mesh"
+
+[[identify]]
+glob = "People/*/Hair/**/*.duf"
+confidence = 0.6
