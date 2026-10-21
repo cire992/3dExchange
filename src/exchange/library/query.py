@@ -17,6 +17,11 @@ from exchange.library.search import compile_query
 
 GROUPS = ("product", "type", "all")
 
+# Effective values for filtering and sorting, computed once per query. Sorting through the full
+# dossier_effective view (which carries large columns such as signals) is ~10x slower.
+EFFECTIVE = ("WITH d AS MATERIALIZED (SELECT id, uid, name, type_id, parent_id, confidence,"
+             " name_overridden, type_overridden, parent_overridden FROM dossier_effective)")
+
 
 @dataclass
 class Brick:
@@ -87,8 +92,16 @@ def list_dossiers(
         clauses.append(f"d.type_id IN ({','.join('?' * len(types))})")
         args.extend(types)
     condition = " AND ".join(clauses)
-    total = conn.execute(f"SELECT count(*) FROM dossier_effective d WHERE {condition}", args).fetchone()[0]
     order = "d.type_id, lower(d.name), d.id" if group == "type" else "lower(d.name), d.id"
+    # Sort and cut the page first; per-row details are then looked up for that page only.
+    ranked = conn.execute(
+        f"{EFFECTIVE} SELECT d.id, count(*) OVER () FROM d WHERE {condition} ORDER BY {order}"
+        f" LIMIT ? OFFSET ?", [*args, limit, offset]).fetchall()
+    total = ranked[0][1] if ranked else (
+        conn.execute(f"{EFFECTIVE} SELECT count(*) FROM d WHERE {condition}", args).fetchone()[0] if offset else 0)
+    ids = [r[0] for r in ranked]
+    if not ids:
+        return Page([], total, offset)
     rows = conn.execute(
         f"SELECT d.id, d.uid, d.name, d.type_id, d.confidence,"
         f" (SELECT rel_path FROM thumbnail t WHERE t.dossier_id = d.id) AS thumbnail,"
@@ -102,8 +115,9 @@ def list_dossiers(
         f" (SELECT count(*) FROM ledger l JOIN entry e ON e.ledger_id = l.id"
         f"   WHERE l.dossier_id = d.id AND e.status != 'retired') AS entries,"
         f" (SELECT count(*) FROM dossier c WHERE c.parent_id = d.id) AS children"
-        f" FROM dossier_effective d WHERE {condition} ORDER BY {order} LIMIT ? OFFSET ?",
-        [*args, limit, offset]).fetchall()
+        f" FROM dossier_effective d WHERE d.id IN ({','.join('?' * len(ids))})", ids).fetchall()
+    position = {dossier_id: i for i, dossier_id in enumerate(ids)}
+    rows = sorted(rows, key=lambda r: position[r["id"]])
     items = [Brick(
         id=r["id"], uid=r["uid"], name=r["name"], type_id=r["type_id"],
         type_name=_type_name(definitions, r["type_id"]), confidence=r["confidence"],
@@ -123,10 +137,11 @@ def sidebar(conn: sqlite3.Connection, definitions: DefinitionSet, *, threshold: 
         "unidentified_dossiers": conn.execute(
             f"SELECT count(DISTINCT x.dossier_id) FROM ({live}) x JOIN dossier d ON d.id = x.dossier_id"
             " WHERE d.confidence < ?", (threshold,)).fetchone()[0],
+        # Counted when each root was last scanned; counting live is too slow for big libraries.
         "unattached_files": conn.execute(
-            "SELECT count(*) FROM file f WHERE f.state = 'present' AND NOT EXISTS"
-            " (SELECT 1 FROM entry_file ef JOIN entry e ON e.id = ef.entry_id"
-            "  WHERE ef.file_id = f.id AND e.status != 'retired')").fetchone()[0],
+            "SELECT COALESCE(sum(s.unattached_files), 0) FROM scan s WHERE s.id IN"
+            " (SELECT max(id) FROM scan WHERE finished_at IS NOT NULL GROUP BY root_id)"
+            " AND s.root_id IN (SELECT id FROM environment_root WHERE status = 'online')").fetchone()[0],
         "environments": [],
     }
     for env in repo.list_environments(conn):
@@ -137,8 +152,8 @@ def sidebar(conn: sqlite3.Connection, definitions: DefinitionSet, *, threshold: 
             f" LEFT JOIN ({live}) x ON x.container_id = c.id WHERE c.environment_id = ?"
             f" GROUP BY c.id ORDER BY lower(c.name)", (env["id"],)).fetchall()
         types = conn.execute(
-            f"SELECT d.type_id, count(DISTINCT d.id) AS count FROM ({live}) x"
-            f" JOIN dossier_effective d ON d.id = x.dossier_id WHERE x.environment_id = ?"
+            f"{EFFECTIVE} SELECT d.type_id, count(DISTINCT d.id) AS count FROM ({live}) x"
+            f" JOIN d ON d.id = x.dossier_id WHERE x.environment_id = ?"
             f" GROUP BY d.type_id ORDER BY d.type_id", (env["id"],)).fetchall()
         out["environments"].append({
             "id": env["id"], "name": env["name"], "type_id": env["type_id"],

@@ -4,11 +4,20 @@ from __future__ import annotations
 
 import io
 import json
+import shutil
 import struct
 from pathlib import Path
 
 import numpy as np
 from PIL import Image
+
+FIXTURES = Path(__file__).parent / "fixtures" / "envs"
+
+
+def copy_fixture(name: str, dest: Path) -> Path:
+    shutil.copytree(FIXTURES / name, dest)
+    return dest
+
 
 CUBE_POSITIONS = np.array([[x, y, z] for x in (-0.5, 0.5) for y in (-0.5, 0.5) for z in (-0.5, 0.5)],
                           dtype=np.float32)

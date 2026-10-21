@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
 import pytest
@@ -8,7 +7,7 @@ import pytest
 from exchange.definitions import DefinitionSet, load_definitions
 from exchange.scanner.scan import ScanReport, run_scan
 
-FIXTURES = Path(__file__).parent / "fixtures" / "envs"
+from builders import FIXTURES, copy_fixture  # noqa: F401  (re-exported for tests)
 
 
 @pytest.fixture(autouse=True)
@@ -25,11 +24,6 @@ def definitions() -> DefinitionSet:
 @pytest.fixture
 def db_path(tmp_path) -> Path:
     return tmp_path / "library" / "library.db"
-
-
-def copy_fixture(name: str, dest: Path) -> Path:
-    shutil.copytree(FIXTURES / name, dest)
-    return dest
 
 
 @pytest.fixture

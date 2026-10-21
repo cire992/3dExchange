@@ -180,12 +180,12 @@ def start_scan(conn: sqlite3.Connection, environment_id: int, root_id: int) -> i
 
 def finish_scan(
     conn: sqlite3.Connection, scan_id: int, *, phase: int, seen: int, new: int, changed: int,
-    gone: int,
+    gone: int, unattached: int = 0,
 ) -> None:
     conn.execute(
         "UPDATE scan SET finished_at = ?, phase_reached = ?, files_seen = ?, files_new = ?,"
-        " files_changed = ?, files_gone = ? WHERE id = ?",
-        (now(), phase, seen, new, changed, gone, scan_id),
+        " files_changed = ?, files_gone = ?, unattached_files = ? WHERE id = ?",
+        (now(), phase, seen, new, changed, gone, unattached, scan_id),
     )
 
 

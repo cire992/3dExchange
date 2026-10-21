@@ -148,3 +148,11 @@ def test_daz_relocated_files(scan, daz_library, library):
     assert d["Summer Dress"]["parent_name"] == "Summer Dress for Genesis 8 Female"
     marius = fields(conn, d["Marius HD-8K for Genesis 9"]["id"])
     assert (marius["manifest_files_relocated"], marius["manifest_files_missing"]) == (0, 1)
+
+
+def test_files_without_a_stem_keep_their_name(scan, tmp_path, library):
+    from builders import glb_bytes, write
+
+    write(tmp_path / "scan" / "odd" / ".glb", glb_bytes())
+    scan(tmp_path / "scan" / "odd")
+    assert library().execute("SELECT name FROM dossier").fetchall()[0][0] == ".glb"

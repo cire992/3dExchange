@@ -293,7 +293,8 @@ class _Session:
             report.identification = stats
             repo.finish_root_scan(conn, root_id, env["id"], stats.layer_config)
             repo.finish_scan(conn, scan_id, phase=2, seen=len(present), new=report.new,
-                             changed=report.changed, gone=report.gone)
+                             changed=report.changed, gone=report.gone,
+                             unattached=stats.unattached_files)
 
     def _sync_files(self, environment_id: int, root_id: int, scan_id: int,
                     det: DetectedEnvironment, report: RootReport) -> list[FileInfo]:
