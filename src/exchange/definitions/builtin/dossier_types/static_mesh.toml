@@ -4,3 +4,8 @@ name = "Static mesh"
 format_version = 1
 scope = "universal"
 extends = "mesh"
+
+[[identify]]
+environment = "unreal_project"
+globs = ["**/SM_*.uasset"]
+confidence = 0.6

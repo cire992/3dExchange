@@ -1,18 +1,8 @@
 import json
-import sqlite3
 
 import pytest
 
-from conftest import env_report
-from exchange.db import open_library
-
-
-@pytest.fixture
-def library(db_path):
-    def _open() -> sqlite3.Connection:
-        return open_library(db_path)
-
-    return _open
+from conftest import root_report
 
 
 def dossiers(conn, environment_type):
@@ -44,7 +34,7 @@ def entry_files(conn, dossier_id):
 
 def test_daz_products_from_manifests(scan, daz_library, library):
     report = scan(daz_library)
-    stats = env_report(report, "daz_studio").identification
+    stats = root_report(report, "daz_studio").identification
     assert (stats.containers, stats.products, stats.dossiers) == (1, 2, 7)
     assert stats.unattached_files == 1  # Runtime/Textures/random.png
 
@@ -82,7 +72,7 @@ def test_daz_products_from_manifests(scan, daz_library, library):
 
 def test_mo2_mods_are_containers_and_products(scan, mo2_instance, library):
     report = scan(mo2_instance)
-    env = env_report(report, "skyrim_se")
+    env = root_report(report, "skyrim_se")
     stats = env.identification
     assert (stats.containers, stats.products, stats.dossiers) == (2, 2, 4)
     assert stats.archives == 1
@@ -117,7 +107,7 @@ def test_mo2_mods_are_containers_and_products(scan, mo2_instance, library):
 
 def test_loose_files_use_folder_heuristics(scan, loose_folder, library):
     report = scan(loose_folder)
-    stats = env_report(report, "loose_files").identification
+    stats = root_report(report, "loose_files").identification
     assert stats.products == 1
     assert stats.below_threshold == 1  # the folder-as-product guess goes to review
     assert stats.unattached_files == 2  # Barrel01_N.png, notes.txt

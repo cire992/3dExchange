@@ -3,3 +3,8 @@ id = "skeleton"
 name = "Skeleton"
 format_version = 1
 scope = "universal"
+
+[[identify]]
+environment = "unreal_project"
+globs = ["**/SKEL_*.uasset"]
+confidence = 0.6

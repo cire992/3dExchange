@@ -50,6 +50,7 @@ class EnvironmentDefinition:
     signatures: tuple[Signature, ...] = ()
     min_confidence: float = 0.5
     fallback: bool = False  # receives files no other environment claims (Loose Files)
+    multi_root: bool = False  # one environment gathers every root of this type (Daz content dirs)
     layer_options: Mapping[str, Any] = field(default_factory=dict)
     ignore_globs: tuple[str, ...] = ()
     capabilities: Mapping[str, bool] = field(default_factory=dict)
@@ -62,6 +63,7 @@ class EnvironmentDefinition:
 class IdentifyRule:
     glob: str  # relative to the container root
     confidence: float
+    environment: str | None = None  # only applies in this environment type
 
 
 @dataclass(frozen=True)

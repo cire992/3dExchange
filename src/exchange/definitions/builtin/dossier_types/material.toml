@@ -3,3 +3,8 @@ id = "material"
 name = "Material"
 format_version = 1
 scope = "universal"
+
+[[identify]]
+environment = "unreal_project"
+globs = ["**/M_*.uasset", "**/MI_*.uasset", "**/MF_*.uasset"]
+confidence = 0.6

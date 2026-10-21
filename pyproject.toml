@@ -8,8 +8,12 @@ version = "0.1.0"
 description = "Manage 3D assets across game, engine and content-library environments."
 readme = "README.md"
 requires-python = ">=3.11"
-# The core uses only the standard library (sqlite3, tomllib, configparser, xml.etree).
-dependencies = []
+# Pillow decodes and resizes images (including DDS) for thumbnails; numpy drives the small
+# mesh renderer that previews glTF/OBJ files. Everything else is the standard library.
+dependencies = [
+    "pillow>=10",
+    "numpy>=1.26",
+]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]

@@ -6,7 +6,9 @@ at least one file, dir or ini_value signature matches. A candidate whose summed 
 belongs to the deepest (most specific) one; files no environment claims fall through to the
 fallback environment (Loose Files) rooted at the scanned folder.
 
-Environments the library already knows keep their type even if detection would now say otherwise.
+Each detected environment here is one root; the scan groups roots into environments (several Daz
+content directories become one Daz Studio environment). Roots the library already knows keep their
+environment's type even if detection would now say otherwise.
 """
 
 from __future__ import annotations
@@ -26,6 +28,8 @@ from exchange.scanner.readonly import ini_value, read_ini
 
 @dataclass(frozen=True)
 class RegisteredEnvironment:
+    """A root the library already knows, with its environment's type."""
+
     root: Path
     type_id: str
     confidence: float
@@ -70,6 +74,13 @@ class TreeIndex:
                 yield ""
             elif full.endswith("/" + key):
                 yield full[: -len(key) - 1]
+
+    def glob_anchors(self, pattern: str) -> Iterator[str]:
+        """Folded roots D holding a file directly whose name matches ``pattern`` (e.g. *.uproject)."""
+        for key in self.files:
+            parent, _, name = key.rpartition("/")
+            if glob_match(pattern, name):
+                yield parent
 
     def files_under(self, root_key: str) -> Iterator[str]:
         prefix = root_key + "/" if root_key else ""
@@ -123,6 +134,8 @@ def detect(
                 roots.update(index.anchors(sig.path, is_dir=False))
             elif sig.kind == "dir":
                 roots.update(index.anchors(sig.path, is_dir=True))
+            elif sig.kind == "glob" and "/" not in sig.glob:
+                roots.update(index.glob_anchors(sig.glob))
         for root_key in sorted(roots):
             score, signals = index.score(definition, root_key)
             if score < definition.min_confidence:
@@ -147,6 +160,17 @@ def detect(
         env = _detected(index, definition, root_key, score, signals)
         env.registered = True
         best[root_key] = env
+
+    # A root inside another root of the same type is part of it (a Daz Connect product folder
+    # looks like a content directory of its own), unless the library already knows it.
+    for root_key, env in list(best.items()):
+        if env.registered:
+            continue
+        outer = [k for k, e in best.items()
+                 if e.definition.id == env.definition.id and k != root_key
+                 and (k == "" or root_key.startswith(k + "/"))]
+        if outer:
+            del best[root_key]
 
     environments = sorted(best.values(), key=lambda e: e.root_rel.count("/") + bool(e.root_rel),
                           reverse=True)

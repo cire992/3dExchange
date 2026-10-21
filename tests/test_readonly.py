@@ -47,7 +47,7 @@ def test_scan_of_committed_fixtures_changes_nothing(scan):
 
 
 def test_database_inside_scanned_folder_is_refused(definitions, mixed):
-    from exchange.scanner import run_scan
+    from exchange.scanner.scan import run_scan
 
     db = mixed / "Loose" / "library.db"
     with pytest.raises(ScanError, match="inside it"):

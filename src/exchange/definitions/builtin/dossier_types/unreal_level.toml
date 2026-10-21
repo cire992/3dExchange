@@ -1,0 +1,10 @@
+[dossier_type]
+id = "unreal_level"
+name = "Unreal level"
+format_version = 1
+scope = "environment"
+environment = "unreal_project"
+
+[[identify]]
+glob = "**/*.umap"
+confidence = 0.8

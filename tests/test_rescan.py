@@ -1,6 +1,6 @@
 import os
 
-from conftest import env_report
+from conftest import root_report
 from exchange.db import open_library
 from exchange.db import repository as repo
 
@@ -14,9 +14,10 @@ def test_unchanged_rescan_keeps_identity(scan, mixed, db_path):
     first = uids(open_library(db_path))
     report = scan(mixed)
     for env in report.environments:
-        assert (env.new, env.changed, env.gone) == (0, 0, 0)
-        assert env.unchanged == env.files
         assert env.registered
+        for root in env.roots:
+            assert (root.new, root.changed, root.gone) == (0, 0, 0)
+            assert root.unchanged == root.files
     assert uids(open_library(db_path)) == first
 
 
@@ -28,7 +29,7 @@ def test_changes_are_tracked_and_history_kept(scan, mo2_instance, db_path):
     esp.write_bytes(b"a bigger plugin")
     (mods / "Lard Lads Donuts" / "meshes" / "clutter" / "cruller01.nif").write_bytes(b"nif")
 
-    env = env_report(scan(mo2_instance), "skyrim_se")
+    env = root_report(scan(mo2_instance), "skyrim_se")
     assert (env.new, env.changed, env.gone) == (1, 1, 1)
     assert env.identification.retired_entries == 1
 
@@ -48,7 +49,7 @@ def test_returning_file_revives_its_entry(scan, loose_folder, db_path):
     wav.unlink()
     scan(loose_folder)
     wav.write_bytes(data)
-    env = env_report(scan(loose_folder), "loose_files")
+    env = root_report(scan(loose_folder), "loose_files")
     assert env.new == 1
     conn = open_library(db_path)
     statuses = conn.execute(
@@ -93,6 +94,6 @@ def test_scanning_a_subfolder_rescans_its_environment(scan, mo2_instance, db_pat
     scan(mo2_instance)
     report = scan(mo2_instance / "mods" / "Lard Lads Donuts")
     assert report.notes and "inside the environment" in report.notes[0]
-    env = env_report(report, "skyrim_se")
+    env = root_report(report, "skyrim_se")
     assert env.gone == 0
     assert env.unchanged == env.files
