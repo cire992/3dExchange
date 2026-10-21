@@ -1,0 +1,6 @@
+[dossier_type]
+id = "skyrim_npc"
+name = "Skyrim NPC"
+format_version = 1
+scope = "environment"
+environment = "skyrim_se"

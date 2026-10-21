@@ -1,0 +1,5 @@
+[dossier_type]
+id = "animation"
+name = "Animation"
+format_version = 1
+scope = "universal"

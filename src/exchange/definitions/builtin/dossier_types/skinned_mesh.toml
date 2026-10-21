@@ -1,0 +1,6 @@
+[dossier_type]
+id = "skinned_mesh"
+name = "Skinned mesh"
+format_version = 1
+scope = "universal"
+extends = "mesh"

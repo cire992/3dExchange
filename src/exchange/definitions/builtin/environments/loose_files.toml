@@ -1,0 +1,18 @@
+# Files no other environment claims. Folder-as-product heuristics at low confidence.
+
+[environment]
+id = "loose_files"
+name = "Loose files"
+format_version = 1
+fallback = true
+
+[layer]
+handler = "folder"
+# A folder holding several assets becomes a product at product_confidence (below the default
+# Unidentified threshold, so it goes to review). Asset dossiers get their rule confidence scaled.
+options = { product_confidence = 0.3, child_confidence_scale = 0.8 }
+
+[capabilities]
+indexable = true
+readable = true
+writable = false

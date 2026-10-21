@@ -1,0 +1,61 @@
+# Daz Studio content library: one content directory (a folder holding data/, Runtime/, People/ ...).
+# Container = the content directory; products come from DIM support manifests (hints, not truth).
+
+[environment]
+id = "daz_studio"
+name = "Daz Studio content library"
+format_version = 1
+
+[detection]
+min_confidence = 0.5
+
+[[detection.signature]]
+kind = "dir"
+path = "data"
+weight = 0.3
+
+[[detection.signature]]
+kind = "dir"
+path = "Runtime"
+weight = 0.2
+
+[[detection.signature]]
+kind = "dir"
+path = "Runtime/Support"
+weight = 0.3
+
+[[detection.signature]]
+kind = "dir"
+path = "People"
+weight = 0.2
+
+[[detection.signature]]
+kind = "glob"
+glob = "**/*.duf"
+weight = 0.2
+
+[layer]
+handler = "daz"
+options = { manifest_glob = "Runtime/Support/*.dsx" }
+
+[capabilities]
+indexable = true
+readable = true
+writable = false   # requisition endpoints arrive in Roadmap phase 4
+
+# Figure generations are dossier-level variants: one library holds content for several.
+[[variant]]
+id = "genesis_9"
+name = "Genesis 9"
+level = "dossier"
+globs = ["People/Genesis 9/**", "data/**/Genesis 9/**"]
+
+[[variant]]
+id = "genesis_8"
+name = "Genesis 8"
+level = "dossier"
+globs = ["People/Genesis 8*/**", "data/**/Genesis 8*/**"]
+
+[compatibility]
+uses_content_from = []
+native_dossier_types = ["daz_morph", "daz_character_preset", "daz_wearable"]

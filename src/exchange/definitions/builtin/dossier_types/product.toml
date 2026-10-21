@@ -1,0 +1,6 @@
+# A whole purchasable or downloadable package; its children are the assets inside.
+[dossier_type]
+id = "product"
+name = "Product"
+format_version = 1
+scope = "universal"

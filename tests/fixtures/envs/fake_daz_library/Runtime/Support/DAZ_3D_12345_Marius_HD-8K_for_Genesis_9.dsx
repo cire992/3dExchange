@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ProductSupport VERSION="0.1">
+ <ProductToken VALUE="12345"/>
+ <ProductName VALUE="Marius HD-8K for Genesis 9"/>
+ <ProductStoreIDX VALUE="12345-1"/>
+ <ProductFileGuid VALUE="0f1e2d3c-0000-4000-8000-000000012345"/>
+ <Artists>
+  <Artist VALUE="Jane Doe"/>
+ </Artists>
+ <ProductFiles>
+  <File VALUE="/data/DAZ 3D/Genesis 9/Base/Morphs/DAZ 3D/Marius/FHMMarius.dsf"/>
+  <File VALUE="/data/DAZ 3D/Genesis 9/Base/Morphs/DAZ 3D/Marius/FBMMarius.dsf"/>
+  <File VALUE="/People/Genesis 9/Characters/Marius/Marius HD-8K.duf"/>
+  <File VALUE="/Runtime/Textures/DAZ/Characters/Genesis9/Marius/Marius_Face_D_1001.jpg"/>
+  <File VALUE="/Runtime/Textures/DAZ/Characters/Genesis9/Marius/Marius_Body_D_1002.jpg"/>
+ </ProductFiles>
+</ProductSupport>

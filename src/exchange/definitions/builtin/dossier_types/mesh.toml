@@ -1,0 +1,10 @@
+# mesh is abstract: static vs skinned needs the mesh itself, so scan phase 3 refines it.
+[dossier_type]
+id = "mesh"
+name = "Mesh"
+format_version = 1
+scope = "universal"
+
+[[identify]]
+globs = ["**/*.glb", "**/*.gltf", "**/*.fbx", "**/*.obj", "**/*.dae", "**/*.nif"]
+confidence = 0.7

@@ -1,0 +1,38 @@
+# Skyrim Special Edition managed by a Mod Organizer 2 instance. Container = MO2 mod folder.
+
+[environment]
+id = "skyrim_se"
+name = "Skyrim Special Edition"
+format_version = 1
+
+[detection]
+min_confidence = 0.75
+
+[[detection.signature]]
+kind = "file"
+path = "ModOrganizer.ini"
+weight = 0.5
+
+[[detection.signature]]
+kind = "ini_value"
+path = "ModOrganizer.ini"
+section = "General"
+key = "gameName"
+equals = "Skyrim Special Edition"
+weight = 0.5
+
+[layer]
+handler = "mo2"
+options = { mods_dir = "mods" }
+
+[ignore]
+globs = ["downloads/**", "overwrite/**"]
+
+[capabilities]
+indexable = true
+readable = true
+writable = false
+
+[compatibility]
+uses_content_from = []
+native_dossier_types = ["skyrim_npc"]
