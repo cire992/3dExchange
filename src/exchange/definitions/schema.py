@@ -77,10 +77,30 @@ class DossierTypeDefinition:
     identify: tuple[IdentifyRule, ...] = ()
 
 
+LEXICON_KINDS = ("category", "variant", "texture_channel", "structural", "index", "ignore")
+
+
+@dataclass(frozen=True)
+class LexiconTerm:
+    value: str  # what a match means: a tag, a variant group, a texture channel, a structural role
+    words: tuple[str, ...] = ()  # matched against filename tokens; plurals match automatically
+    patterns: tuple[str, ...] = ()  # globs matched against the whole lower-cased file stem
+
+
+@dataclass(frozen=True)
+class Lexicon:
+    id: str
+    name: str
+    kind: str
+    source: str
+    terms: tuple[LexiconTerm, ...] = ()
+
+
 @dataclass
 class DefinitionSet:
     environments: dict[str, EnvironmentDefinition]
     dossier_types: dict[str, DossierTypeDefinition]
+    lexicons: dict[str, Lexicon] = field(default_factory=dict)
 
     @property
     def fallback_environment(self) -> EnvironmentDefinition:

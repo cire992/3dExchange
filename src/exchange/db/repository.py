@@ -280,7 +280,7 @@ def find_entry(
     conn: sqlite3.Connection, container_id: int, identity_key: str
 ) -> sqlite3.Row | None:
     return conn.execute(
-        "SELECT e.id, e.status, e.ledger_id, l.dossier_id FROM entry e"
+        "SELECT e.id, e.status, e.ledger_id, e.moved_from, l.dossier_id FROM entry e"
         " JOIN ledger l ON l.id = e.ledger_id"
         " WHERE e.container_id = ? AND e.identity_key = ?",
         (container_id, identity_key),
@@ -302,13 +302,13 @@ def find_product_by_key(conn: sqlite3.Connection, environment_id: int, product_k
 
 def create_dossier(
     conn: sqlite3.Connection, *, type_id: str, name: str, parent_id: int | None,
-    confidence: float, signals: list[str],
+    confidence: float, signals: list[str], uid: str | None = None,
 ) -> int:
     stamp = now()
     cur = conn.execute(
-        "INSERT INTO dossier (uid, type_id, name, parent_id, confidence, signals, created_at,"
-        " updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (new_uid(), type_id, name, parent_id, confidence, to_json(signals), stamp, stamp),
+        "INSERT INTO dossier (uid, type_id, name, parent_id, confidence, confidence_base, signals,"
+        " created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (uid or new_uid(), type_id, name, parent_id, confidence, confidence, to_json(signals), stamp, stamp),
     )
     return cur.lastrowid
 
@@ -317,11 +317,14 @@ def update_dossier(
     conn: sqlite3.Connection, dossier_id: int, *, type_id: str, name: str,
     parent_id: int | None, confidence: float, signals: list[str],
 ) -> None:
-    """Refresh the scanned layer of a dossier. Overrides live elsewhere and are untouched."""
+    """Refresh the scanned layer of a dossier. Overrides live elsewhere and are untouched.
+
+    ``confidence`` is the identification's own; the classification pass adds evidence on top.
+    """
     conn.execute(
-        "UPDATE dossier SET type_id = ?, name = ?, parent_id = ?, confidence = ?, signals = ?,"
-        " updated_at = ? WHERE id = ?",
-        (type_id, name, parent_id, confidence, to_json(signals), now(), dossier_id),
+        "UPDATE dossier SET type_id = ?, name = ?, parent_id = ?, confidence = ?, confidence_base = ?,"
+        " signals = ?, updated_at = ? WHERE id = ?",
+        (type_id, name, parent_id, confidence, confidence, to_json(signals), now(), dossier_id),
     )
 
 
@@ -385,9 +388,17 @@ def retire_entries(conn: sqlite3.Connection, entry_ids: Iterable[int]) -> None:
     )
 
 
-def move_entry(conn: sqlite3.Connection, entry_id: int, ledger_id: int, status: str) -> None:
-    conn.execute("UPDATE entry SET ledger_id = ?, status = ? WHERE id = ?",
-                 (ledger_id, status, entry_id))
+def move_entry(conn: sqlite3.Connection, entry_id: int, ledger_id: int, status: str,
+               moved_from: str | None = None) -> None:
+    conn.execute("UPDATE entry SET ledger_id = ?, status = ?, moved_from = COALESCE(?, moved_from)"
+                 " WHERE id = ?", (ledger_id, status, moved_from, entry_id))
+
+
+def has_home_entry(conn: sqlite3.Connection, dossier_id: int) -> bool:
+    """True if the dossier has an entry of its own (not one moved onto it by a merge or link)."""
+    return conn.execute(
+        "SELECT EXISTS (SELECT 1 FROM entry e JOIN ledger l ON l.id = e.ledger_id"
+        " WHERE l.dossier_id = ? AND e.moved_from IS NULL)", (dossier_id,)).fetchone()[0] == 1
 
 
 def delete_dossier(conn: sqlite3.Connection, dossier_id: int) -> None:

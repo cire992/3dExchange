@@ -1,0 +1,17 @@
+# Structural words mark files that are part of another mesh rather than assets of their own:
+# levels of detail (LOD1, LOD2 ... ; LOD0 is the mesh itself) and collision shapes.
+
+[lexicon]
+id = "structural"
+name = "Structural"
+kind = "structural"
+format_version = 1
+
+[[term]]
+value = "lod"
+words = ["lod"]
+
+[[term]]
+value = "collision"
+words = ["col", "collision", "collider", "phys", "physics", "hitbox"]
+patterns = ["ucx_*", "ubx_*", "ucp_*", "usp_*"]

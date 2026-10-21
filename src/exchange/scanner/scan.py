@@ -87,6 +87,8 @@ class ScanReport:
     errors: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     cancelled: bool = False
+    classification: object | None = None  # ClassifyStats
+    suggestions: dict | None = None  # new suggestions by kind
 
 
 def run_scan(
@@ -131,6 +133,8 @@ def run_scan(
     try:
         session = _Session(conn, definitions, report, dry_run, threshold, progress, cancel)
         session.scan_folder(folder)
+        if not dry_run and not report.cancelled:
+            session.classify()
         if enrich and not dry_run and not report.cancelled:
             session.enrich()
     finally:
@@ -171,6 +175,8 @@ def run_rescan(
                 session.scan_folder(path)
             else:
                 session.mark_offline(root)
+        if not report.cancelled:
+            session.classify()
         if enrich and not report.cancelled:
             session.enrich()
     finally:
@@ -356,6 +362,21 @@ class _Session:
             self.report.notes.append(
                 f"{root['path']} has been offline for {days} days; if it is gone for good, "
                 f"run: exchange env forget {env['id']}")
+
+    # End of phase 2: classification and suggestions ---------------------------------------------
+
+    def classify(self) -> None:
+        from exchange.scanner.classify import classify
+        from exchange.suggestions import generate
+
+        ids = [e.id for e in self.report.environments
+               if e.id is not None and any(r.status == "scanned" for r in e.roots)]
+        if not ids:
+            return
+        self.progress(ProgressEvent(2, "library", "classification"))
+        with repo.transaction(self.conn):
+            self.report.classification = classify(self.conn, self.definitions, environment_ids=ids)
+            self.report.suggestions = generate(self.conn, self.definitions, environment_ids=ids)
 
     # Phase 3 ----------------------------------------------------------------------------------
 

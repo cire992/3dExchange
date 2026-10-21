@@ -1,0 +1,98 @@
+# Category words: a filename token, folder name or source category matching a word gives the
+# dossier that tag. Plurals (donuts, boxes, berries) match automatically; add synonyms as words.
+# Edit by copying this file to your definitions folder (lexicons/category.toml) or let Exchange
+# write it when you accept "add word" suggestions. Your copy replaces this one.
+
+[lexicon]
+id = "category"
+name = "Categories"
+kind = "category"
+format_version = 1
+
+[[term]]
+value = "Food"
+words = ["food", "donut", "doughnut", "cruller", "bagel", "bread", "loaf", "baguette", "croissant",
+         "cake", "cupcake", "muffin", "cookie", "pie", "pizza", "burger", "hamburger", "sandwich",
+         "hotdog", "taco", "apple", "banana", "lemon", "pear", "grape", "cherry", "berry",
+         "strawberry", "melon", "watermelon", "fruit", "vegetable", "carrot", "potato", "tomato",
+         "onion", "cabbage", "corn", "mushroom", "cheese", "meat", "steak", "sausage", "ham",
+         "chicken", "fish", "egg", "candy", "chocolate", "sweetroll", "drink", "beverage", "coffee",
+         "tea", "soda", "juice", "milk", "wine", "beer", "ale", "mead", "sushi", "noodle", "rice",
+         "soup"]
+
+[[term]]
+value = "Furniture"
+words = ["furniture", "chair", "stool", "bench", "sofa", "couch", "armchair", "table", "desk",
+         "bed", "bunk", "dresser", "cabinet", "cupboard", "shelf", "bookshelf",
+         "bookcase", "nightstand", "drawer", "throne", "ottoman"]
+
+[[term]]
+value = "Weapon"
+words = ["weapon", "sword", "blade", "dagger", "knife", "axe", "mace", "hammer", "spear", "halberd",
+         "bow", "crossbow", "arrow", "staff", "wand", "katana", "saber", "sabre", "gun", "pistol",
+         "rifle", "shotgun", "revolver", "blaster", "lightsaber", "grenade", "shield"]
+
+[[term]]
+value = "Container"
+words = ["container", "barrel", "crate", "box", "chest", "sack", "bag", "basket", "bucket", "jar",
+         "pot", "urn", "bottle", "flask", "vial", "keg", "cask", "trunk", "coffer", "tankard",
+         "mug", "cup", "bowl", "plate", "tray"]
+
+[[term]]
+value = "Clothing"
+words = ["clothing", "clothes", "outfit", "dress", "skirt", "shirt", "tshirt", "top", "blouse",
+         "jacket", "coat", "hoodie", "sweater", "pants", "trousers", "jeans", "shorts", "bikini",
+         "swimsuit", "lingerie", "bra", "panty", "underwear", "sock", "stocking", "shoe", "boot",
+         "sandal", "heel", "sneaker", "glove", "hat", "cap", "helmet", "hood", "cloak", "cape",
+         "robe", "armor", "armour", "belt", "scarf", "uniform", "suit", "wardrobe"]
+
+[[term]]
+value = "Hair"
+words = ["hair", "hairstyle", "ponytail", "braid", "bun", "bob", "beard", "mustache", "moustache",
+         "eyebrow", "eyelash", "lashes", "fur"]
+
+[[term]]
+value = "Vehicle"
+words = ["vehicle", "car", "truck", "van", "bus", "bike", "bicycle", "motorcycle", "tank", "ship",
+         "boat", "plane", "airplane", "aircraft", "helicopter", "spaceship", "starship", "fighter",
+         "cart", "wagon", "train", "speeder"]
+
+[[term]]
+value = "Plant"
+words = ["plant", "tree", "bush", "shrub", "grass", "flower", "rose", "fern", "vine", "ivy", "leaf",
+         "foliage", "cactus", "palm", "pine", "oak", "moss", "log", "stump"]
+
+[[term]]
+value = "Architecture"
+words = ["architecture", "building", "house", "castle", "tower", "wall", "door", "window", "roof",
+         "floor", "stair", "staircase", "column", "pillar", "arch", "bridge", "fence", "gate",
+         "room", "interior", "ruin", "temple", "church", "dungeon", "environment", "street"]
+
+[[term]]
+value = "Lighting"
+words = ["lighting", "light", "lamp", "lantern", "candle", "torch", "chandelier", "sconce", "bulb",
+         "hdri", "skydome"]
+
+[[term]]
+value = "Character"
+words = ["character", "person", "human", "man", "woman", "girl", "boy", "body",
+         "head", "face", "npc"]
+
+[[term]]
+value = "Creature"
+words = ["creature", "animal", "monster", "dragon", "beast", "dog", "cat", "horse", "wolf", "bird",
+         "spider", "insect", "dinosaur", "alien", "demon", "zombie", "skeleton", "undead"]
+
+[[term]]
+value = "Prop"
+words = ["prop", "props", "clutter", "misc", "decoration", "decor", "book", "scroll", "coin",
+         "tool", "key", "clock", "mirror", "rug", "carpet", "curtain", "pillow", "cushion",
+         "statue", "sign", "trophy", "gem", "ring", "necklace", "jewelry", "jewellery"]
+
+[[term]]
+value = "Pose"
+words = ["pose", "poses", "animation", "expression", "emotion", "gesture"]
+
+[[term]]
+value = "Material"
+words = ["material", "shader", "texture", "mdl", "iray", "pbr", "skin"]

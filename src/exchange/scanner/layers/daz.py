@@ -108,6 +108,7 @@ def identify(ctx: LayerContext) -> LayerResult:
             return unlisted_by_tail[tail], True
         return None, False
 
+    claimed: set[str] = set()  # folded paths some manifest accounts for
     per_manifest = Counter(f.rel for f, _ in parsed)
     for index, (f, product) in enumerate(parsed):
         members, children, relocated, missing = [], [], 0, 0
@@ -150,6 +151,13 @@ def identify(ctx: LayerContext) -> LayerResult:
             children_only=True,
         ))
 
+    for product in result.products:
+        claimed.update(fold(r) for r in product.primary + product.members)
+    in_cloud = {fold(f.rel) for files in cloud.values() for f in files}
+    result.products += _folder_products([f.rel for f in ctx.files if fold(f.rel) not in claimed
+                                         and fold(f.rel) not in in_cloud
+                                         and not glob_match(manifest_glob, f.rel)])
+
     for folder, files in sorted(cloud.items()):
         sku = _CLOUD_FOLDER.match(folder).group(2)
         result.products.append(ProductSpec(
@@ -164,6 +172,62 @@ def identify(ctx: LayerContext) -> LayerResult:
             type_root=folder,
         ))
     return result
+
+
+# Unmanifested content -----------------------------------------------------------------------------
+
+# Subfolders that hold part of a product rather than a product of their own.
+_PART_FOLDERS = frozenset({
+    "materials", "material", "mat", "mats", "iray", "3delight", "3dl", "filament", "textures", "texture",
+    "poses", "pose", "morphs", "morph", "presets", "preset", "shaders", "shader", "utilities", "utility",
+    "scripts", "hide", "show", "fits", "fit", "expressions", "expression", "options", "addons", "extras",
+    "parts", "props", "lights", "cameras", "render settings", "!presets", "!utilities", "readme", "readmes",
+})
+UNMANIFESTED_CONFIDENCE = 0.6
+
+
+def _folder_products(unlisted: list[str]) -> list[ProductSpec]:
+    """Content no manifest lists (installed by hand, or manifests lost) grouped by product folder.
+
+    A product folder is the folder holding user-facing ``.duf`` files, walking up out of part
+    subfolders (Materials/Iray ...): ``People/Genesis 9/Clothing/Loose Boots``. Its data and
+    textures elsewhere (``data/<vendor>/Loose Boots``, ``Runtime/Textures/<vendor>/Loose Boots``)
+    join it when the folder name is unambiguous.
+    """
+    products: dict[str, str] = {}  # folded product folder -> original
+    for rel in unlisted:
+        if not rel.lower().endswith(".duf") or "/" not in rel:
+            continue
+        parts = rel.split("/")[:-1]
+        while len(parts) > 1 and fold(parts[-1]) in _PART_FOLDERS:
+            parts.pop()
+        top = fold(parts[0])
+        if top in ("data", "runtime") or len(parts) < (4 if top == "people" else 2):
+            continue  # too shallow to be one product (People/Genesis 9, Props)
+        folder = "/".join(parts)
+        products.setdefault(fold(folder), folder)
+
+    # Folder names that identify exactly one product, for data/ and Runtime/ files.
+    by_name: dict[str, list[str]] = defaultdict(list)
+    for key in products:
+        by_name[key.rsplit("/", 1)[-1]].append(key)
+    unique = {name: keys[0] for name, keys in by_name.items()
+              if len(keys) == 1 and len(name) >= 4 and name not in _PART_FOLDERS}
+
+    members: dict[str, list[str]] = defaultdict(list)
+    product_keys = sorted(products, key=len, reverse=True)
+    for rel in unlisted:
+        key = fold(rel)
+        owner = next((p for p in product_keys if key.startswith(p + "/")), None)
+        if owner is None and fold(rel.split("/", 1)[0]) in ("data", "runtime"):
+            owner = next((unique[seg] for seg in map(fold, rel.split("/")[1:-1]) if seg in unique), None)
+        if owner is not None:
+            members[owner].append(rel)
+    return [ProductSpec(
+        container_rel="", identity_key=f"folder:{key}", name=products[key].rsplit("/", 1)[-1],
+        confidence=UNMANIFESTED_CONFIDENCE, signals=[f"folder of unmanifested content {products[key]}"],
+        fields={"installed_by": "hand (no manifest)"}, members=files)
+        for key, files in sorted(members.items())]
 
 
 def _tail(rel: str) -> str:

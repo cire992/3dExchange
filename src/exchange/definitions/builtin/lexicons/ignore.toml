@@ -1,0 +1,14 @@
+# Noise words dropped before matching names (Barrel_final_v2 is just Barrel). A "v" followed by a
+# number is a version and is dropped too.
+
+[lexicon]
+id = "ignore"
+name = "Ignore"
+kind = "ignore"
+format_version = 1
+
+[[term]]
+words = ["final", "new", "copy", "backup", "bak", "temp", "tmp", "wip", "test", "fixed",
+         "edit", "edited", "version", "ver", "rev", "export", "exported", "latest", "low", "high",
+         "poly", "lowpoly", "highpoly", "hd", "sd", "4k", "2k", "8k", "1k", "fbx", "obj", "glb",
+         "the", "of", "for", "and", "with"]

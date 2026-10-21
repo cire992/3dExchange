@@ -96,7 +96,7 @@ def test_grouping_and_paging(indexed, definitions):
 
 def test_sidebar(indexed, definitions):
     bar = sidebar(indexed, definitions)
-    assert bar["all"] == 6 + 7 + 4  # loose files, Daz, MO2: every live dossier once
+    assert bar["all"] == 6 + 8 + 4  # loose files, Daz, MO2: every live dossier once
     assert bar["unidentified_dossiers"] == 1
     envs = {e["type_id"]: e for e in bar["environments"]}
     mo2 = envs["skyrim_se"]

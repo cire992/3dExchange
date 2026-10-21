@@ -92,7 +92,7 @@ def test_forget_environment(scan, mixed, library):
     with repo.transaction(conn):
         repo.set_override_field(conn, uid, "name", "Cowboy Boots")
         removed = repo.forget_environment(conn, daz["id"])
-    assert removed == 7
+    assert removed == 8
     assert "daz_studio" not in [e["type_id"] for e in repo.list_environments(conn)]
     assert conn.execute("SELECT count(*) FROM dossier WHERE uid = ?", (uid,)).fetchone()[0] == 0
     # The user's edit is kept, ready if the environment comes back with the same identity.

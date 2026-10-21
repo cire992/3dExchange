@@ -1,4 +1,8 @@
-"""Command line: scan, rescan, enrich, environments, discovery, search and show."""
+"""Command line: scan, rescan, enrich, environments, discovery, search and show.
+
+Curation commands (classify, lexicon, suggest, curate, collection, history, undo) are in
+``cli_curation``.
+"""
 
 from __future__ import annotations
 
@@ -88,6 +92,10 @@ def build_parser() -> argparse.ArgumentParser:
     forget.add_argument("id", type=int)
     forget.add_argument("--yes", action="store_true", help="do it; without this, only say what would go")
 
+    from exchange import cli_curation
+
+    cli_curation.add_parsers(commands, common)
+
     commands.add_parser("discover", parents=[common],
                         help="list environments found on this PC (Steam, Epic, Unreal, Daz, MO2)")
 
@@ -110,6 +118,10 @@ def main(argv: list[str] | None = None) -> int:
     args.db = args.db or default_db_path()
     try:
         definitions = load_definitions(args.definitions)
+        from exchange import cli_curation
+
+        if args.command in cli_curation.COMMANDS:
+            return cli_curation.run(args, definitions)
         handler = _HANDLERS[args.command]
         return handler(args, definitions)
     except ExchangeError as exc:
