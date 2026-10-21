@@ -1,10 +1,12 @@
-# Daz Studio content library: one content directory (a folder holding data/, Runtime/, People/ ...).
-# Container = the content directory; products come from DIM support manifests (hints, not truth).
+# Daz Studio: one environment gathers every content directory (a folder holding data/, Runtime/,
+# People/ ...), including the Daz Connect one. Container = a content directory; products come
+# from DIM support manifests (hints, not truth) and Daz Connect product folders.
 
 [environment]
 id = "daz_studio"
-name = "Daz Studio content library"
+name = "Daz Studio"
 format_version = 1
+multi_root = true
 
 [detection]
 min_confidence = 0.5
@@ -22,6 +24,11 @@ weight = 0.2
 [[detection.signature]]
 kind = "dir"
 path = "Runtime/Support"
+weight = 0.3
+
+[[detection.signature]]
+kind = "dir"
+path = "data/cloud"
 weight = 0.3
 
 [[detection.signature]]

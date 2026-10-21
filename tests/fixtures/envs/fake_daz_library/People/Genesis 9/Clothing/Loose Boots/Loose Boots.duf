@@ -1,1 +1,10 @@
-manual wearable
+{
+ "file_version": "0.6.0.0",
+ "scene": {
+  "nodes": [
+   {
+    "url": "/data/Someone/Loose%20Boots/Loose%20Boots.dsf#Boots"
+   }
+  ]
+ }
+}

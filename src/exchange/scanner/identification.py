@@ -1,4 +1,4 @@
-"""Scan phase 2, identification (first pass).
+"""Scan phase 2, identification, for one root of an environment.
 
 The environment's layer handler names containers and products. The engine then:
 
@@ -6,10 +6,12 @@ The environment's layer handler names containers and products. The engine then:
   dossier-type rule recognizes;
 * makes a standalone dossier for each recognized file that no product claims;
 * records every dossier's presence as an entry (in a ledger for this environment) with its files;
-* retires entries whose files are gone, so history is kept.
+* retires entries of this root whose files are gone, so history is kept.
 
 Dossiers are matched across rescans by their entry's (container, identity key), so a dossier keeps
-its uid, and with it the user's overrides, for as long as its files stay in place.
+its uid, and with it the user's overrides, for as long as its files stay in place. Products that
+share a product key (a Daz SKU installed through both DIM and Daz Connect) become one dossier with
+an entry per container.
 """
 
 from __future__ import annotations
@@ -57,21 +59,83 @@ class _Spec:
     support: list[FileInfo] = field(default_factory=list)
     fields: dict[str, Any] = field(default_factory=dict)
     parent_id: int | None = None
+    product_key: str | None = None
 
 
-def identify_environment(
+class _Writer:
+    """Persists specs for one root and remembers what it touched."""
+
+    def __init__(self, conn: sqlite3.Connection, environment_id: int, handler: str,
+                 definitions: DefinitionSet) -> None:
+        self.conn, self.environment_id, self.handler = conn, environment_id, handler
+        self.definitions = definitions
+        self.seen_entries: set[int] = set()
+        self.dossiers: set[int] = set()
+
+    def persist(self, spec: _Spec) -> int:
+        conn = self.conn
+        existing = repo.find_entry(conn, spec.container_id, spec.key)
+        values = dict(type_id=spec.type_id, name=spec.name, parent_id=spec.parent_id,
+                      confidence=spec.confidence, signals=spec.signals)
+        if existing is not None:
+            dossier_id, entry_id = existing["dossier_id"], existing["id"]
+            if existing["status"] == "retired":
+                repo.revive_entry(conn, entry_id, "origin")
+            elif existing["status"] == "unknown":
+                # A copy merged into another dossier by hash: the dossier's own scan owns it.
+                values = None
+            if values is not None:
+                self._update(dossier_id, values, own_entry=True)
+        else:
+            dossier_id = repo.find_product_by_key(conn, self.environment_id, spec.product_key) \
+                if spec.product_key else None
+            if dossier_id is None:
+                dossier_id = repo.create_dossier(conn, **values)
+            else:
+                self._update(dossier_id, values, own_entry=False)
+            ledger_id = repo.ensure_ledger(conn, dossier_id, self.environment_id)
+            entry_id = repo.create_entry(conn, ledger_id=ledger_id, container_id=spec.container_id,
+                                         identity_key=spec.key)
+        repo.replace_entry_files(
+            conn, entry_id,
+            [(f.id, "primary") for f in spec.primary] + [(f.id, "support") for f in spec.support],
+        )
+        fields = dict(spec.fields)
+        if spec.product_key:
+            fields["product_key"] = spec.product_key
+        repo.replace_scanned_fields(conn, dossier_id, f"scan:{self.handler}:{spec.container_id}", fields)
+        repo.replace_tokens(conn, dossier_id, tokenize(repo.get_dossier(conn, dossier_id)["name"]))
+        self.seen_entries.add(entry_id)
+        self.dossiers.add(dossier_id)
+        return dossier_id
+
+    def _update(self, dossier_id: int, values: dict[str, Any], *, own_entry: bool) -> None:
+        current = repo.get_dossier(self.conn, dossier_id)
+        if not own_entry and current["confidence"] >= values["confidence"]:
+            return  # another container's better identification of the same product wins
+        # Enrichment may have refined the type (mesh -> static mesh); keep the refinement.
+        if current["type_id"] in self.definitions.dossier_types and \
+                self.definitions.is_a(current["type_id"], values["type_id"]):
+            values = {**values, "type_id": current["type_id"]}
+        repo.update_dossier(self.conn, dossier_id, **values)
+
+
+def identify_root(
     conn: sqlite3.Connection,
     *,
     environment_id: int,
+    root_id: int,
     definition: EnvironmentDefinition,
     definitions: DefinitionSet,
     root: Path,
     files: list[FileInfo],
+    user_ignore: tuple[str, ...] = (),
     threshold: float,
 ) -> IdentifyStats:
-    """Run phase 2 for one environment. ``files`` are its present files."""
+    """Run phase 2 for one root. ``files`` are its present files."""
     stats = IdentifyStats()
-    content = [f for f in files if not any_match(definition.ignore_globs, f.rel)]
+    ignore = definition.ignore_globs + tuple(user_ignore)
+    content = [f for f in files if not any_match(ignore, f.rel)]
     ctx = LayerContext(root, definition, definitions, content, files)
     result = HANDLERS[definition.handler](ctx)
     stats.layer_config, stats.warnings = result.layer_config, result.warnings
@@ -89,8 +153,8 @@ def identify_environment(
     container_ids: dict[str, int] = {}
     for c in result.containers:
         container_ids[fold(c.rel_path)] = repo.upsert_container(
-            conn, environment_id, rel_path=c.rel_path, rel_key=fold(c.rel_path), kind=c.kind,
-            name=c.name, meta=c.meta,
+            conn, environment_id, root_id, rel_path=c.rel_path, rel_key=fold(c.rel_path),
+            kind=c.kind, name=c.name, meta=c.meta,
         )
     stats.containers = len(container_ids)
     deepest_first = sorted(container_ids, key=lambda k: (k.count("/"), len(k)), reverse=True)
@@ -101,21 +165,19 @@ def identify_environment(
 
     file_container = {f.id: container_of(f.rel) for f in content}
     repo.set_file_containers(
-        conn, ((container_ids.get(file_container[f.id]) if file_container[f.id] is not None else None,
-                f.id) for f in content)
-    )
+        conn, ((container_ids[c] if (c := file_container[f.id]) is not None else None, f.id)
+               for f in content))
 
-    def in_container(f: FileInfo, container_key: str) -> str:
-        return rel_under(f.rel, container_key) if container_key else f.rel
-
-    def child_spec(f: FileInfo, container_key: str, parent_id: int | None) -> _Spec | None:
-        rel = in_container(f, container_key)
+    def child_spec(f: FileInfo, container_key: str, parent_id: int | None,
+                   type_root: str = "") -> _Spec | None:
+        rel = (type_root and rel_under(f.rel, type_root)) or \
+            (rel_under(f.rel, container_key) if container_key else f.rel)
         match = ctx.match_type(rel)
         if match is None:
             return None
         scale = float(ctx.options.get("child_confidence_scale", 1.0))
         spec = _Spec(
-            key=f"file:{fold(rel)}",
+            key=f"file:{fold(rel_under(f.rel, container_key) if container_key else f.rel)}",
             type_id=match.type_id,
             name=f.rel.rsplit("/", 1)[-1].rsplit(".", 1)[0],
             confidence=round(match.confidence * scale, 4),
@@ -129,10 +191,13 @@ def identify_environment(
             spec.fields["variant"] = variant
         return spec
 
-    seen_entries: set[int] = set()
+    writer = _Writer(conn, environment_id, definition.handler, definitions)
     claimed: set[int] = set()  # files in some entry
     children: set[int] = set()  # files that already became a child dossier
-    source = f"scan:{definition.handler}"
+
+    def count(spec: _Spec) -> None:
+        stats.dossiers += 1
+        stats.below_threshold += spec.confidence < threshold
 
     for product in result.products:
         container_key = fold(product.container_rel)
@@ -151,21 +216,20 @@ def identify_environment(
             primary=primary,
             support=[m for m in members if m not in primary],
             fields=product.fields,
+            product_key=product.product_key,
         )
-        product_id = _persist(conn, environment_id, spec, source, seen_entries)
+        product_id = writer.persist(spec)
         stats.products += 1
-        stats.dossiers += 1
-        stats.below_threshold += spec.confidence < threshold
+        count(spec)
         claimed.update(f.id for f in primary + members)
         for m in members:
             if m.id in children:
                 continue
-            child = child_spec(m, container_key, product_id)
+            child = child_spec(m, container_key, product_id, product.type_root)
             if child is not None:
-                _persist(conn, environment_id, child, source, seen_entries)
+                writer.persist(child)
                 children.add(m.id)
-                stats.dossiers += 1
-                stats.below_threshold += child.confidence < threshold
+                count(child)
 
     for f in content:
         container_key = file_container[f.id]
@@ -173,41 +237,16 @@ def identify_environment(
             continue
         spec = child_spec(f, container_key, None)
         if spec is not None:
-            _persist(conn, environment_id, spec, source, seen_entries)
+            writer.persist(spec)
             claimed.add(f.id)
-            stats.dossiers += 1
-            stats.below_threshold += spec.confidence < threshold
+            count(spec)
 
     stats.unattached_files = sum(f.id not in claimed for f in content)
-    stale = repo.live_entry_ids(conn, environment_id) - seen_entries
+    stale = repo.live_entry_ids(conn, root_id) - writer.seen_entries
     repo.retire_entries(conn, stale)
     stats.retired_entries = len(stale)
+    repo.index_dossiers(conn, writer.dossiers)
     return stats
-
-
-def _persist(conn: sqlite3.Connection, environment_id: int, spec: _Spec, source: str,
-             seen_entries: set[int]) -> int:
-    existing = repo.find_entry(conn, spec.container_id, spec.key)
-    values = dict(type_id=spec.type_id, name=spec.name, parent_id=spec.parent_id,
-                  confidence=spec.confidence, signals=spec.signals)
-    if existing is None:
-        dossier_id = repo.create_dossier(conn, **values)
-        ledger_id = repo.ensure_ledger(conn, dossier_id, environment_id)
-        entry_id = repo.create_entry(conn, ledger_id=ledger_id, container_id=spec.container_id,
-                                     identity_key=spec.key)
-    else:
-        dossier_id, entry_id = existing["dossier_id"], existing["id"]
-        repo.update_dossier(conn, dossier_id, **values)
-        if existing["status"] == "retired":
-            repo.revive_entry(conn, entry_id)
-    repo.replace_entry_files(
-        conn, entry_id,
-        [(f.id, "primary") for f in spec.primary] + [(f.id, "support") for f in spec.support],
-    )
-    repo.replace_scanned_fields(conn, dossier_id, source, spec.fields)
-    repo.replace_tokens(conn, dossier_id, tokenize(spec.name))
-    seen_entries.add(entry_id)
-    return dossier_id
 
 
 def _dossier_variant(definition: EnvironmentDefinition, rel_in_container: str) -> str | None:

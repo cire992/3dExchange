@@ -1,1 +1,10 @@
-wearable
+{
+ "file_version": "0.6.0.0",
+ "scene": {
+  "nodes": [
+   {
+    "url": "/data/DAZ%203D/Summer%20Dress/Summer%20Dress.dsf#SummerDress"
+   }
+  ]
+ }
+}

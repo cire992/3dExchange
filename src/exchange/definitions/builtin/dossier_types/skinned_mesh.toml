@@ -4,3 +4,8 @@ name = "Skinned mesh"
 format_version = 1
 scope = "universal"
 extends = "mesh"
+
+[[identify]]
+environment = "unreal_project"
+globs = ["**/SK_*.uasset", "**/SKM_*.uasset"]
+confidence = 0.6

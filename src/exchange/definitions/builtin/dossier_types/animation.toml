@@ -3,3 +3,8 @@ id = "animation"
 name = "Animation"
 format_version = 1
 scope = "universal"
+
+[[identify]]
+environment = "unreal_project"
+globs = ["**/A_*.uasset", "**/AS_*.uasset", "**/AM_*.uasset"]
+confidence = 0.6

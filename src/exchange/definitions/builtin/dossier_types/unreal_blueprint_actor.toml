@@ -1,0 +1,10 @@
+[dossier_type]
+id = "unreal_blueprint_actor"
+name = "Unreal Blueprint actor"
+format_version = 1
+scope = "environment"
+environment = "unreal_project"
+
+[[identify]]
+glob = "**/BP_*.uasset"
+confidence = 0.6

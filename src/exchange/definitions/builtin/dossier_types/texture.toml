@@ -1,0 +1,12 @@
+# A single texture. Loose image files are not identified on their own (too noisy); they are
+# linked to meshes as texture sets during curation.
+[dossier_type]
+id = "texture"
+name = "Texture"
+format_version = 1
+scope = "universal"
+
+[[identify]]
+environment = "unreal_project"
+globs = ["**/T_*.uasset"]
+confidence = 0.6

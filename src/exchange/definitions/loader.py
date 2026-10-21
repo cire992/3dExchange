@@ -153,7 +153,7 @@ def _identifier(table: _Table, key: str = "id") -> str:
 def parse_environment(data: dict[str, Any], source: str) -> EnvironmentDefinition:
     top = _Table(data, source, "", ["environment", "detection", "layer", "ignore",
                                     "capabilities", "variant", "compatibility"])
-    env = top.table("environment", ["id", "name", "format_version", "fallback"])
+    env = top.table("environment", ["id", "name", "format_version", "fallback", "multi_root"])
     version = env.get("format_version", int)
     if version != FORMAT_VERSION:
         raise DefinitionError(source, f"unsupported format_version {version} (expected {FORMAT_VERSION})")
@@ -176,6 +176,7 @@ def parse_environment(data: dict[str, Any], source: str) -> EnvironmentDefinitio
         signatures=signatures,
         min_confidence=detection.number("min_confidence", 0.5),
         fallback=fallback,
+        multi_root=env.get("multi_root", bool, False),
         layer_options=dict(layer.get("options", dict, {})),
         ignore_globs=top.table("ignore", ["globs"]).strings("globs"),
         capabilities={c: capabilities.get(c, bool, False) for c in CAPABILITIES},
@@ -227,12 +228,13 @@ def parse_dossier_type(data: dict[str, Any], source: str) -> DossierTypeDefiniti
             source, "dossier_type.environment is required for scope = \"environment\" and only then"
         )
     rules: list[IdentifyRule] = []
-    for t in top.tables("identify", ["glob", "globs", "confidence"]):
+    for t in top.tables("identify", ["glob", "globs", "confidence", "environment"]):
         confidence = t.number("confidence")
         globs = ([t.get("glob", str)] if "glob" in t.data else []) + list(t.strings("globs"))
         if not globs:
             raise DefinitionError(source, f"{t.where} needs glob or globs")
-        rules.extend(IdentifyRule(g, confidence) for g in globs)
+        rule_env = t.get("environment", str, None) or environment
+        rules.extend(IdentifyRule(g, confidence, rule_env) for g in globs)
     return DossierTypeDefinition(
         id=_identifier(dt),
         name=dt.get("name", str),
@@ -269,6 +271,9 @@ def validate(definitions: DefinitionSet) -> None:
     for dtype in types.values():
         if dtype.environment is not None and dtype.environment not in envs:
             raise DefinitionError(dtype.source, f"dossier_type.environment: unknown environment {dtype.environment!r}")
+        for rule in dtype.identify:
+            if rule.environment is not None and rule.environment not in envs:
+                raise DefinitionError(dtype.source, f"identify.environment: unknown environment {rule.environment!r}")
         seen = {dtype.id}
         parent = dtype.extends
         while parent is not None:

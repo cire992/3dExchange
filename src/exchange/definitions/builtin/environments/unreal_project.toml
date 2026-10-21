@@ -1,0 +1,45 @@
+# Unreal Engine project. Containers: each top-level folder under Content/ (Fab packs are usually
+# one folder) and each plugin. Build output and caches are not content.
+
+[environment]
+id = "unreal_project"
+name = "Unreal Engine project"
+format_version = 1
+
+[detection]
+min_confidence = 0.7
+
+[[detection.signature]]
+kind = "glob"
+glob = "*.uproject"
+weight = 0.7
+
+[[detection.signature]]
+kind = "dir"
+path = "Content"
+weight = 0.2
+
+[[detection.signature]]
+kind = "dir"
+path = "Config"
+weight = 0.1
+
+[layer]
+handler = "unreal"
+# Top-level Content/ folders that belong to the project or the editor, not to a content pack.
+options = { not_packs = ["Developers", "Collections", "__ExternalActors__", "__ExternalObjects__", "Movies", "Splash"] }
+
+[ignore]
+globs = [
+    "Intermediate/**", "Saved/**", "DerivedDataCache/**", "Binaries/**", ".vs/**", ".git/**",
+    "Plugins/**/Intermediate/**", "Plugins/**/Binaries/**",
+]
+
+[capabilities]
+indexable = true
+readable = true
+writable = false
+
+[compatibility]
+uses_content_from = []
+native_dossier_types = ["unreal_blueprint_actor", "unreal_level"]

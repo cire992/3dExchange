@@ -1,0 +1,2 @@
+# Fixture files are compared byte for byte (sizes, hashes); never convert their line endings.
+tests/fixtures/** -text

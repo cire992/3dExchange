@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
-from exchange.definitions.schema import DefinitionSet, EnvironmentDefinition
+from exchange.definitions.schema import DefinitionSet, EnvironmentDefinition, IdentifyRule
 from exchange.globs import glob_match
 from exchange.paths import to_path
 from exchange.scanner import readonly
@@ -50,8 +50,13 @@ class ProductSpec:
     confidence: float
     signals: list[str]
     fields: dict[str, Any] = field(default_factory=dict)
-    primary: list[str] = field(default_factory=list)  # env-relative paths, e.g. the manifest
-    members: list[str] = field(default_factory=list)  # env-relative paths of contained files
+    primary: list[str] = field(default_factory=list)  # root-relative paths, e.g. the manifest
+    members: list[str] = field(default_factory=list)  # root-relative paths of contained files
+    # Products sharing a key in one environment are one dossier (Daz SKU via DIM and Connect).
+    product_key: str | None = None
+    # Members are typed relative to this folder when inside it (a Daz Connect product folder
+    # mirrors a content directory's layout); otherwise relative to the container.
+    type_root: str = ""
 
 
 @dataclass
@@ -71,10 +76,15 @@ class LayerContext:
         self.definitions = definitions
         self.files = files  # present files, minus the definition's ignore globs
         self.all_files = all_files  # every present file, for reading layer configuration
-        self._env_types = [t for t in definitions.dossier_types.values()
-                           if t.environment == definition.id and t.identify]
-        self._universal_types = [t for t in definitions.dossier_types.values()
-                                 if t.scope == "universal" and t.identify]
+        # Rules tied to this environment (environment-specific types, or universal types with an
+        # environment-scoped rule) beat rules that apply everywhere.
+        self._rule_groups: list[list[tuple[str, IdentifyRule]]] = [[], []]
+        for dtype in definitions.dossier_types.values():
+            for rule in dtype.identify:
+                if rule.environment == definition.id:
+                    self._rule_groups[0].append((dtype.id, rule))
+                elif rule.environment is None:
+                    self._rule_groups[1].append((dtype.id, rule))
 
     @property
     def options(self) -> Mapping[str, Any]:
@@ -88,14 +98,13 @@ class LayerContext:
 
     def match_type(self, rel_in_container: str) -> TypeMatch | None:
         """Best dossier type for a file. Environment-specific types beat universal ones."""
-        for group in (self._env_types, self._universal_types):
+        for group in self._rule_groups:
             best: TypeMatch | None = None
-            for dtype in group:
-                for rule in dtype.identify:
-                    if (best is None or rule.confidence > best.confidence) and glob_match(
-                        rule.glob, rel_in_container
-                    ):
-                        best = TypeMatch(dtype.id, rule.confidence, rule.glob)
+            for type_id, rule in group:
+                if (best is None or rule.confidence > best.confidence) and glob_match(
+                    rule.glob, rel_in_container
+                ):
+                    best = TypeMatch(type_id, rule.confidence, rule.glob)
             if best is not None:
                 return best
         return None

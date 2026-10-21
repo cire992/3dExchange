@@ -91,15 +91,23 @@ def migrate(conn: sqlite3.Connection, path: Path) -> list[int]:
     has_data = conn.execute("SELECT count(*) FROM sqlite_master").fetchone()[0] > 0
     if has_data:
         backup(conn, path, current)
-    for migration in pending:
-        try:
-            conn.executescript(
-                f"BEGIN;\n{migration.sql}\nPRAGMA user_version = {migration.version};\nCOMMIT;"
-            )
-        except sqlite3.Error as exc:
-            if conn.in_transaction:
-                conn.execute("ROLLBACK")
-            raise LibraryError(f"migration {migration.name} failed: {exc}") from exc
+    # Table rebuilds drop and rename tables other tables point at; check references at the end.
+    conn.execute("PRAGMA foreign_keys = OFF")
+    try:
+        for migration in pending:
+            try:
+                conn.executescript(
+                    f"BEGIN;\n{migration.sql}\nPRAGMA user_version = {migration.version};\nCOMMIT;"
+                )
+            except sqlite3.Error as exc:
+                if conn.in_transaction:
+                    conn.execute("ROLLBACK")
+                raise LibraryError(f"migration {migration.name} failed: {exc}") from exc
+        broken = conn.execute("PRAGMA foreign_key_check").fetchall()
+        if broken:
+            raise LibraryError(f"migration left {len(broken)} broken references, e.g. {tuple(broken[0])}")
+    finally:
+        conn.execute("PRAGMA foreign_keys = ON")
     return [m.version for m in pending]
 
 

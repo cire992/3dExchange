@@ -1,1 +1,28 @@
-body morph
+{
+ "file_version": "0.6.0.0",
+ "modifier_library": [
+  {
+   "id": "FBMMarius",
+   "parent": "/data/DAZ%203D/Genesis%209/Base/Genesis9.dsf#Genesis9",
+   "morph": {
+    "deltas": {
+     "count": 2,
+     "values": [
+      [
+       1,
+       0,
+       0,
+       0.1
+      ],
+      [
+       2,
+       0,
+       0.1,
+       0
+      ]
+     ]
+    }
+   }
+  }
+ ]
+}
