@@ -1,0 +1,7 @@
+[dossier_type]
+id = "daz_figure"
+name = "Daz figure"
+format_version = 1
+scope = "environment"
+environment = "daz_studio"
+extends = "skinned_mesh"

@@ -43,7 +43,32 @@ weight = 0.2
 
 [layer]
 handler = "daz"
-options = { manifest_glob = "Runtime/Support/*.dsx" }
+
+[layer.options]
+manifest_glob = "Runtime/Support/*.dsx"
+
+# A manifest's Assets carry a Daz ContentType. Assets whose type starts with one of these become
+# child dossiers of that type (the longest match wins); the rest stay files of the product.
+[layer.options.content_types]
+"Actor" = "daz_figure"
+"Actor/Character" = "daz_character_preset"
+"Figure" = "daz_figure"
+"Follower/Hair" = "daz_hair"
+"Follower/Wardrobe" = "daz_wearable"
+"Preset/Character" = "daz_character_preset"
+"Preset/Hair" = "daz_hair"
+"Preset/Materials" = "texture_set"
+"Preset/Morph" = "daz_morph"
+"Preset/Wearables" = "daz_wearable"
+"Prop" = "daz_prop"
+
+# An Asset's Compatibility (e.g. "/Genesis 9/Female") names its figure generation.
+[layer.options.compatibility_variants]
+"/Genesis 9" = "genesis_9"
+"/Genesis 8" = "genesis_8"
+"/Genesis 8.1" = "genesis_8"
+"/Genesis 3" = "genesis_3"
+"/Genesis 2" = "genesis_2"
 
 [capabilities]
 indexable = true
@@ -63,6 +88,18 @@ name = "Genesis 8"
 level = "dossier"
 globs = ["People/Genesis 8*/**", "data/**/Genesis 8*/**"]
 
+[[variant]]
+id = "genesis_3"
+name = "Genesis 3"
+level = "dossier"
+globs = ["People/Genesis 3*/**", "data/**/Genesis 3/**"]
+
+[[variant]]
+id = "genesis_2"
+name = "Genesis 2"
+level = "dossier"
+globs = ["People/Genesis 2*/**", "data/**/Genesis 2/**"]
+
 [compatibility]
 uses_content_from = []
-native_dossier_types = ["daz_morph", "daz_character_preset", "daz_wearable"]
+native_dossier_types = ["daz_figure", "daz_character_preset", "daz_morph", "daz_wearable", "daz_hair", "daz_prop"]

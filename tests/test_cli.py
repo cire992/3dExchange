@@ -109,7 +109,7 @@ def test_search_and_show(capsys, mixed, db_path):
     assert page["total"] == 2
     uid = page["items"][0]["uid"]
     code, out, _ = run(capsys, "show", uid[:10], "--db", db_path)
-    assert code == 0 and "Daz morph" in out and "ledgers (1)" in out and "morph_deltas" in out
+    assert code == 0 and "Daz morph" in out and "ledgers (1)" in out and "variant: genesis_9" in out
     code, _, err = run(capsys, "search", "has:candidate", "--db", db_path)
     assert code == 2 and "phase 4" in err
     code, _, err = run(capsys, "show", "zzz", "--db", db_path)

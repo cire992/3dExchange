@@ -1,17 +1,64 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<ProductSupport VERSION="0.1">
- <ProductToken VALUE="12345"/>
- <ProductName VALUE="Marius HD-8K for Genesis 9"/>
- <ProductStoreIDX VALUE="12345-1"/>
- <ProductFileGuid VALUE="0f1e2d3c-0000-4000-8000-000000012345"/>
- <Artists>
-  <Artist VALUE="Jane Doe"/>
- </Artists>
- <ProductFiles>
-  <File VALUE="/data/DAZ 3D/Genesis 9/Base/Morphs/DAZ 3D/Marius/FHMMarius.dsf"/>
-  <File VALUE="/data/DAZ 3D/Genesis 9/Base/Morphs/DAZ 3D/Marius/FBMMarius.dsf"/>
-  <File VALUE="/People/Genesis 9/Characters/Marius/Marius HD-8K.duf"/>
-  <File VALUE="/Runtime/Textures/DAZ/Characters/Genesis9/Marius/Marius_Face_D_1001.jpg"/>
-  <File VALUE="/Runtime/Textures/DAZ/Characters/Genesis9/Marius/Marius_Body_D_1002.jpg"/>
- </ProductFiles>
-</ProductSupport>
+<ContentDBInstall VERSION="1.0">
+ <Products>
+  <Product VALUE="Marius HD-8K for Genesis 9">
+   <StoreID VALUE="DAZ 3D"/>
+   <GlobalID VALUE="0f1e2d3c-0000-4000-8000-000000012345"/>
+   <ProductToken VALUE="12345"/>
+   <Artists>
+    <Artist VALUE="Jane Doe"/>
+    <Artist VALUE="Daz 3D"/>
+   </Artists>
+   <Assets>
+    <Asset VALUE="People/Genesis 9/Characters/Marius/Marius HD-8K.duf">
+     <ContentType VALUE="Actor/Character"/>
+     <Audience VALUE="General"/>
+     <Categories>
+      <Category VALUE="/Default/Actor/Character"/>
+     </Categories>
+     <Compatibilities>
+      <Compatibility VALUE="/Genesis 9"/>
+     </Compatibilities>
+    </Asset>
+    <Asset VALUE="People/Genesis 9/Morphs/Marius/Marius Head.duf">
+     <ContentType VALUE="Preset/Morph/Apply/Head"/>
+     <Audience VALUE="General"/>
+     <Categories>
+      <Category VALUE="/Default/Preset/Morph/Apply/Head"/>
+     </Categories>
+     <Compatibilities>
+      <Compatibility VALUE="/Genesis 9"/>
+     </Compatibilities>
+    </Asset>
+    <Asset VALUE="People/Genesis 9/Morphs/Marius/Marius Body.duf">
+     <ContentType VALUE="Preset/Morph/Apply/Body"/>
+     <Audience VALUE="General"/>
+     <Categories>
+      <Category VALUE="/Default/Preset/Morph/Apply/Body"/>
+     </Categories>
+     <Compatibilities>
+      <Compatibility VALUE="/Genesis 9"/>
+     </Compatibilities>
+    </Asset>
+    <Asset VALUE="People/Genesis 9/Poses/Marius/Marius Pose.duf">
+     <ContentType VALUE="Preset/Pose"/>
+     <Audience VALUE="General"/>
+     <Categories>
+      <Category VALUE="/Default/Preset/Pose"/>
+     </Categories>
+     <Compatibilities>
+      <Compatibility VALUE="/Genesis 9"/>
+     </Compatibilities>
+    </Asset>
+   </Assets>
+   <SupportAssets>
+    <SupportAsset VALUE="/data/DAZ 3D/Genesis 9/Base/Morphs/DAZ 3D/Marius/FHMMarius.dsf"/>
+    <SupportAsset VALUE="/data/DAZ 3D/Genesis 9/Base/Morphs/DAZ 3D/Marius/FBMMarius.dsf"/>
+    <SupportAsset VALUE="/Runtime/Textures/DAZ/Characters/Genesis9/Marius/Marius_Face_D_1001.jpg"/>
+    <SupportAsset VALUE="/Runtime/Textures/DAZ/Characters/Genesis9/Marius/Marius_Body_D_1002.jpg"/>
+    <SupportAsset VALUE="/Runtime/Support/DAZ_3D_12345_Marius_HD-8K_for_Genesis_9.dsx"/>
+    <SupportAsset VALUE="/Runtime/Support/DAZ_3D_12345_Marius_HD-8K_for_Genesis_9.jpg"/>
+   </SupportAssets>
+  </Product>
+ </Products>
+</ContentDBInstall>

@@ -35,7 +35,8 @@ def test_builtins_load(definitions):
     assert not definitions.is_a("daz_morph", "mesh")
     daz = definitions.environments["daz_studio"]
     assert daz.handler == "daz"
-    assert [v.id for v in daz.variants] == ["genesis_9", "genesis_8"]
+    assert [v.id for v in daz.variants] == ["genesis_9", "genesis_8", "genesis_3", "genesis_2"]
+    assert daz.layer_options["content_types"]["Follower/Wardrobe"] == "daz_wearable"
     mesh_rules = definitions.dossier_types["mesh"].identify
     assert any(r.glob == "**/*.nif" for r in mesh_rules)
 

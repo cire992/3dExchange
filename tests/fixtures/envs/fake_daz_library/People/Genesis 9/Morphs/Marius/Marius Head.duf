@@ -1,0 +1,13 @@
+{
+ "file_version": "0.6.0.0",
+ "scene": {
+  "modifiers": [
+   {
+    "url": "/data/DAZ%203D/Genesis%209/Base/Morphs/DAZ%203D/Marius/FHMMarius.dsf#FHMMarius",
+    "channel": {
+     "value": 1
+    }
+   }
+  ]
+ }
+}
