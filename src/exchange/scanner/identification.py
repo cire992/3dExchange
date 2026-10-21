@@ -179,7 +179,7 @@ def identify_root(
         spec = _Spec(
             key=f"file:{fold(rel_under(f.rel, container_key) if container_key else f.rel)}",
             type_id=match.type_id,
-            name=f.rel.rsplit("/", 1)[-1].rsplit(".", 1)[0],
+            name=display_name(f.rel),
             confidence=round(match.confidence * scale, 4),
             signals=[f"rule {match.type_id}: {match.glob}"],
             container_id=container_ids[container_key],
@@ -230,7 +230,7 @@ def identify_root(
             if given is not None:
                 child = _Spec(
                     key=f"file:{fold(rel_under(m.rel, container_key) if container_key else m.rel)}",
-                    type_id=given.type_id, name=m.rel.rsplit("/", 1)[-1].rsplit(".", 1)[0],
+                    type_id=given.type_id, name=display_name(m.rel),
                     confidence=given.confidence, signals=given.signals,
                     container_id=container_ids[container_key], primary=[m], parent_id=product_id,
                     fields=dict(given.fields))
@@ -263,6 +263,12 @@ def identify_root(
     stats.retired_entries = len(stale)
     repo.index_dossiers(conn, writer.dossiers)
     return stats
+
+
+def display_name(rel: str) -> str:
+    """A file's name without its extension; the whole name for files like ".duf"."""
+    filename = rel.rsplit("/", 1)[-1]
+    return filename.rsplit(".", 1)[0] or filename
 
 
 def _dossier_variant(definition: EnvironmentDefinition, rel_in_container: str) -> str | None:
