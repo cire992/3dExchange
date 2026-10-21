@@ -41,6 +41,7 @@ SCHEMA_VERSION = _migrations()[-1].version
 def _configure(conn: sqlite3.Connection) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA busy_timeout = 10000")  # the app and a scan process may write at once
     return conn
 
 

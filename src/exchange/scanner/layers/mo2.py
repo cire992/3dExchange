@@ -7,9 +7,12 @@ Everything outside the mods folder (profiles, logs, the instance's own files) is
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
 from exchange.paths import fold, normalize_rel, rel_under
 from exchange.scanner.layers.base import ContainerSpec, LayerContext, LayerResult, ProductSpec
-from exchange.scanner.readonly import ini_value
+from exchange.scanner.readonly import ini_value, read_ini
 
 _META_FIELDS = {  # meta.ini [General] key -> dossier field
     "modid": "nexus_mod_id",
@@ -21,9 +24,31 @@ _META_FIELDS = {  # meta.ini [General] key -> dossier field
 }
 
 
+def instance_ini(root: Path) -> Path | None:
+    """The ``ModOrganizer.ini`` of the instance whose files are in ``root``.
+
+    A portable instance keeps it in the folder itself; a global instance keeps it in
+    ``%LOCALAPPDATA%\\ModOrganizer\\<name>`` with ``[Settings] base_directory`` pointing at the folder.
+    """
+    own = root / "ModOrganizer.ini"
+    if own.is_file():
+        return own
+    local = os.environ.get("LOCALAPPDATA")
+    if not local:
+        return None
+    for ini in sorted((Path(local) / "ModOrganizer").glob("*/ModOrganizer.ini")):
+        base = ini_value(read_ini(ini), "Settings", "base_directory")
+        if base and fold(os.path.normpath(base)) == fold(os.path.normpath(str(root))):
+            return ini
+    return None
+
+
 def identify(ctx: LayerContext) -> LayerResult:
     result = LayerResult()
-    instance = ctx.read_ini("ModOrganizer.ini")
+    ini_path = instance_ini(ctx.root)
+    instance = read_ini(ini_path) if ini_path else None
+    if ini_path is not None and ini_path.parent != ctx.root:
+        result.layer_config["instance_ini"] = str(ini_path)
     mods_dir = normalize_rel(str(ctx.options.get("mods_dir", "mods")))
     custom = ini_value(instance, "Settings", "mod_directory")
     if custom:
@@ -36,8 +61,8 @@ def identify(ctx: LayerContext) -> LayerResult:
 
     profiles = _read_profiles(ctx)
     selected = ini_value(instance, "General", "selected_profile")
-    result.layer_config = {"mods_dir": mods_dir, "selected_profile": selected,
-                           "profiles": sorted(profiles)}
+    result.layer_config.update({"mods_dir": mods_dir, "selected_profile": selected,
+                                "profiles": sorted(profiles)})
 
     mods: dict[str, list[str]] = {}
     mod_names: dict[str, str] = {}

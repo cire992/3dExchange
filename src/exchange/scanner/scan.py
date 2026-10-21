@@ -83,6 +83,7 @@ class ScanReport:
     threshold: float
     environments: list[EnvironmentReport] = field(default_factory=list)
     links_skipped: list[str] = field(default_factory=list)
+    excluded: list[str] = field(default_factory=list)  # folders skipped because the user excluded them
     errors: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     cancelled: bool = False
@@ -105,6 +106,7 @@ def run_scan(
     folder = folder.resolve()
     db_path = Path(db_path).resolve()
     _refuse_db_inside(db_path, folder)
+    requested = folder
     report = ScanReport(str(folder), str(db_path), dry_run, threshold)
 
     # Scanning inside a known root rescans that whole root, so files outside the requested
@@ -119,6 +121,13 @@ def run_scan(
         _refuse_db_inside(db_path, folder)
 
     conn = open_library_readonly(db_path) if dry_run else open_library(db_path)
+    if conn is not None and not dry_run:
+        from exchange.environments import excluded_roots, set_excluded
+
+        if any(fold(p) == fold(str(requested)) for p in excluded_roots(conn)):
+            with repo.transaction(conn):
+                set_excluded(conn, requested, False)  # scanning it by name means it is wanted again
+            report.notes.append(f"{requested} was excluded; it is included again")
     try:
         session = _Session(conn, definitions, report, dry_run, threshold, progress, cancel)
         session.scan_folder(folder)
@@ -214,6 +223,9 @@ class _Session:
         self.cancel = cancel
         self.scanned_folders: list[str] = []
         self._envs: dict[object, EnvironmentReport] = {}
+        from exchange.environments import excluded_roots
+
+        self.excluded = excluded_roots(conn) if conn is not None else []
 
     def cancelled(self) -> bool:
         if self.cancel is not None and self.cancel.is_set():
@@ -232,8 +244,9 @@ class _Session:
         self.scanned_folders.append(str(folder))
         self.progress(ProgressEvent(1, str(folder), "discovery"))
         registered = _registered(self.conn) if self.conn is not None else []
-        discovery = discover(folder)
+        discovery = discover(folder, self.excluded)
         self.report.links_skipped += [str(folder / l) for l in discovery.links]
+        self.report.excluded += [str(folder / x) for x in discovery.excluded]
         self.report.errors += discovery.errors
         for det in detect(discovery, self.definitions, registered):
             if self.cancelled():

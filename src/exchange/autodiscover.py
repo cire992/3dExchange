@@ -39,6 +39,7 @@ class Found:
     confidence: float = 0.0
     signals: list[str] = field(default_factory=list)
     registered: bool = False
+    score_path: str | None = None  # where to look for signatures, if not ``path`` itself
 
 
 @dataclass
@@ -69,7 +70,7 @@ def discover_sources(definitions: DefinitionSet, places: Places | None = None,
         path = Path(item.path)
         if not path.is_dir() or fold(str(path)) in found:
             continue
-        match = score_folder(definitions, path)
+        match = score_folder(definitions, Path(item.score_path or item.path))
         if match is not None:
             definition, score, signals = match
             item.type_id, item.confidence, item.signals = definition.id, score, signals
@@ -216,9 +217,13 @@ def _mo2(places: Places) -> list[Found]:
     base = places.local_appdata / "ModOrganizer"
     out = []
     for ini in sorted(base.glob("*/ModOrganizer.ini")) if base.is_dir() else []:
-        game = ini_value(read_ini(ini), "General", "gameName")
+        parser = read_ini(ini)
+        game = ini_value(parser, "General", "gameName")
         name = f"{ini.parent.name}" + (f" ({game})" if game else "")
-        out.append(Found(str(ini.parent), name, "Mod Organizer 2 instances"))
+        # A global instance's files (mods, profiles) live in its base_directory.
+        files = ini_value(parser, "Settings", "base_directory")
+        path = os.path.normpath(files) if files else str(ini.parent)
+        out.append(Found(path, name, "Mod Organizer 2 instances", score_path=str(ini.parent)))
     return out
 
 

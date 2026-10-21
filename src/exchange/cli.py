@@ -71,6 +71,17 @@ def build_parser() -> argparse.ArgumentParser:
     config.add_argument("--profile", help="MO2 profile to use")
     config.add_argument("--visibility", choices=VISIBILITIES, help="endpoint visibility")
     config.add_argument("--endpoint", help="where requisitions will write (used from Roadmap phase 4)")
+    add = env_commands.add_parser(
+        "add", parents=[common], help="register a folder as an environment of a given type (nothing is read)")
+    add.add_argument("path", type=Path)
+    add.add_argument("--type", required=True, metavar="TYPE", help="environment definition id, e.g. daz_studio")
+    add.add_argument("--name")
+    add.add_argument("--profile", help="MO2 profile to use")
+    add.add_argument("--visibility", choices=VISIBILITIES)
+    add.add_argument("--ignore-add", action="append", default=[], metavar="GLOB")
+    exclude = env_commands.add_parser("exclude", parents=[common], help="never index this folder")
+    exclude.add_argument("path", type=Path)
+    exclude.add_argument("--undo", action="store_true", help="index it again")
     forget = env_commands.add_parser(
         "forget", parents=[common],
         help="remove an environment from the library (nothing on disk changes)")
@@ -252,6 +263,31 @@ def _env_config(args, definitions, conn) -> int:
     return 0
 
 
+def _env_add(args, definitions, conn) -> int:
+    from exchange.environments import register_root
+
+    config = {"mo2_profile": args.profile, "visibility": args.visibility,
+              "ignore": args.ignore_add or None}
+    with repo.transaction(conn):
+        env_id = register_root(conn, definitions, args.path, args.type, name=args.name, config=config)
+    env = repo.get_environment(conn, env_id)
+    _emit(args, {"id": env_id, "name": env["name"], "type_id": env["type_id"]},
+          f"Added {args.path} to {env['name']} [{env['type_id']}] (id {env_id}). "
+          f"Scan it with: exchange rescan --env {env_id}")
+    return 0
+
+
+def _env_exclude(args, definitions, conn) -> int:
+    from exchange.environments import excluded_roots, set_excluded
+
+    with repo.transaction(conn):
+        set_excluded(conn, args.path, not args.undo)
+    paths = excluded_roots(conn)
+    text = "\n".join(["Excluded folders:", *(f"  {p}" for p in paths)]) if paths else "No folders are excluded."
+    _emit(args, paths, text)
+    return 0
+
+
 def _env_forget(args, definitions, conn) -> int:
     env = _get_env(conn, args.id)
     roots = [r["path"] for r in repo.list_roots(conn, env["id"])]
@@ -331,7 +367,8 @@ def _read(db: Path):
 
 _HANDLERS = {"scan": _scan, "rescan": _rescan, "enrich": _enrich, "env": _env,
              "discover": _discover, "search": _search, "show": _show}
-_ENV_HANDLERS = {"list": _env_list, "show": _env_show, "config": _env_config, "forget": _env_forget}
+_ENV_HANDLERS = {"list": _env_list, "show": _env_show, "config": _env_config, "add": _env_add,
+                 "exclude": _env_exclude, "forget": _env_forget}
 
 
 # Formatting -------------------------------------------------------------------------------------

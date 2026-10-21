@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PySide6.QtGui import QColor, QFont, QFontDatabase
+from PySide6.QtGui import QColor, QFont, QFontDatabase, QPalette
 
 BG = "#121418"
 PANEL = "#16181c"
@@ -30,6 +30,26 @@ MONO_FAMILIES = ["JetBrains Mono", "Cascadia Mono", "Consolas", "monospace"]
 
 def color(name: str) -> QColor:
     return QColor(name)
+
+
+def palette() -> QPalette:
+    """Dark colors for the controls the style sheet does not draw (combo boxes, check boxes ...)."""
+    p = QPalette()
+    roles = {
+        QPalette.ColorRole.Window: SURFACE, QPalette.ColorRole.WindowText: TEXT,
+        QPalette.ColorRole.Base: BG, QPalette.ColorRole.AlternateBase: PANEL,
+        QPalette.ColorRole.Text: TEXT, QPalette.ColorRole.Button: CARD,
+        QPalette.ColorRole.ButtonText: TEXT_2, QPalette.ColorRole.Highlight: ACCENT_BG,
+        QPalette.ColorRole.HighlightedText: ACCENT_LIGHT, QPalette.ColorRole.ToolTipBase: SURFACE,
+        QPalette.ColorRole.ToolTipText: TEXT, QPalette.ColorRole.PlaceholderText: MUTED,
+        QPalette.ColorRole.Light: CARD_HOVER, QPalette.ColorRole.Mid: BORDER,
+        QPalette.ColorRole.Dark: PANEL, QPalette.ColorRole.Shadow: BG,
+    }
+    for role, value in roles.items():
+        p.setColor(role, QColor(value))
+    for role in (QPalette.ColorRole.Text, QPalette.ColorRole.ButtonText, QPalette.ColorRole.WindowText):
+        p.setColor(QPalette.ColorGroup.Disabled, role, QColor(MUTED))
+    return p
 
 
 def ui_font(size: float = 9.5, weight: QFont.Weight = QFont.Weight.Normal) -> QFont:
@@ -69,6 +89,11 @@ QLineEdit {{
     selection-background-color: {ACCENT_BG};
 }}
 QLineEdit:focus {{ border-color: {ACCENT}; }}
+QComboBox {{ background: {CARD}; border: 1px solid {BORDER}; border-radius: 6px; padding: 5px 10px; color: {TEXT_2}; }}
+QComboBox:hover {{ background: {CARD_HOVER}; }}
+QComboBox QAbstractItemView {{ background: {SURFACE}; border: 1px solid {BORDER}; selection-background-color: {ACCENT_BG}; }}
+QPlainTextEdit {{ background: {BG}; border: 1px solid {BORDER}; border-radius: 6px; padding: 4px; }}
+QCheckBox::indicator, QRadioButton::indicator {{ width: 15px; height: 15px; }}
 QPushButton {{
     background: {CARD}; border: 1px solid {BORDER}; border-radius: 6px; padding: 6px 12px; color: {TEXT_2};
 }}

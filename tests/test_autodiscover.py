@@ -51,3 +51,26 @@ def test_discovers_from_every_source(definitions, tmp_path):
 
 def test_nothing_configured(definitions):
     assert discover_sources(definitions, Places()) == []
+
+
+def test_global_mo2_instance_is_found_at_its_base_directory(definitions, tmp_path, monkeypatch):
+    local = tmp_path / "Local"
+    base = copy_fixture("fake_mo2", tmp_path / "Games" / "Outlaw")
+    ini = (base / "ModOrganizer.ini").read_text()
+    (base / "ModOrganizer.ini").unlink()
+    write(base / "ModOrganizer.exe", b"MZ")
+    write(local / "ModOrganizer" / "SkyrimSE" / "ModOrganizer.ini",
+          (ini + f"\n[Settings]\nbase_directory={base.as_posix()}\n").encode())
+    found = discover_sources(definitions, Places(local_appdata=local))
+    assert [(f.path, f.type_id) for f in found] == [(str(base), "skyrim_se")]
+
+    # Detection of the folder alone sees an MO2 instance (its game is in the global ini) ...
+    from exchange.scanner.detection import detect
+    from exchange.scanner.discovery import discover
+
+    assert [e.definition.id for e in detect(discover(base), definitions)] == ["mo2_generic"]
+    # ... and the MO2 layer finds that ini for the selected profile.
+    from exchange.scanner.layers.mo2 import instance_ini
+
+    monkeypatch.setenv("LOCALAPPDATA", str(local))
+    assert instance_ini(base) == local / "ModOrganizer" / "SkyrimSE" / "ModOrganizer.ini"

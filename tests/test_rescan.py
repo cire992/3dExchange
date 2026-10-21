@@ -1,6 +1,6 @@
 import os
 
-from conftest import root_report
+from builders import root_report
 from exchange.db import open_library
 from exchange.db import repository as repo
 

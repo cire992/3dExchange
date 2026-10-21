@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from conftest import root_report
+from builders import root_report
 
 
 def dossiers(conn, environment_type):

@@ -13,6 +13,22 @@ kind = "file"
 path = "ModOrganizer.ini"
 weight = 0.6
 
+# A global instance keeps its ini in %LOCALAPPDATA%\ModOrganizer; its folder still has these.
+[[detection.signature]]
+kind = "file"
+path = "ModOrganizer.exe"
+weight = 0.3
+
+[[detection.signature]]
+kind = "dir"
+path = "profiles"
+weight = 0.1
+
+[[detection.signature]]
+kind = "dir"
+path = "mods"
+weight = 0.1
+
 [layer]
 handler = "mo2"
 options = { mods_dir = "mods" }

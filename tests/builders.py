@@ -121,3 +121,19 @@ def daz_connect_library(root: Path) -> Path:
           json.dumps({"modifier_library": [{"morph": {"deltas": {"count": 1}}}]}).encode())
     write(root / "data" / "cloud" / "readme.txt", b"cloud\n")
     return root
+
+
+# Scan report helpers -----------------------------------------------------------------------------
+
+
+def env_report(report: ScanReport, type_id: str):
+    matches = [e for e in report.environments if e.type_id == type_id]
+    assert len(matches) == 1, [e.type_id for e in report.environments]
+    return matches[0]
+
+
+def root_report(report: ScanReport, type_id: str):
+    """The report of an environment that has exactly one root."""
+    roots = env_report(report, type_id).roots
+    assert len(roots) == 1, [r.path for r in roots]
+    return roots[0]

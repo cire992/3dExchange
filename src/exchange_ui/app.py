@@ -17,6 +17,7 @@ def make_app(argv: list[str]) -> QApplication:
     app = QApplication.instance() or QApplication(argv)
     app.setApplicationName("Exchange")
     app.setStyle("Fusion")
+    app.setPalette(theme.palette())
     app.setFont(theme.ui_font())
     app.setStyleSheet(theme.STYLE)
     return app

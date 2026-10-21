@@ -4,8 +4,7 @@ import threading
 
 from PIL import Image
 
-from builders import glb_bytes, obj_bytes, png_bytes, write
-from conftest import env_report
+from builders import env_report, glb_bytes, obj_bytes, png_bytes, write
 from exchange.db import repository as repo
 from exchange.scanner.enrichment import thumbnail_dir
 from test_readonly import snapshot
