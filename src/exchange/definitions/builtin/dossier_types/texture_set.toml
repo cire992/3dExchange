@@ -1,0 +1,5 @@
+[dossier_type]
+id = "texture_set"
+name = "Texture set"
+format_version = 1
+scope = "universal"

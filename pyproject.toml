@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "exchange"
+version = "0.1.0"
+description = "Manage 3D assets across game, engine and content-library environments."
+readme = "README.md"
+requires-python = ">=3.11"
+# The core uses only the standard library (sqlite3, tomllib, configparser, xml.etree).
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+exchange = "exchange.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"exchange.db" = ["migrations/*.sql"]
+"exchange.definitions" = ["builtin/environments/*.toml", "builtin/dossier_types/*.toml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

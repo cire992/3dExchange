@@ -1,0 +1,9 @@
+[dossier_type]
+id = "audio"
+name = "Audio"
+format_version = 1
+scope = "universal"
+
+[[identify]]
+globs = ["**/*.wav", "**/*.ogg", "**/*.mp3", "**/*.flac"]
+confidence = 0.7

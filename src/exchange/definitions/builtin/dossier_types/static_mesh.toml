@@ -1,0 +1,6 @@
+[dossier_type]
+id = "static_mesh"
+name = "Static mesh"
+format_version = 1
+scope = "universal"
+extends = "mesh"

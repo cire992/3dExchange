@@ -1,0 +1,10 @@
+[dossier_type]
+id = "daz_character_preset"
+name = "Daz character preset"
+format_version = 1
+scope = "environment"
+environment = "daz_studio"
+
+[[identify]]
+glob = "People/*/Characters/**/*.duf"
+confidence = 0.6

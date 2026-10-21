@@ -1,0 +1,26 @@
+# Any Mod Organizer 2 instance whose game has no definition of its own yet.
+
+[environment]
+id = "mo2_generic"
+name = "Mod Organizer 2 instance"
+format_version = 1
+
+[detection]
+min_confidence = 0.5
+
+[[detection.signature]]
+kind = "file"
+path = "ModOrganizer.ini"
+weight = 0.6
+
+[layer]
+handler = "mo2"
+options = { mods_dir = "mods" }
+
+[ignore]
+globs = ["downloads/**", "overwrite/**"]
+
+[capabilities]
+indexable = true
+readable = true
+writable = false

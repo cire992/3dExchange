@@ -1,0 +1,10 @@
+[dossier_type]
+id = "daz_morph"
+name = "Daz morph"
+format_version = 1
+scope = "environment"
+environment = "daz_studio"
+
+[[identify]]
+glob = "data/**/Morphs/**/*.dsf"
+confidence = 0.7

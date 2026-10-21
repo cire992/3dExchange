@@ -1,0 +1,5 @@
+[dossier_type]
+id = "material"
+name = "Material"
+format_version = 1
+scope = "universal"
