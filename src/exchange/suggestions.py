@@ -22,6 +22,7 @@ from collections.abc import Iterable
 from exchange.db import repository as repo
 from exchange.definitions.schema import DefinitionSet
 from exchange.lexicons import LexiconIndex
+from exchange.scanner.classify import in_roots
 from exchange.scanner.tokenize import tokenize
 
 MESH_FILE_EXTS = frozenset({".glb", ".gltf", ".fbx", ".obj", ".dae", ".nif", ".blend", ".3ds", ".ply", ".stl"})
@@ -35,13 +36,15 @@ def _key(kind: str, parts: Iterable[str]) -> str:
 
 
 def generate(conn: sqlite3.Connection, definitions: DefinitionSet, *,
-             environment_ids: Iterable[int]) -> dict[str, int]:
-    """Propose links and groupings for some environments. Returns new suggestions by kind."""
+             environment_ids: Iterable[int], root_ids: Iterable[int] | None = None) -> dict[str, int]:
+    """Propose links and groupings for some environments (only about entries in ``root_ids``,
+    if given: what a scan of those roots can have changed). Returns new suggestions by kind."""
     ids = list(environment_ids)
+    scope, scope_params = in_roots(root_ids) if root_ids is not None else ("", [])
     index = LexiconIndex(definitions)
     proposals: list[tuple[str, str, str, dict, float]] = []  # kind, key, subject, payload, confidence
-    proposals += _texture_links(conn, index, ids)
-    proposals += _variant_groups(conn, index, ids)
+    proposals += _texture_links(conn, index, ids, scope, scope_params)
+    proposals += _variant_groups(conn, index, ids, scope, scope_params)
 
     keys = {p[1] for p in proposals}
     created = defaultdict(int)
@@ -55,21 +58,21 @@ def generate(conn: sqlite3.Connection, definitions: DefinitionSet, *,
     pending = conn.execute(
         f"SELECT s.id, s.key FROM suggestion s WHERE s.state = 'pending' AND s.kind IN ('texture_link', 'variant_group')"
         f" AND (s.subject_uid IS NULL OR NOT EXISTS (SELECT 1 FROM dossier d WHERE d.uid = s.subject_uid)"
-        f" OR EXISTS (SELECT 1 FROM dossier d JOIN ledger l ON l.dossier_id = d.id"
-        f" WHERE d.uid = s.subject_uid AND l.environment_id IN ({marks})))", ids).fetchall()
+        f" OR EXISTS (SELECT 1 FROM dossier d JOIN ledger l ON l.dossier_id = d.id JOIN entry e ON e.ledger_id = l.id"
+        f" WHERE d.uid = s.subject_uid AND l.environment_id IN ({marks}){scope}))", [*ids, *scope_params]).fetchall()
     stale = [r[0] for r in pending if r[1] not in keys]
     conn.executemany("UPDATE suggestion SET state = 'stale' WHERE id = ?", ((i,) for i in stale))
     return {k: created.get(k, 0) for k in GENERATED} | {"stale": len(stale)}
 
 
-def _texture_links(conn, index: LexiconIndex, env_ids: list[int]) -> list:
+def _texture_links(conn, index: LexiconIndex, env_ids: list[int], scope: str = "", scope_params=()) -> list:
     marks = ",".join("?" * len(env_ids))
     meshes = conn.execute(
         f"SELECT d.uid, f.root_id, f.rel_path, f.rel_key, f.ext FROM dossier d"
         f" JOIN ledger l ON l.dossier_id = d.id JOIN entry e ON e.ledger_id = l.id"
         f" JOIN entry_file ef ON ef.entry_id = e.id AND ef.role = 'primary' JOIN file f ON f.id = ef.file_id"
         f" WHERE l.environment_id IN ({marks}) AND e.status != 'retired' AND f.state = 'present'"
-        f" AND d.type_id != 'product'", env_ids).fetchall()
+        f" AND d.type_id != 'product'{scope}", [*env_ids, *scope_params]).fetchall()
     meshes = [m for m in meshes if m["ext"] in MESH_FILE_EXTS]
     if not meshes:
         return []
@@ -135,15 +138,15 @@ def _channel(index: LexiconIndex, image_rel: str, mesh_base: tuple[str, ...]) ->
     return None
 
 
-def _variant_groups(conn, index: LexiconIndex, env_ids: list[int]) -> list:
+def _variant_groups(conn, index: LexiconIndex, env_ids: list[int], scope: str = "", scope_params=()) -> list:
     marks = ",".join("?" * len(env_ids))
     rows = conn.execute(
         f"SELECT d.id, d.uid, d.name, d.type_id, e.container_id, f.rel_key FROM dossier_effective d"
         f" JOIN ledger l ON l.dossier_id = d.id JOIN entry e ON e.ledger_id = l.id"
         f" JOIN entry_file ef ON ef.entry_id = e.id AND ef.role = 'primary' JOIN file f ON f.id = ef.file_id"
         f" WHERE l.environment_id IN ({marks}) AND e.status != 'retired' AND e.moved_from IS NULL"
-        f" AND d.type_id != 'product' AND NOT EXISTS (SELECT 1 FROM dossier_alias a WHERE a.alias_uid = d.uid)",
-        env_ids).fetchall()
+        f" AND d.type_id != 'product' AND NOT EXISTS (SELECT 1 FROM dossier_alias a WHERE a.alias_uid = d.uid){scope}",
+        [*env_ids, *scope_params]).fetchall()
     groups: dict[tuple, dict[str, tuple[int, str | None]]] = defaultdict(dict)
     for r in rows:
         tokens = index.clean(tokenize(r["name"]))

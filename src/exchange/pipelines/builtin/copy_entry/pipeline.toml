@@ -1,0 +1,24 @@
+# Copy an asset that is already in an environment into another container of it (a new MO2 mod,
+# the Exchange Conversions content directory): the "copy from an existing entry" route. The
+# files keep their layout inside the container, so a Daz product stays a valid content layout.
+
+[pipeline]
+id = "copy_entry"
+name = "Copy to another container"
+version = "1.0.0"
+author = "Exchange"
+description = "Copies an entry's files, unchanged, into the endpoint."
+format_version = 1
+
+[input]
+dossier_types = []
+artifact = "Files"
+
+[output]
+environment = "same"
+folder = ""
+entry_status = "copied"
+
+[[step]]
+id = "copy"
+operation = "core.copy"

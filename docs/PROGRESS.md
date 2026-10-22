@@ -1,6 +1,6 @@
 # Exchange: progress and handoff
 
-Last updated 2026-10-21, during Roadmap phase 3. `main` has phases 1 and 2 and PRs 3a and 3b. PR 3c (desk, lexicon editor, watcher) is #9, on branch `phase-3c-desk-lexicons-watcher`. 181 tests pass.
+Last updated 2026-10-22, during Roadmap phase 4. `main` has phases 1-3. PR 4a (the requisition engine) is on branch `phase-4a-requisition-engine`. 193 tests pass.
 
 Read this first, then `docs/DESIGN_SPEC.md` (the source of truth; use its terms exactly) and
 `docs/USEFUL_PATHS.md` (real asset folders and tools on the dev machine, for testing). The
@@ -8,9 +8,12 @@ Read this first, then `docs/DESIGN_SPEC.md` (the source of truth; use its terms 
 
 ## Where we are
 
-**Roadmap phases 1 (Foundations) and 2 (Library) are merged. Phase 3 (Curation) is in progress,
-split into three PRs (3a core, 3b editing in the main window, 3c Unidentified desk + lexicon editor +
-file watcher).** The phase 3 plan was approved with all recommended answers (see Decisions).
+**Roadmap phases 1 (Foundations), 2 (Library) and 3 (Curation) are merged. Phase 4 (Requisitions
+v1) is in progress, split into four PRs: 4a the requisition engine (core and CLI), 4b bridges
+(Blender, Daz Studio, command-line tools), 4c requisitions in the window, 4d the first real
+pipeline (Daz cross-figure, G9/G2 → G8).** The phase 4 plan was approved with all recommended
+answers (see Decisions); open question 1 (what cross-figure converts first, and with which tool)
+still needs the user's answer before 4d.
 
 | PR | What | State |
 | --- | --- | --- |
@@ -22,7 +25,11 @@ file watcher).** The phase 3 plan was approved with all recommended answers (see
 | #6 | This handoff doc | merged |
 | #7 | 3a: curation core: lexicons, classification, undoable curation, suggestions, collections, hand-installed Daz products, CLI | merged |
 | #8 | 3b: editing in the main window: inspector editing + revert markers, bulk edit, drag and drop linking, collections in the sidebar, context-menu actions, Ctrl+Z/Ctrl+Y | merged |
-| #9 | 3c: Unidentified desk (low-confidence dossiers, unattached files by folder, suggestions in batches), lexicon editor, file watcher (`watchdog`); split, fold and promote in the window | open |
+| #9 | 3c: Unidentified desk (low-confidence dossiers, unattached files by folder, suggestions in batches), lexicon editor, file watcher (`watchdog`); split, fold and promote in the window | merged |
+| 4a | Requisition engine: pipeline packages (manifest, trust, prerequisites, core operations), planning (routes, chains, product plans), queue and runner (checkpoints, cached steps, collisions), endpoints, sidecars, staleness, removal, CLI, test harness | branch `phase-4a-requisition-engine`, PR to open |
+| 4b | Bridges: Blender (headless), Daz Studio (DazScript at launch), command-line tools; one job per app | after 4a |
+| 4c | Requisitions in the window: plan view with option forms and presets, the queue, Settings › Pipelines | after 4b |
+| 4d | First pipeline: Daz cross-figure (G9/G2 → G8) | needs the user's answer to open question 1 |
 
 ## How we work
 
@@ -99,6 +106,18 @@ Phase 3:
    - A folder of more than 5,000 unattached files can't be made into a product or linked: that's a category, not an asset.
    - Accepting a batch of suggestions is one undo step.
 
+Phase 4 (approved 2026-10-22, all recommended answers):
+1. **First conversion** (open): what cross-figure converts first (characters, clothing, hair) and with which tool. The recommendation was clothing via Transfer Utility and auto-fit, pending the user's own workflow.
+2. **VaM backporting and DS3 legacy conversion** move to phase 5, with the VaM environment.
+3. **Daz output:** an `Exchange Conversions` folder beside the library. Exchange never edits Daz Studio's settings; adding it in the Content Directory Manager is the user's one-time step.
+4. **Daz Studio window:** accepted during jobs, as a separate instance (`-instanceName Exchange`).
+5. **Pipelines:** built-ins ship with Exchange; the user's go in `<data>/pipelines/`, trusted before they run.
+6. **Types:** operations take and make named artifact types (`Files` accepts any), checked along the chain. Dossier types are unchanged.
+7. **Execution:** one worker process runs the queue, reporting progress like scans.
+8. **Sidecars:** `.exchange/<requisition>.json` in each output container.
+9. **Recycle folder:** Exchange's own, under the data folder; nothing is hard-deleted.
+10. **After writing:** only the output's root is rescanned.
+
 ## Architecture in one page
 
 ```
@@ -128,6 +147,14 @@ src/exchange/            core, never imports Qt (a test enforces this)
   curation.py            Curator: every user change as logged, undoable state changes
   suggestions.py         texture-link and variant-group proposals; listing
   links.py               applying user file links (override layer) to entries
+  locks.py               cross-process locks (one queue worker; one job per external app)
+  pipelines/             packages: manifest (pipeline.toml), operations (API), core_ops,
+                         registry (find, trust, load, prerequisites, tool paths), builtin/copy_entry
+  requisitions/          plan (routes, chains, product plans, queueing), endpoints, runner (queue,
+                         work folders, cached steps, checkpoints, writing, sidecars, rescans),
+                         sidecars (written and read back by identification), lifecycle (resume,
+                         hold, move, remove, stale, rebuild)
+  cli_requisitions.py    pipelines, tools, requisition, test-pipeline
   library/               search language (FTS5 + filters), query API (pages, sidebar, detail, collections),
                          desk (unattached files by folder, one level at a time over the (root, rel_key) index)
   autodiscover.py        Steam, Epic, Unreal recent projects, Daz registry, MO2 instances
@@ -197,6 +224,9 @@ Key ideas:
     - It was 100 s: each moved entry checked all 235k ledgers for emptiness. Now only the ledger it left is checked.
   - **Watcher:** watching `D:\Daz 3D\Studio\My Library` starts at once, and reported no events while idle.
 - **First open:** migrating a 1.6 GB library takes about 17 s, mostly the backup.
+- **Requisitions (4a, a copy of the library, writing to a scratch folder):** copying a real Daz product ("XI Japanese Racing Bike": 4 children, 18 files) takes 3.3 s, including the rescan.
+  - The output keeps its content layout (`data/`, `Runtime/Support/`, `Vehicles/…`). It becomes 5 *copied* entries on the original dossiers, with no new dossiers, even with a copied DIM manifest.
+  - It took 92 s at first: the rescan of the new root reclassified and re-suggested the whole Daz environment. Scans now classify and suggest only for the roots they scanned.
 
 **Loose folders** (`Z:\Content Farm\Sketchfab` and `SWBF Model and Textures`), checked in 3a:
 - **Tags:** 77% of 4,728 dossiers got one. SWBF's many *Weapon* tags are correct: the folder is mostly weapon sound effects.
@@ -209,7 +239,13 @@ Key ideas:
 
 ## Known gaps and good next candidates
 
-- **Phase 3 is complete once 3b and 3c merge.** Phase 4 (requisitions) is next.
+- **4b-4d** (see the table above). 4d needs the user's answer on what cross-figure converts first.
+- **Not in 4a:**
+  - Presets and last-used options (4c, with the plan view).
+  - The `new-pipeline` scaffold and the authoring guide (phase 6).
+  - Bridges (4b): operations with an `app` cannot run yet.
+- **Rebuilding from sidecars after a lost database** keeps each output with its asset's original uid. The source environment's rescan makes a new uid for the same asset, so the two show as separate assets until merged.
+- **Overwriting another requisition's output:** both sidecars list the files, so the asset shows an entry for each until one is removed.
 - **Edits run on the UI thread.** Those that change counts (merge, new product, accepted suggestions, retype, undo) reload the sidebar, about 1.7 s on the real library. The first big batch after opening can take several seconds while the database warms up.
 - **Settings has only Lexicons.** Dossier types, environments and storage pages are still to come; dossier types are edited as TOML files for now.
 - **Known authors from older scans:** a library scanned before the import-folder filter (`data/<asset>_<number>`) keeps those names until its next rescan.

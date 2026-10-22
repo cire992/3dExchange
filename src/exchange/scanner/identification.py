@@ -26,6 +26,7 @@ from exchange.definitions.schema import DefinitionSet, EnvironmentDefinition
 from exchange.globs import any_match
 from exchange.lexicons import with_generated
 from exchange.links import apply_file_links, linked_keys
+from exchange.requisitions.sidecars import apply_sidecars, is_sidecar, read_sidecars, sidecar_keys
 from exchange.paths import fold, rel_under
 from exchange.scanner.layers import HANDLERS
 from exchange.scanner.layers.base import FileInfo, LayerContext
@@ -138,7 +139,10 @@ def identify_root(
     """Run phase 2 for one root. ``files`` are its present files."""
     stats = IdentifyStats()
     ignore = definition.ignore_globs + tuple(user_ignore)
-    content = [f for f in files if not any_match(ignore, f.rel)]
+    content = [f for f in files if not any_match(ignore, f.rel) and not is_sidecar(f.rel)]
+    # Exchange's own output: files a requisition wrote join their source asset (see sidecars.py).
+    sidecars = read_sidecars(root, [f.rel for f in files if is_sidecar(f.rel)])
+    output_keys = sidecar_keys(sidecars)
     # Lexicons with the words earlier scans found (known authors), for the layer to group by.
     known = with_generated(definitions, repo.generated_words(conn))
     ctx = LayerContext(root, definition, known, content, files)
@@ -198,8 +202,10 @@ def identify_root(
         return spec
 
     writer = _Writer(conn, environment_id, definition.handler, definitions)
-    # Files the user linked onto a dossier belong to it; they do not become dossiers of their own.
-    linked = {by_key[k].id for k in linked_keys(conn, root_id) if k in by_key}
+    # Files the user linked onto a dossier belong to it, and so do files a requisition wrote (to
+    # the asset it converted); they do not become dossiers of their own.
+    outputs = {by_key[k].id for k in output_keys if k in by_key}
+    linked = {by_key[k].id for k in linked_keys(conn, root_id) if k in by_key} | outputs
     claimed: set[int] = set(linked)  # files in some entry
     children: set[int] = set()  # files that already became a child dossier
 
@@ -214,6 +220,8 @@ def identify_root(
             continue
         primary = [by_key[fold(r)] for r in product.primary if fold(r) in by_key]
         members = [by_key[fold(r)] for r in dict.fromkeys(product.members) if fold(r) in by_key]
+        if outputs and all(f.id in outputs for f in primary + members):
+            continue  # a "product" made only of a requisition's output (e.g. a Daz folder product)
         spec = _Spec(
             key=f"product:{product.identity_key}",
             type_id="product",
@@ -267,6 +275,13 @@ def identify_root(
 
     stats.unattached_files = sum(f.id not in claimed for f in content)
     writer.seen_entries |= apply_file_links(conn, root_id)
+    if sidecars:
+        seen, touched = apply_sidecars(conn, environment_id, sidecars, by_key,
+                                       {f.id: container_ids.get(file_container[f.id]) for f in content
+                                        if file_container[f.id] is not None},
+                                       set(definitions.dossier_types))
+        writer.seen_entries |= seen
+        writer.dossiers |= touched
     stale = repo.live_entry_ids(conn, root_id) - writer.seen_entries
     repo.retire_entries(conn, stale)
     stats.retired_entries = len(stale)

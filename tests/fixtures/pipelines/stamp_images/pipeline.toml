@@ -1,0 +1,48 @@
+# A test pipeline: scale images down, then "stamp" them with a note, optionally pausing for a
+# review (a manual checkpoint) first.
+
+[pipeline]
+id = "stamp_images"
+name = "Stamp images"
+version = "1.0.0"
+author = "Tests"
+format_version = 1
+
+[input]
+dossier_types = ["mesh"]
+artifact = "Files"
+
+[output]
+environment = "same"
+folder = "Stamped/{name}"
+
+[[parameter]]
+id = "size"
+type = "int"
+default = 16
+min = 1
+
+[[parameter]]
+id = "review"
+type = "bool"
+default = false
+
+[[parameter]]
+id = "note"
+type = "str"
+default = "stamped"
+
+[[step]]
+id = "shrink"
+operation = "core.resize_images"
+params = { size = "{size}" }
+
+[[step]]
+id = "review"
+operation = "stamp.review"
+params = { pause = "{review}" }
+
+[[step]]
+id = "stamp"
+operation = "stamp.mark"
+params = { note = "{note} {name}" }

@@ -92,9 +92,10 @@ def build_parser() -> argparse.ArgumentParser:
     forget.add_argument("id", type=int)
     forget.add_argument("--yes", action="store_true", help="do it; without this, only say what would go")
 
-    from exchange import cli_curation
+    from exchange import cli_curation, cli_requisitions
 
     cli_curation.add_parsers(commands, common)
+    cli_requisitions.add_parsers(commands, common)
 
     commands.add_parser("discover", parents=[common],
                         help="list environments found on this PC (Steam, Epic, Unreal, Daz, MO2)")
@@ -118,10 +119,12 @@ def main(argv: list[str] | None = None) -> int:
     args.db = args.db or default_db_path()
     try:
         definitions = load_definitions(args.definitions)
-        from exchange import cli_curation
+        from exchange import cli_curation, cli_requisitions
 
         if args.command in cli_curation.COMMANDS:
             return cli_curation.run(args, definitions)
+        if args.command in cli_requisitions.COMMANDS:
+            return cli_requisitions.run(args, definitions)
         handler = _HANDLERS[args.command]
         return handler(args, definitions)
     except ExchangeError as exc:
