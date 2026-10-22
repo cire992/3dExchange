@@ -107,9 +107,16 @@ def _structural(fields: dict, role: str, tokens: list[str], after: int) -> None:
         fields["structural_role"] = role
 
 
+def in_roots(root_ids: Iterable[int]) -> tuple[str, list]:
+    """An SQL condition on an entry ``e``: it is in a container of one of these roots."""
+    ids = list(root_ids)
+    return f" AND e.container_id IN (SELECT c.id FROM container c WHERE c.root_id IN ({','.join('?' * len(ids)) or 'NULL'}))", ids
+
+
 def classify(conn: sqlite3.Connection, definitions: DefinitionSet, *,
-             environment_ids: Iterable[int] | None = None) -> ClassifyStats:
-    """Classify the live dossiers of some environments (all when None)."""
+             environment_ids: Iterable[int] | None = None, root_ids: Iterable[int] | None = None) -> ClassifyStats:
+    """Classify the live dossiers of some environments (all when None), or only those with an
+    entry in some roots (what a scan of those roots can have changed)."""
     stats = ClassifyStats()
     index = LexiconIndex(definitions)
     where, params = "", []
@@ -119,6 +126,10 @@ def classify(conn: sqlite3.Connection, definitions: DefinitionSet, *,
             return stats
         where = f" AND l.environment_id IN ({','.join('?' * len(ids))})"
         params = ids
+    if root_ids is not None:
+        scope, scope_params = in_roots(root_ids)
+        where += scope
+        params = [*params, *scope_params]
     rows = conn.execute(
         "SELECT d.id, d.name, d.confidence, COALESCE(d.confidence_base, d.confidence) AS base,"
         " (SELECT f.rel_path FROM ledger l2 JOIN entry e2 ON e2.ledger_id = l2.id"

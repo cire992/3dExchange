@@ -257,6 +257,7 @@ class _Session:
         self.progress = progress or (lambda event: None)
         self.cancel = cancel
         self.scanned_folders: list[str] = []
+        self.scanned_roots: list[int] = []  # classification and suggestions look only at these
         self._envs: dict[object, EnvironmentReport] = {}
         from exchange.environments import excluded_roots
 
@@ -328,6 +329,7 @@ class _Session:
             root_id = repo.upsert_root(
                 conn, env["id"], path=str(det.root), root_key=fold(str(det.root)),
                 variant=det.variant, confidence=det.confidence, signals=det.signals)
+            self.scanned_roots.append(root_id)
             scan_id = repo.start_scan(conn, env["id"], root_id)
             present = self._sync_files(env["id"], root_id, scan_id, det, report)
 
@@ -404,8 +406,10 @@ class _Session:
             return
         self.progress(ProgressEvent(2, "library", "classification"))
         with repo.transaction(self.conn):
-            self.report.classification = classify(self.conn, self.definitions, environment_ids=ids)
-            self.report.suggestions = generate(self.conn, self.definitions, environment_ids=ids)
+            self.report.classification = classify(self.conn, self.definitions, environment_ids=ids,
+                                                  root_ids=self.scanned_roots)
+            self.report.suggestions = generate(self.conn, self.definitions, environment_ids=ids,
+                                               root_ids=self.scanned_roots)
 
     # Phase 3 ----------------------------------------------------------------------------------
 
