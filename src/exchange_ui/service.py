@@ -21,10 +21,13 @@ from exchange.db import open_library, open_library_readonly
 from exchange.db import repository as repo
 from exchange.definitions import DefinitionSet, load_definitions
 from exchange.errors import ExchangeError
+from exchange.lexicons import with_generated
+from exchange.library.desk import unattached_files, unattached_roots
 from exchange.library.query import Page, dossier_detail, list_collections, list_dossiers, sidebar
 from exchange.paths import fold, is_within
 from exchange.scanner.enrichment import thumbnail_dir
 from exchange.scanner.scan import DEFAULT_THRESHOLD
+from exchange.suggestions import list_suggestions
 
 
 @dataclass
@@ -107,6 +110,31 @@ class LibraryService:
 
     def collections(self) -> list[dict]:
         return list_collections(self._conn, self.definitions, threshold=self.threshold)
+
+    def reader(self) -> sqlite3.Connection:
+        """A new read-only connection, for a background thread (connections stay in one thread)."""
+        return open_library_readonly(self.db_path)
+
+    def desk_roots(self) -> list[dict]:
+        return unattached_roots(self._conn)
+
+    def unattached_keys(self, root_id: int, folder: str) -> list[tuple[int, str]]:
+        """The unattached files under a folder as (root id, rel_key), for a product or link."""
+        return [(root_id, f["rel_key"]) for f in unattached_files(self._conn, root_id, folder)]
+
+    def suggestions(self, kind: str | None = None, limit: int = 300, offset: int = 0) -> tuple[list[dict], int]:
+        """Pending suggestions (one page) and how many there are in all."""
+        total = self._conn.execute("SELECT count(*) FROM suggestion WHERE state = 'pending'"
+                                   + (" AND kind = ?" if kind else ""), [kind] if kind else []).fetchone()[0]
+        return list_suggestions(self._conn, kind=kind, limit=limit, offset=offset), total
+
+    def lexicons(self) -> dict:
+        """Lexicons as scans use them: the files, plus the words scans found (known authors)."""
+        return with_generated(self.definitions, repo.generated_words(self._conn)).lexicons
+
+    def suggestion_counts(self) -> dict[str, int]:
+        return dict(self._conn.execute(
+            "SELECT kind, count(*) FROM suggestion WHERE state = 'pending' GROUP BY kind").fetchall())
 
     def connection_for_tests(self) -> sqlite3.Connection:
         return self._conn

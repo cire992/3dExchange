@@ -34,10 +34,13 @@ from exchange.library.query import Brick
 from exchange_ui import theme
 from exchange_ui.delegates import BRICK_SIZE, BrickDelegate, SidebarDelegate
 from exchange_ui.inspector import Inspector
-from exchange_ui.models import BRICK, COLLECTION_UID, KIND, BrowserModel, SidebarModel, filter_for
+from exchange_ui.models import BRICK, COLLECTION_UID, DETAIL, ENV_ID, KIND, BrowserModel, SidebarModel, filter_for
 from exchange_ui.scanning import ScanRunner
 from exchange_ui.service import EditError, Filter, LibraryService
+from exchange_ui.desk import SuggestionsPanel, UnattachedPanel
+from exchange_ui.scanning import CliJob
 from exchange_ui.views import BrickGrid, SidebarTree
+from exchange_ui.watcher import ChangeWatcher
 from exchange_ui.wizard import AddEnvironmentsDialog
 
 _PHASES = {1: "Discovery", 2: "Identification", 3: "Enrichment"}
@@ -55,6 +58,9 @@ class MainWindow(QMainWindow):
         self.sidebar_model = SidebarModel(service, self)
         self.browser_model = BrowserModel(service, self)
         self.filter = Filter()
+        self.desk_mode = "low"  # in the Unidentified desk: low (confidence) | files | suggestions
+        self.watcher = ChangeWatcher(self)
+        self.lexicon_job: CliJob | None = None
 
         central = QWidget()
         central.setObjectName("central")
@@ -96,7 +102,15 @@ class MainWindow(QMainWindow):
         self.runner.progress.connect(self._on_progress)
         self.runner.finished.connect(self._on_scan_finished)
         self.runner.runningChanged.connect(self._on_running)
+        self.unattached_panel.makeProduct.connect(self.product_from_folder)
+        self.unattached_panel.linkFolder.connect(self.link_folder)
+        self.unattached_panel.ignoreFolder.connect(self.ignore_folder)
+        self.suggestions_panel.decided.connect(self._on_suggestions)
+        self.suggestions_panel.subjectSelected.connect(
+            lambda uid: self.inspector.show_detail(self.service.detail(uid)))
+        self.watcher.changed.connect(self._on_changes)
         self.refresh()
+        self._watch()
 
     # Building ---------------------------------------------------------------------------------
 
@@ -127,8 +141,8 @@ class MainWindow(QMainWindow):
         self.rescan_button.setToolTip("Rescan known environments; only what changed is reprocessed (F5)")
         self.rescan_button.clicked.connect(self.rescan)
         settings = QPushButton("⚙")
-        settings.setEnabled(False)
-        settings.setToolTip("Settings arrive with the add-environment wizard")
+        settings.setToolTip("Settings: lexicons")
+        settings.clicked.connect(lambda: self.open_settings())
         for button in (self.add_button, self.rescan_button, settings):
             layout.addWidget(button)
         return bar
@@ -196,6 +210,25 @@ class MainWindow(QMainWindow):
         header.addLayout(segments)
         layout.addLayout(header)
 
+        # The Unidentified desk's three piles, shown while the desk is open.
+        self.desk_bar = QWidget()
+        desk = QHBoxLayout(self.desk_bar)
+        desk.setContentsMargins(0, 6, 0, 0)
+        desk.setSpacing(0)
+        self.desk_buttons = QButtonGroup(self)
+        for label, mode in (("Low confidence", "low"), ("Unattached files", "files"), ("Suggestions", "suggestions")):
+            button = QPushButton(label)
+            button.setObjectName("segment")
+            button.setCheckable(True)
+            button.setProperty("mode", mode)
+            button.setChecked(mode == "low")
+            self.desk_buttons.addButton(button)
+            desk.addWidget(button)
+        desk.addStretch(1)
+        self.desk_buttons.buttonClicked.connect(lambda b: self.set_desk_mode(b.property("mode")))
+        self.desk_bar.hide()
+        layout.addWidget(self.desk_bar)
+
         self.grid = BrickGrid()
         self.grid.setViewMode(QListView.ViewMode.IconMode)
         self.grid.setResizeMode(QListView.ResizeMode.Adjust)
@@ -221,6 +254,10 @@ class MainWindow(QMainWindow):
         self.stack = QStackedLayout(stack_host)
         self.stack.addWidget(self.grid)
         self.stack.addWidget(self.empty)
+        self.unattached_panel = UnattachedPanel(self.service)
+        self.suggestions_panel = SuggestionsPanel(self.service)
+        self.stack.addWidget(self.unattached_panel)
+        self.stack.addWidget(self.suggestions_panel)
         layout.addSpacing(8)
         layout.addWidget(stack_host, 1)
         return center
@@ -311,14 +348,96 @@ class MainWindow(QMainWindow):
             self.unidentified_button.blockSignals(True)
             self.unidentified_button.setChecked(False)
             self.unidentified_button.blockSignals(False)
+            self._close_desk()
         self.filter = filter_for(index, self.filter)
         self.browser_model.set_filter(self.filter)
 
     def _on_unidentified(self, checked: bool) -> None:
         if checked:
             self.tree.selectionModel().clearSelection()
+            self.desk_bar.show()
+            self._update_desk_counts()
+        else:
+            self._close_desk()
         self.filter = Filter(query=self.filter.query, group=self.filter.group, unidentified=checked)
         self.browser_model.set_filter(self.filter)
+
+    # The Unidentified desk --------------------------------------------------------------------
+
+    def _close_desk(self) -> None:
+        self.desk_bar.hide()
+        self.set_desk_mode("low")
+
+    def set_desk_mode(self, mode: str) -> None:
+        """Show one of the desk's piles: low-confidence assets, unattached files or suggestions."""
+        self.desk_mode = mode
+        for button in self.desk_buttons.buttons():
+            button.setChecked(button.property("mode") == mode)
+        if mode == "files":
+            if self.unattached_panel.model.rowCount() == 0:
+                self.unattached_panel.load_roots()
+            self.stack.setCurrentWidget(self.unattached_panel)
+            self.title.setText("Unattached files")
+            self.subtitle.setText(f"{self.sidebar_model.unattached:,} files belong to no asset (as of the last scans)")
+        elif mode == "suggestions":
+            self.suggestions_panel.reload()
+            self.stack.setCurrentWidget(self.suggestions_panel)
+            self.title.setText("Suggestions")
+            self.subtitle.setText("Links and groupings Exchange found; check them, then accept or reject in batches")
+        else:
+            self._update_header(self.browser_model.total)
+        self.search.setEnabled(mode == "low")
+        for button in self.group_buttons.buttons():
+            button.setVisible(mode == "low")  # grouping is for the grid only
+
+    def _update_desk_counts(self) -> None:
+        counts = self.service.suggestion_counts()
+        for button in self.desk_buttons.buttons():
+            mode = button.property("mode")
+            n = {"low": self.sidebar_model.unidentified, "files": self.sidebar_model.unattached,
+                 "suggestions": sum(counts.values())}[mode]
+            label = {"low": "Low confidence", "files": "Unattached files", "suggestions": "Suggestions"}[mode]
+            button.setText(f"{label}  {n:,}")
+
+    def product_from_folder(self, root_id: int, env_id: int, folder: str, count: int) -> None:
+        name = self.ask_text("New product", f"Name for a product holding the {count:,} files in {folder}:",
+                             folder.rsplit("/", 1)[-1])
+        if not name:
+            return
+        files = self.service.unattached_keys(root_id, folder)
+        if self._edit(f"new product {name}", lambda cur: cur.create_product(name, [], files=files), scope="all"):
+            self.unattached_panel.reload_folder(folder, root_id)
+
+    def link_folder(self, root_id: int, folder: str, count: int) -> None:
+        target = self.pick_asset(f"Link the {count:,} files in {folder} to…")
+        if target is None:
+            return
+        uid, name = target
+        files = self.service.unattached_keys(root_id, folder)
+        if self._edit(f"link files to {name}", lambda cur: cur.link_files(uid, files), scope="all"):
+            self.unattached_panel.reload_folder(folder, root_id)
+
+    def ignore_folder(self, env_id: int, folder: str) -> None:
+        root_id = self.unattached_panel.selected_folder()[0] if self.unattached_panel.selected_folder() else None
+        if self._edit(f"ignore {folder}", lambda cur: cur.ignore_folder(env_id, folder), scope="all") and root_id:
+            self.unattached_panel.reload_folder(folder, root_id)
+
+    def pick_asset(self, title: str) -> tuple[str, str] | None:
+        """Ask for an asset by searching for it; (uid, name) or None (tests replace this)."""
+        from exchange_ui.pickers import AssetPicker
+
+        dialog = AssetPicker(self.service, title, self)
+        return dialog.chosen if dialog.exec() else None
+
+    def _on_suggestions(self, ids: list[int], accept: bool) -> None:
+        n = f"{len(ids):,} suggestion{'s' * (len(ids) != 1)}"
+        if accept:
+            self._edit(f"accept {n}", lambda cur: cur.accept_many(ids), scope="all")
+        else:
+            self._edit(f"reject {n}", lambda cur: cur.reject(ids), scope="none")
+        if self.desk_mode == "suggestions":
+            self.suggestions_panel.reload()
+            self._update_desk_counts()
 
     def _on_group(self, button: QPushButton) -> None:
         self.filter.group = button.property("group")
@@ -333,13 +452,15 @@ class MainWindow(QMainWindow):
         self.search_error.setVisible(bool(message))
 
     def _update_header(self, total: int) -> None:
+        if self.filter.unidentified and self.desk_mode != "low":
+            return  # another pile of the desk is showing; the grid updates behind it
         index = self.tree.currentIndex()
         if self.filter.parent_uid:
             crumb, title = "Product contents · click the sidebar to go back", self.filter.parent_name
         elif self.filter.collection_uid:
             crumb, title = "Collection", self.filter.collection_name
         elif self.filter.unidentified:
-            crumb, title = "Library", "Unidentified"
+            crumb, title = "Unidentified desk", "Low confidence"
         elif index.isValid() and index.data(KIND) not in (None, "all", "section"):
             kind = index.data(KIND)
             env = index
@@ -431,6 +552,18 @@ class MainWindow(QMainWindow):
             target = clicked.uid if clicked.uid in uids else uids[0]
             name = clicked.name if clicked.uid in uids else self.browser_model.brick(self.browser_model.row_of(target)).name
             menu.addAction(f"Merge the others into “{name}”", lambda: self.merge([u for u in uids if u != target], target))
+        else:
+            detail = self.service.detail(clicked.uid) or {"ledgers": [], "variants": []}
+            live = [e for l in detail["ledgers"] for e in l["entries"] if e["status"] != "retired"]
+            if len(live) > 1:
+                menu.addAction("Split…", lambda: self.split(detail))
+            for variant in detail["variants"]:
+                menu.addAction(f"Make variant “{variant}” its own asset", lambda v=variant: self._edit(
+                    f"make variant {v} its own asset", lambda cur: cur.promote_variant(clicked.uid, v), scope="all"))
+        dismissed = "is:dismissed" in self.filter.query.lower()
+        menu.addAction("Count as an asset again" if dismissed else "Not an asset", lambda: self._edit(
+            "count as an asset again" if dismissed else "not an asset",
+            lambda cur: cur.dismiss(uids, not dismissed), scope="all"))
         menu.addSeparator()
         menu.addAction("Show in folder", lambda: self._show_in_folder(index))
         menu.addAction("Open in app", lambda: self._open_in_app(index))
@@ -486,6 +619,8 @@ class MainWindow(QMainWindow):
         return result
 
     def _after_edit(self, scope: str) -> None:
+        if scope == "none":
+            return
         if scope == "all":
             self.refresh()
             return
@@ -563,6 +698,28 @@ class MainWindow(QMainWindow):
         if name:
             self._edit(f"new product {name}", lambda cur: cur.create_product(name, uids), scope="all")
 
+    def ask_entries(self, detail: dict) -> tuple[list[int], str] | None:
+        """Entries to split off and the new asset's name, or None (tests replace this)."""
+        from exchange_ui.pickers import EntryPicker
+
+        dialog = EntryPicker(detail, self)
+        if dialog.exec() and dialog.checked():
+            return dialog.checked(), dialog.name.text().strip() or detail["name"]
+        return None
+
+    def split(self, detail: dict) -> None:
+        chosen = self.ask_entries(detail)
+        if chosen:
+            entries, name = chosen
+            self._edit(f"split {name} off", lambda cur: cur.split(detail["uid"], entries, name), scope="all")
+
+    def fold_variant(self, uid: str, target: Brick) -> None:
+        variant = self.ask_text("Fold in as a variant", f"It becomes a variant of “{target.name}”. Variant name "
+                                                         "(e.g. Blue, Rusty):")
+        if variant:
+            self._edit(f"fold in as variant {variant}", lambda cur: cur.fold_variant(uid, target.uid, variant),
+                       scope="all")
+
     def merge(self, uids: list[str], target: str) -> None:
         """Merge dossiers into ``target`` (the same asset found more than once); one undo step each."""
         for uid in uids:
@@ -615,6 +772,8 @@ class MainWindow(QMainWindow):
                 f"put into {target.name}", lambda cur: cur.set_parent(uids, target.uid), scope="all"))
         menu.addAction(f"Link their files to “{target.name}”", lambda: self.link_dossiers(target, uids))
         menu.addAction(f"Merge {n} into “{target.name}” (the same asset)", lambda: self.merge(uids, target.uid))
+        if len(uids) == 1:
+            menu.addAction(f"Fold in as a variant of “{target.name}”…", lambda: self.fold_variant(uids[0], target))
         menu.addSeparator()
         menu.addAction("Cancel")
         return menu
@@ -719,10 +878,79 @@ class MainWindow(QMainWindow):
             self.status.setText(" · ".join([text, *notes]))
         self.status.style().unpolish(self.status)
         self.status.style().polish(self.status)
+        if not error:
+            self.watcher.clear({e["id"] for e in envs if e.get("id") is not None})
+        self.refresh()
+        self._watch()
+        self._changes_shown()
+        if self.unattached_panel.model.rowCount():
+            self.unattached_panel.load_roots()  # counts changed with the scan
+
+    # Change detection -------------------------------------------------------------------------
+
+    def _watch(self) -> None:
+        """Watch the online roots for changes (the user decides when to rescan)."""
+        self.watcher.watch([(r["path"], r["environment_id"]) for r in self.service.roots() if r["status"] == "online"])
+
+    def _on_changes(self, environment_id: int) -> None:
+        self._changes_shown()
+        names = [e["name"] for e in self.service.sidebar()["environments"] if e["id"] in self.watcher.changed_environments]
+        if not self.runner.running:
+            self._say(f"Changes detected in {', '.join(names)} · Rescan changed (F5) when you're ready")
+
+    def _changes_shown(self) -> None:
+        """Mark environments with changes in the sidebar and on the rescan button."""
+        changed = self.watcher.changed_environments
+        self.sidebar_model.changed = changed
+        model = self.sidebar_model
+        for r in range(model.rowCount()):
+            index = model.index(r, 0)
+            if index.data(KIND) == "environment":
+                model.itemFromIndex(index).setData(model.env_detail(index.data(ENV_ID)), DETAIL)
+        self.rescan_button.setText(f"Rescan changed ({len(changed)})" if changed else "Rescan changed")
+        self.rescan_button.setObjectName("primary" if changed else "")
+        self.rescan_button.style().unpolish(self.rescan_button)
+        self.rescan_button.style().polish(self.rescan_button)
+
+    # Settings ---------------------------------------------------------------------------------
+
+    def open_settings(self, lexicon: str | None = None):
+        from exchange_ui.settings import SettingsDialog
+
+        dialog = SettingsDialog(self)
+        dialog.applyRequested.connect(self.apply_lexicons)
+        if lexicon:
+            dialog.select(lexicon)
+        dialog.open()
+        return dialog
+
+    def apply_lexicons(self, regroup: bool) -> None:
+        """Re-run classification (and the grouping of Daz products) with the edited lexicons, in
+        a background process like a scan."""
+        if self.runner.running or self.lexicon_job is not None:
+            self._say("Wait for the running scan to finish, then apply the lexicons.", error=True)
+            return
+        self.lexicon_job = CliJob(["classify", *(["--regroup"] if regroup else [])], self.service.db_path, self)
+        self.lexicon_job.finished.connect(self._on_lexicons_applied)
+        self._say("Applying lexicon changes to the library" + (" and regrouping Daz products (minutes on a big "
+                                                               "library)" if regroup else "") + " …")
+        self.lexicon_job.start()
+
+    def _on_lexicons_applied(self, data, error: str) -> None:
+        self.lexicon_job = None
+        if error:
+            self._say(f"Applying the lexicons failed: {error}", error=True)
+            return
+        stats = (data or {}).get("classification", {})
+        self._say(f"Lexicons applied · {stats.get('tagged', 0):,} assets tagged")
         self.refresh()
 
     def closeEvent(self, event) -> None:
         self.search_timer.stop()
         if self.runner.running:
             self.runner.stop()
+        if self.lexicon_job is not None:
+            self.lexicon_job.kill()
+        self.watcher.stop()
+        self.unattached_panel.wait()
         super().closeEvent(event)

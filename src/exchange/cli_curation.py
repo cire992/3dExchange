@@ -84,6 +84,19 @@ def add_parsers(commands, common: argparse.ArgumentParser) -> None:
     p = cur.add_parser("product", parents=[common], help="make a product holding some dossiers")
     p.add_argument("name")
     p.add_argument("uids", nargs="+")
+    p = cur.add_parser("dismiss", parents=[common], help="not an asset: out of Unidentified and default views")
+    p.add_argument("uids", nargs="+")
+    p.add_argument("--restore", action="store_true", help="count them as assets again")
+    p = cur.add_parser("ignore-folder", parents=[common],
+                       help="ignore a folder from now on (its unattached files leave the desk)")
+    p.add_argument("env", type=int, metavar="ENV_ID")
+    p.add_argument("folder", help="relative to the environment's roots, e.g. Runtime/Libraries/Old")
+    p.add_argument("--restore", action="store_true", help="stop ignoring it")
+
+    desk = commands.add_parser("desk", parents=[common],
+                               help="unattached files (no asset holds them), folder by folder")
+    desk.add_argument("root", type=int, nargs="?", metavar="ROOT_ID", help="a root (see: exchange env list)")
+    desk.add_argument("folder", nargs="?", default="", help="a folder in that root")
 
     coll = commands.add_parser("collection", help="manual and smart collections")
     col = coll.add_subparsers(dest="collection_command", required=True)
@@ -195,8 +208,8 @@ def _suggest(args, definitions, conn, curator) -> int:
         _emit(args, rows, "\n".join(lines) or f"No {args.state} suggestions.")
         return 0
     if args.suggest_command == "accept":
-        logs = [curator.accept(i) for i in args.ids]
-        _emit(args, {"log_ids": logs}, f"Accepted {len(logs)} · undo with: exchange undo <id> ({', '.join(map(str, logs))})")
+        log_id = curator.accept_many(args.ids)
+        _emit(args, {"log_id": log_id}, f"Accepted {len(args.ids)} · undo with: exchange undo {log_id}")
     else:
         log_id = curator.reject(args.ids)
         _emit(args, {"log_id": log_id}, f"Rejected {len(args.ids)} · undo with: exchange undo {log_id}")
@@ -227,6 +240,10 @@ def _curate(args, definitions, conn, curator) -> int:
         log_id, new_uid = curator.split(uid(args.uid), args.entries, name=args.name)
     elif c == "promote":
         log_id, new_uid = curator.promote_variant(uid(args.uid), args.variant)
+    elif c == "dismiss":
+        log_id = curator.dismiss([uid(u) for u in args.uids], dismissed=not args.restore)
+    elif c == "ignore-folder":
+        log_id = curator.ignore_folder(args.env, args.folder, ignored=not args.restore)
     else:
         log_id, new_uid = curator.create_product(args.name, [uid(u) for u in args.uids])
     text = f"Done · undo with: exchange undo {log_id}" + (f"\nNew dossier {new_uid}" if new_uid else "")
@@ -268,6 +285,23 @@ def _undo(args, definitions, conn, curator) -> int:
     return 0
 
 
+def _desk(args, definitions, conn, curator) -> int:
+    from exchange.library.desk import unattached_folders, unattached_roots
+
+    if args.root is None:
+        rows = unattached_roots(conn)
+        _emit(args, rows, "\n".join(f"  root {r['id']:>3}  {r['environment']}  {r['path']}" for r in rows)
+              + "\nShow one with: exchange desk ROOT_ID [FOLDER]" if rows else "No online roots.")
+        return 0
+    data = unattached_folders(conn, args.root, args.folder)
+    lines = [f"{data['total']:,} unattached files in {args.folder or 'the root'}"]
+    lines += [f"  {f['count']:>9,}  {f['path']}/" for f in data["folders"]]
+    if data["files"]:
+        lines.append(f"  {data['files']:>9,}  (files directly here)")
+    _emit(args, data, "\n".join(lines))
+    return 0
+
+
 _COMMANDS = {"classify": _classify, "lexicon": _lexicon, "suggest": _suggest, "curate": _curate,
-             "collection": _collection, "history": _history, "undo": _undo}
+             "collection": _collection, "history": _history, "undo": _undo, "desk": _desk}
 COMMANDS = tuple(_COMMANDS)

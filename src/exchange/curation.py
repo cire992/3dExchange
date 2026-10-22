@@ -24,7 +24,9 @@ from exchange.db import repository as repo
 from exchange.definitions.schema import GENERATED_LEXICON_KINDS, DefinitionSet
 from exchange.errors import ExchangeError
 from exchange.lexicons import LexiconIndex, has_word, set_word, word_state
+from exchange.library.desk import UNATTACHED, key_range
 from exchange.links import apply_file_links
+from exchange.paths import fold
 from exchange.scanner.tokenize import tokenize
 
 EDITABLE_FIELDS = ("name", "type_id", "author", "authors", "license", "redistribution", "source", "url",
@@ -124,12 +126,15 @@ class Curator:
         files = list(files)
         if not files:
             raise CurationError("no files to link")
+        self._check_files(files)
+        changes = [("link", (f"root:{r}:{k}",), {"target": uid, "role": role}) for r, k in files]
+        return self._run("link_files", changes, [uid], {"files": [k for _, k in files], "role": role})
+
+    def _check_files(self, files: list[tuple[int, str]]) -> None:
         for root_id, rel_key in files:
             if self.conn.execute("SELECT 1 FROM file WHERE root_id = ? AND rel_key = ?",
                                  (root_id, rel_key)).fetchone() is None:
                 raise CurationError(f"no file {rel_key} in root {root_id}")
-        changes = [("link", (f"root:{r}:{k}",), {"target": uid, "role": role}) for r, k in files]
-        return self._run("link_files", changes, [uid], {"files": [k for _, k in files], "role": role})
 
     def unlink_files(self, files: Iterable[tuple[int, str]]) -> int:
         changes = [("link", (f"root:{r}:{k}",), None) for r, k in files]
@@ -192,18 +197,47 @@ class Curator:
         source = self.dossier(uid)
         return self.split(uid, entries, name=f"{source['name']} {variant}")
 
-    def create_product(self, name: str, child_uids: Iterable[str]) -> tuple[int, str]:
-        """A new product (e.g. for loose files that belong together) holding some dossiers."""
+    def create_product(self, name: str, child_uids: Iterable[str],
+                       files: Iterable[tuple[int, str]] = ()) -> tuple[int, str]:
+        """A new product holding some dossiers and/or files given as (root id, rel_key), e.g. a
+        folder of loose files from the Unidentified desk. One undoable step."""
         if not name.strip():
             raise CurationError("a product needs a name")
-        children = list(child_uids)
+        children, files = list(child_uids), list(files)
+        if not children and not files:
+            raise CurationError("a product needs something in it")
         for uid in children:
             self.dossier(uid)
+        self._check_files(files)
         new_uid = repo.new_uid()
         changes: list[Change] = [("dossier", (new_uid,), {"type_id": "product", "name": name.strip()}),
                                  ("field", (new_uid, "user_created"), True)]
         changes += [("parent", (uid,), {"target": new_uid}) for uid in children]
-        return self._run("create_product", changes, [new_uid, *children], {"name": name}), new_uid
+        changes += [("link", (f"root:{r}:{k}",), {"target": new_uid, "role": "linked"}) for r, k in files]
+        return self._run("create_product", changes, [new_uid, *children],
+                         {"name": name, "files": len(files)}), new_uid
+
+    # The Unidentified desk ---------------------------------------------------------------------
+
+    def dismiss(self, uids: str | Iterable[str], dismissed: bool = True) -> int:
+        """Mark dossiers as not assets (or not any more): out of Unidentified and default views."""
+        uids = [uids] if isinstance(uids, str) else list(uids)
+        for uid in uids:
+            self.dossier(uid)
+        return self._run("dismiss" if dismissed else "undismiss",
+                         [("field", (uid, "not_an_asset"), True if dismissed else None) for uid in uids], uids, {})
+
+    def ignore_folder(self, environment_id: int, folder: str, ignored: bool = True) -> int:
+        """Ignore a folder (relative to the environment's roots) from now on: its unattached files
+        leave the desk now, and rescans skip all of it. Undoable."""
+        folder = folder.strip("/")
+        if not folder:
+            raise CurationError("choose a folder, not a whole root")
+        if repo.get_environment(self.conn, environment_id) is None:
+            raise CurationError(f"no environment {environment_id}")
+        return self._run("ignore_folder" if ignored else "unignore_folder",
+                         [("ignore", (environment_id, f"{folder}/**"), True if ignored else None)], [],
+                         {"environment": environment_id, "folder": folder})
 
     # Collections -----------------------------------------------------------------------------------
 
@@ -264,6 +298,28 @@ class Curator:
     # Suggestions -----------------------------------------------------------------------------------
 
     def accept(self, suggestion_id: int) -> int:
+        return self.accept_many([suggestion_id])
+
+    def accept_many(self, suggestion_ids: Iterable[int]) -> int:
+        """Accept suggestions in one undoable step (the desk's batches)."""
+        ids = list(dict.fromkeys(suggestion_ids))
+        if not ids:
+            raise CurationError("no suggestions to accept")
+        changes: list[Change] = []
+        dossiers: list[str] = []
+        kinds = set()
+        for suggestion_id in ids:
+            more, uids, kind = self._accept_changes(suggestion_id)
+            changes += more
+            dossiers += uids
+            kinds.add(kind)
+        action = f"accept_{kinds.pop()}" if len(kinds) == 1 else "accept_suggestions"
+        details = {"suggestion": ids[0]} if len(ids) == 1 else {"suggestions": ids}
+        log_id = self._run(action, changes, dossiers, details)
+        self.conn.executemany("UPDATE suggestion SET log_id = ? WHERE id = ?", [(log_id, i) for i in ids])
+        return log_id
+
+    def _accept_changes(self, suggestion_id: int) -> tuple[list[Change], list[str], str]:
         s = self.conn.execute("SELECT * FROM suggestion WHERE id = ?", (suggestion_id,)).fetchone()
         if s is None:
             raise CurationError(f"no suggestion {suggestion_id}")
@@ -296,9 +352,7 @@ class Curator:
                 raise CurationError("accepting a lexicon word needs the definitions")
             changes.append(("lexicon", (payload["lexicon"], payload["value"], payload["word"]), True))
         changes.append(("suggestion", (suggestion_id,), {"state": "accepted", "decided_at": repo.now()}))
-        log_id = self._run(f"accept_{s['kind']}", changes, dossiers, {"suggestion": suggestion_id})
-        self.conn.execute("UPDATE suggestion SET log_id = ? WHERE id = ?", (log_id, suggestion_id))
-        return log_id
+        return changes, dossiers, s["kind"]
 
     def reject(self, suggestion_ids: int | Iterable[int]) -> int:
         ids = [suggestion_ids] if isinstance(suggestion_ids, int) else list(suggestion_ids)
@@ -366,6 +420,10 @@ class Curator:
             roots: set[int] = set()
             touched: set[str] = set(dossiers)
             for kind, key, value in changes:
+                if kind == "dossier" and value is None:
+                    # Removing a dossier (undoing one you made): unlinked files must leave it first.
+                    for root_id in roots:
+                        apply_file_links(self.conn, root_id)
                 inverse.append([kind, list(key), self._read(kind, key)])
                 touched |= self._write(kind, key, value, roots)
             for root_id in roots:
@@ -420,6 +478,8 @@ class Curator:
             return {"state": row[0], "decided_at": row[1]} if row else None
         if kind == "lexicon":
             return word_state(self.definitions, *key)
+        if kind == "ignore":
+            return True if key[1] in repo.user_config(c, key[0]).get("ignore", []) else None
         raise CurationError(f"unknown state kind {kind!r}")
 
     def _write(self, kind: str, key: tuple, value: Any, roots: set[int]) -> set[str]:
@@ -465,13 +525,14 @@ class Curator:
             target = c.execute("SELECT id FROM dossier WHERE uid = ?", (value["dossier"],)).fetchone()
             if target is None:
                 raise CurationError(f"no dossier {value['dossier']}")
-            env = c.execute("SELECT l.environment_id FROM entry e JOIN ledger l ON l.id = e.ledger_id WHERE e.id = ?",
-                            key).fetchone()[0]
+            env, old_ledger = c.execute("SELECT l.environment_id, l.id FROM entry e JOIN ledger l ON l.id = e.ledger_id"
+                                        " WHERE e.id = ?", key).fetchone()
             ledger_id = repo.ensure_ledger(c, target[0], env)
             c.execute("UPDATE entry SET ledger_id = ?, moved_from = ?, variant = ? WHERE id = ?",
                       (ledger_id, value["moved_from"], value["variant"], key[0]))
-            c.execute("DELETE FROM ledger WHERE environment_id = ? AND NOT EXISTS"
-                      " (SELECT 1 FROM entry e WHERE e.ledger_id = ledger.id)", (env,))
+            # Only the ledger it left can have become empty (checking them all is slow in a big library).
+            c.execute("DELETE FROM ledger WHERE id = ? AND NOT EXISTS (SELECT 1 FROM entry e WHERE e.ledger_id = ?)",
+                      (old_ledger, old_ledger))
             return {previous, value["dossier"]}
         if kind == "dossier":
             row = c.execute("SELECT id FROM dossier WHERE uid = ?", key).fetchone()
@@ -506,6 +567,27 @@ class Curator:
         if kind == "suggestion":
             c.execute("UPDATE suggestion SET state = ?, decided_at = ? WHERE id = ?",
                       (value["state"], value["decided_at"], key[0]))
+            return set()
+        if kind == "ignore":
+            env_id, glob = key
+            config = repo.user_config(c, env_id)
+            rules = [g for g in config.get("ignore", []) if g != glob] + ([glob] if value else [])
+            if rules:
+                config["ignore"] = rules
+            else:
+                config.pop("ignore", None)
+            repo.set_user_config(c, env_id, config)
+            # Rescans apply the rule to every file; until then only the folder's unattached files
+            # change state, so assets made of its files stay until the next rescan.
+            low, high = key_range(fold(glob[: -len("/**")]))
+            in_folder = ("f.root_id IN (SELECT id FROM environment_root WHERE environment_id = ?)"
+                         " AND f.rel_key >= ? AND f.rel_key < ?")  # uses the (root, rel_key) index
+            if value:
+                c.execute(f"UPDATE file AS f SET state = 'ignored' WHERE {in_folder} AND {UNATTACHED}",
+                          (env_id, low, high))
+            else:
+                c.execute(f"UPDATE file AS f SET state = 'present' WHERE {in_folder} AND f.state = 'ignored'",
+                          (env_id, low, high))
             return set()
         if kind == "lexicon":
             # True: in the user's file; "excluded": removed from a generated lexicon; None: neither.

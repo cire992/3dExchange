@@ -59,7 +59,7 @@ def compile_query(text: str, definitions: DefinitionSet, *, threshold: float = 0
     """
     clauses: list[str] = []
     params: list = []
-    wants_retired = wants_structural = False
+    wants_retired = wants_structural = wants_dismissed = False
     for term in parse_query(text):
         if term.key == "collection":
             sql, args = _collection(term.value, definitions, threshold, conn, _depth)
@@ -69,8 +69,12 @@ def compile_query(text: str, definitions: DefinitionSet, *, threshold: float = 0
             wants_retired = True
         if term.key == "is" and term.value.lower() == "structural":
             wants_structural = True
+        if term.key == "is" and term.value.lower() == "dismissed":
+            wants_dismissed = True
         clauses.append(f"NOT ({sql})" if term.negated else f"({sql})")
         params.extend(args)
+    if not wants_dismissed:
+        clauses.insert(0, f"NOT {DISMISSED}")
     if not wants_structural:
         clauses.insert(0, f"NOT {_STRUCTURAL}")
     if not wants_retired:
@@ -82,6 +86,8 @@ def compile_query(text: str, definitions: DefinitionSet, *, threshold: float = 0
 _LIVE = ("(EXISTS (SELECT 1 FROM ledger l JOIN entry e ON e.ledger_id = l.id"
          " WHERE l.dossier_id = d.id AND e.status != 'retired')"
          " OR EXISTS (SELECT 1 FROM override_field u WHERE u.dossier_uid = d.uid AND u.field = 'user_created'))")
+# Dossiers the user dismissed as not an asset (from the Unidentified desk), out of sight unless asked for.
+DISMISSED = ("EXISTS (SELECT 1 FROM override_field n WHERE n.dossier_uid = d.uid AND n.field = 'not_an_asset')")
 # Parts of another mesh (collision shapes, LOD1 and up) stay out of sight unless asked for.
 _STRUCTURAL = ("EXISTS (SELECT 1 FROM dossier_field s WHERE s.dossier_id = d.id AND s.field = 'structural_role'"
                " AND (s.value = '\"collision\"' OR EXISTS (SELECT 1 FROM dossier_field g WHERE g.dossier_id = d.id"
@@ -170,8 +176,10 @@ def _clause(term: Term, definitions: DefinitionSet, threshold: float) -> tuple[s
                                  " WHERE ef.entry_id = e.id AND ef.role = 'linked')"), []
         if value.lower() == "structural":
             return _STRUCTURAL, []
+        if value.lower() == "dismissed":
+            return DISMISSED, []
         raise SearchError(f"unknown is:{value} "
-                          "(is:unidentified, is:product, is:overridden, is:linked, is:structural)")
+                          "(is:unidentified, is:product, is:overridden, is:linked, is:structural, is:dismissed)")
     if key == "has":
         v = value.lower()
         if v == "thumbnail":
