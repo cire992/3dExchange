@@ -1,21 +1,28 @@
-"""The window's view of the library: a read-only connection plus the core's query API.
+"""The window's view of the library: a read-only connection plus the core's query API, and the
+user's edits through the curation engine.
 
-Scans run in a separate process and write to the database; the window only reads (WAL mode
-lets both happen at once), so the UI never holds a write lock.
+Scans run in a separate process and write to the database. The window reads on its own
+connection (WAL mode lets both happen at once); edits go through a second connection in short
+transactions. A scan holds the write lock while it identifies a root, so an edit made then fails
+quickly with a message instead of freezing the window.
 """
 
 from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
+from exchange.curation import CurationError, Curator
 from exchange.db import open_library, open_library_readonly
 from exchange.db import repository as repo
 from exchange.definitions import DefinitionSet, load_definitions
-from exchange.library.query import Page, dossier_detail, list_dossiers, sidebar
-from exchange.paths import fold
+from exchange.errors import ExchangeError
+from exchange.library.query import Page, dossier_detail, list_collections, list_dossiers, sidebar
+from exchange.paths import fold, is_within
 from exchange.scanner.enrichment import thumbnail_dir
 from exchange.scanner.scan import DEFAULT_THRESHOLD
 
@@ -32,29 +39,52 @@ class Filter:
     unidentified: bool = False
     parent_uid: str | None = None  # showing one product's contents
     parent_name: str = ""
+    collection_uid: str | None = None
+    collection_name: str = ""
 
     def effective_group(self) -> str:
-        """Searches, type and Unidentified views list child dossiers too; grouping by product
-        would hide them."""
-        return "all" if self.query or self.type_id or self.unidentified else self.group
+        """Searches, type, collection and Unidentified views list child dossiers too; grouping
+        by product would hide them."""
+        return "all" if self.query or self.type_id or self.unidentified or self.collection_uid else self.group
 
     def full_query(self) -> str:
-        return f"{self.query} is:unidentified".strip() if self.unidentified else self.query
+        parts = [self.query]
+        if self.unidentified:
+            parts.append("is:unidentified")
+        if self.collection_uid:
+            parts.append(f"collection:{self.collection_uid}")
+        return " ".join(p for p in parts if p)
+
+
+BUSY = "The library is busy: a scan is writing to it. Try again when the scan finishes."
+WRITE_TIMEOUT_MS = 1500
+
+
+class EditError(ExchangeError):
+    """An edit that could not be made, with a message for the user."""
 
 
 class LibraryService:
     def __init__(self, db_path: Path, definitions: DefinitionSet | None = None,
-                 threshold: float = DEFAULT_THRESHOLD) -> None:
+                 threshold: float = DEFAULT_THRESHOLD, user_dir: Path | None = None) -> None:
         self.db_path = Path(db_path).resolve()
         self.definitions = definitions or load_definitions()
         self.threshold = threshold
+        self.user_dir = user_dir  # lexicon edits; None is the user's definitions folder
         self.thumbnails = thumbnail_dir(self.db_path)
         # Create or migrate once, then read only.
         open_library(self.db_path).close()
         self._conn: sqlite3.Connection = open_library_readonly(self.db_path)
+        self._curator: Curator | None = None
+        # This session's actions as (curation_log id, label); undoing one logs its inverse,
+        # which is what redo undoes.
+        self.undo_stack: list[tuple[int, str]] = []
+        self.redo_stack: list[tuple[int, str]] = []
 
     def close(self) -> None:
         self._conn.close()  # closing twice is harmless
+        if self._curator is not None:
+            self._curator.conn.close()
 
     def sidebar(self) -> dict:
         return sidebar(self._conn, self.definitions, threshold=self.threshold)
@@ -75,8 +105,79 @@ class LibraryService:
                                        repo.field_sources(self._conn, detail["parent"]["uid"]).items()}
         return detail
 
+    def collections(self) -> list[dict]:
+        return list_collections(self._conn, self.definitions, threshold=self.threshold)
+
     def connection_for_tests(self) -> sqlite3.Connection:
         return self._conn
+
+    # Editing ------------------------------------------------------------------------------------
+
+    def _curation(self) -> Curator:
+        if self._curator is None:
+            conn = open_library(self.db_path)
+            conn.execute(f"PRAGMA busy_timeout = {WRITE_TIMEOUT_MS}")
+            self._curator = Curator(conn, self.definitions, user_dir=self.user_dir)
+        return self._curator
+
+    def _call(self, fn: Callable[[Curator], Any]) -> Any:
+        try:
+            return fn(self._curation())
+        except CurationError as exc:
+            raise EditError(str(exc)) from exc
+        except sqlite3.OperationalError as exc:
+            if "locked" in str(exc) or "busy" in str(exc):
+                raise EditError(BUSY) from exc
+            raise
+
+    def edit(self, label: str, fn: Callable[[Curator], Any]) -> Any:
+        """Make one undoable edit: ``fn`` calls the curator and returns its log id (or a tuple
+        starting with it). ``label`` names it for Undo/Redo. Raises EditError."""
+        result = self._call(fn)
+        log_id = result[0] if isinstance(result, tuple) else result
+        self.undo_stack.append((log_id, label))
+        self.redo_stack.clear()
+        return result
+
+    def undo(self) -> str | None:
+        """Undo this session's latest edit; returns its label, or None if there is none."""
+        if not self.undo_stack:
+            return None
+        log_id, label = self.undo_stack[-1]
+        undone = self._call(lambda c: c.undo(log_id))
+        self.undo_stack.pop()
+        self.redo_stack.append((undone, label))
+        return label
+
+    def redo(self) -> str | None:
+        if not self.redo_stack:
+            return None
+        log_id, label = self.redo_stack[-1]
+        redone = self._call(lambda c: c.undo(log_id))
+        self.redo_stack.pop()
+        self.undo_stack.append((redone, label))
+        return label
+
+    def undo_entry(self, log_id: int, label: str) -> None:
+        """Undo one entry of a dossier's history (any session); itself undoable."""
+        self.edit(f"undo {label}", lambda c: c.undo(log_id))
+
+    def file_key(self, path: str | Path) -> tuple[int, str] | None:
+        """(root id, rel_key) of a file inside a known root, for linking; None if outside all."""
+        path = Path(path).resolve()
+        for root in repo.list_roots(self._conn):
+            base = Path(root["path"])
+            if is_within(path, base):
+                return root["id"], fold(path.relative_to(base.resolve()).as_posix())
+        return None
+
+    def files_of(self, uid: str) -> list[tuple[int, str]]:
+        """The files of a dossier's live entries, as (root id, rel_key), for linking elsewhere."""
+        rows = self._conn.execute(
+            "SELECT DISTINCT f.root_id, f.rel_key FROM dossier d JOIN ledger l ON l.dossier_id = d.id"
+            " JOIN entry e ON e.ledger_id = l.id AND e.status != 'retired'"
+            " JOIN entry_file ef ON ef.entry_id = e.id JOIN file f ON f.id = ef.file_id WHERE d.uid = ?", (uid,))
+        return [(r[0], r[1]) for r in rows]
 
     def roots(self) -> list:
         return repo.list_roots(self._conn)

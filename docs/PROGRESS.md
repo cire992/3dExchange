@@ -1,6 +1,6 @@
 # Exchange: progress and handoff
 
-Last updated 2026-10-21, during Roadmap phase 3. `main` has phases 1 and 2. PR 3a (curation core) is on branch `phase-3a-curation-core`. 164 tests pass.
+Last updated 2026-10-21, during Roadmap phase 3. `main` has phases 1 and 2 and PR 3a. PR 3b (editing in the main window) is on branch `phase-3b-editing`. 173 tests pass.
 
 Read this first, then `docs/DESIGN_SPEC.md` (the source of truth; use its terms exactly) and
 `docs/USEFUL_PATHS.md` (real asset folders and tools on the dev machine, for testing). The
@@ -20,8 +20,8 @@ file watcher).** The phase 3 plan was approved with all recommended answers (see
 | #4 | 2b: main window (PySide6) | merged |
 | #5 | 2c: add-environment wizard | merged |
 | #6 | This handoff doc | merged |
-| 3a | Curation core: lexicons, classification, undoable curation, suggestions, collections, hand-installed Daz products, CLI | branch `phase-3a-curation-core`, PR to open |
-| 3b | Editing in the main window: inspector editing + revert markers, bulk edit, drag and drop linking, collections in the sidebar, context-menu actions, Ctrl+Z/Ctrl+Y | next |
+| #7 | 3a: curation core: lexicons, classification, undoable curation, suggestions, collections, hand-installed Daz products, CLI | merged |
+| 3b | Editing in the main window: inspector editing + revert markers, bulk edit, drag and drop linking, collections in the sidebar, context-menu actions, Ctrl+Z/Ctrl+Y | branch `phase-3b-editing`, PR to open |
 | 3c | Unidentified desk (low-confidence dossiers, unattached files by folder, suggestions in batches), lexicon editor, file watcher (`watchdog`) | after 3b |
 
 ## How we work
@@ -71,7 +71,7 @@ Phase 2:
 - **Daz Studio:** one environment per PC, holding every content directory (including Daz Connect).
 - **Dependencies:** Pillow and numpy are core dependencies; PySide6 is the optional `ui` extra.
 - **Mesh thumbnails:** a small numpy/Pillow renderer for glTF/GLB/OBJ. Other formats get an icon until the Blender bridge (phase 4).
-- **Inspector:** read-only in phase 2; editing is PR 3b.
+- **Inspector:** read-only in phase 2; editable since PR 3b.
 - **Exact duplicates:** merged automatically, with *unknown provenance*. Never for dossiers the user has edited.
 - **File watcher:** deferred to phase 3 (PR 3c). There is a *Rescan changed* button for now.
 - **Unreal asset types:** from name prefixes (`SM_`, `SK_`, `T_`, `M_`/`MI_`, `BP_`, `.umap`). `.uasset` class parsing is **not** done. Embedded thumbnails are found by scanning for PNG/JPEG signatures.
@@ -127,8 +127,10 @@ src/exchange/            core, never imports Qt (a test enforces this)
   autodiscover.py        Steam, Epic, Unreal recent projects, Daz registry, MO2 instances
   environments.py        register_root (user's type wins), excluded folders
   cli.py cli_curation.py command line
-src/exchange_ui/         PySide6 app: main_window, models (paged browser, sidebar), delegates,
-                         inspector, wizard, scanning (scans run as `python -m exchange ... --progress-json`)
+src/exchange_ui/         PySide6 app: main_window, models (paged browser, sidebar with collections), delegates,
+                         views (grid and sidebar with drag and drop), inspector (editing, bulk edit),
+                         service (reads + edits via Curator, session undo/redo), wizard,
+                         scanning (scans run as `python -m exchange ... --progress-json`)
 tests/                   pytest; fixtures in tests/fixtures/envs; builders.py makes GLB/uasset/PNG/Unreal/
                          Daz Connect content and holds report helpers; tests/ui uses pytest-qt offscreen
 ```
@@ -147,6 +149,10 @@ Key ideas:
   - `lexicons.with_generated()` merges them with the user's lexicon file. Spellings that squash alike (`AeonSoul`, `Aeon Soul`) join one term.
   - The file's `exclude` list holds names the user removed; they are never added back.
   - Lexicon edits apply on the next rescan, or straight away with `exchange classify --regroup`.
+- **Editing in the window (3b):**
+  - The window reads on a read-only connection. Edits go through `LibraryService.edit()` on a second connection with a 1.5 s busy timeout, so an edit made while a scan holds the write lock fails with a message instead of freezing the window.
+  - `edit()` keeps a session undo/redo stack of curation log ids. Redo undoes the undo, as in the core.
+  - The inspector's signals carry the dossier uids its editors were built for, so a field committed as the selection moves still edits the right dossier.
 - **Confidence:** `dossier.confidence_base` is identification's own confidence. Classification adds evidence on top into `dossier.confidence`, so re-classifying never compounds.
 - **Read-only, enforced by tests:**
   - All file reads go through `scanner/readonly.py`.
@@ -174,6 +180,8 @@ Key ideas:
 - **Search:** `tag:food` takes 10 ms with the `dossier_tag_lower` index (0.4 s warm, 9.5 s cold without it).
 - **Missing:** about a third of the files the manifests list are genuinely absent on disk.
 - **UI:** a page of 200 takes 0.2-0.7 s, the sidebar 1.7 s (main thread), search about 0.25 s.
+- **Edits (3b, on a copy of the library):** a rename takes 0.2 s, and changing a field, tag or collection on 200 assets takes under 0.1 s. Undo takes 0.1 s, a dossier's detail 0.2 s, a collection's page 0.8 s.
+  - Bulk tagging was 2.7 s: its suggestion inserts each committed on their own. They now commit together, and a bulk tag only proposes words shared by at least two of the names.
 - **First open:** migrating a 1.6 GB library takes about 17 s, mostly the backup.
 
 **Loose folders** (`Z:\Content Farm\Sketchfab` and `SWBF Model and Textures`), checked in 3a:
@@ -187,7 +195,9 @@ Key ideas:
 
 ## Known gaps and good next candidates
 
-- **3b and 3c** (see the table above). The core for both is in 3a: `Curator`, `list_suggestions`, `list_collections`, and the extended `dossier_detail`.
+- **3c** (see the table above). Its core is in 3a: `Curator`, `list_suggestions`, `list_collections`, and the extended `dossier_detail`.
+- **Not in the window yet** (CLI only): split, fold variant and promote variant; linking files by picking them from a list (drag from Explorer works for scanned files).
+- **Edits that change counts** (merge, new product, accepted suggestion, retype, undo) reload the sidebar, which takes about 1.7 s on the real library on the UI thread.
 - **Speed:**
   - The sidebar query (1.7 s on the real library) runs on the UI thread. Move it to a worker.
   - Enrichment (hashing) has not been run on the full 3.56M-file library.

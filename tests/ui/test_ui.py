@@ -1,7 +1,7 @@
 """The desktop app: models, the main window and background scans."""
 
 from PySide6.QtCore import QModelIndex
-from PySide6.QtWidgets import QLabel
+from PySide6.QtWidgets import QLabel, QLineEdit
 
 from builders import copy_fixture, write
 from exchange_ui.models import BRICK, KIND, THUMBNAIL, BrowserModel, SidebarModel
@@ -35,7 +35,8 @@ def test_sidebar_model(service):
     model = SidebarModel(service)
     model.reload()
     rows = sidebar_rows(model)
-    assert rows[:3] == [("LIBRARY", "section"), ("All assets", "all"), ("ENVIRONMENTS", "section")]
+    assert rows[:5] == [("LIBRARY", "section"), ("All assets", "all"), ("COLLECTIONS", "section"),
+                        ("New collection…", "new_collection"), ("ENVIRONMENTS", "section")]
     envs = {name: model.index(i, 0) for i, (name, kind) in enumerate(rows) if kind == "environment"}
     children = dict(sidebar_rows(model, envs["Daz Studio"]))
     assert children["Daz morph"] == "type"  # one content directory: no container rows
@@ -52,7 +53,7 @@ def test_many_containers_are_grouped(scan, tmp_path, db_path, definitions):
     svc = LibraryService(db_path, definitions)
     model = SidebarModel(svc)
     model.reload()
-    assert ("Mods", "group") in sidebar_rows(model, model.index(3, 0))
+    assert ("Mods", "group") in sidebar_rows(model, model.index(5, 0))
     svc.close()
 
 
@@ -101,8 +102,8 @@ def test_main_window_browsing(window):
 
     select_brick(window, "Marius Head")
     assert window.inspector.name.text() == "Marius Head"
-    texts = [w.text() for w in window.inspector.overview.findChildren(QLabel)]
-    assert any("Jane Doe" in t and "(from product)" in t for t in texts)
+    author = window.inspector.overview.findChild(QLineEdit, "authorEdit")
+    assert author.text() == "" and author.placeholderText() == "Jane Doe, Daz 3D (from product)"
 
     window.tree.setCurrentIndex(find(window, "all", "All assets"))
     index = select_brick(window, "Marius HD-8K for Genesis 9")
