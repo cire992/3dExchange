@@ -262,6 +262,27 @@ def test_lost_library_is_rebuilt_from_sidecars(setup, scan, tmp_path, definition
     assert rows == [(s["barrel"], "requisitioned")]  # the output's asset, by its original uid
 
 
+def test_presets_and_lenient_defaults(setup, capsys):
+    s = setup
+    # A preset or last-used value the pipeline no longer takes is dropped, not an error.
+    p = plan(s, defaults={"stamp_images.size": "big", "stamp_images.gone": 1, "stamp_images.note": "kept"},
+             params={"stamp_images.review": True})
+    assert p.items[0].include and p.items[0].params["stamp_images"] == {"size": 16, "review": True, "note": "kept"}
+
+    db = str(s["db"])
+    assert main(["requisition", "plan", s["barrel"][:10], "--env", str(s["env"]), "--pipeline", "stamp_images",
+                 "--param", "size=5", "--save-preset", "Five", "--db", db]) == 0
+    capsys.readouterr()
+    assert main(["presets", "list", "--db", db]) == 0
+    assert "Five  (stamp_images)" in capsys.readouterr().out
+    assert main(["requisition", "plan", s["barrel"][:10], "--env", str(s["env"]), "--pipeline", "stamp_images",
+                 "--preset", "Five", "--param", "note=hi", "--db", db, "--json"]) == 0
+    item = json.loads(capsys.readouterr().out)["items"][0]
+    assert item["params"]["stamp_images"] == {"size": 5, "review": False, "note": "hi"}
+    assert main(["presets", "delete", "Five", "--db", db]) == 0
+    assert main(["requisition", "plan", s["barrel"][:10], "--env", str(s["env"]), "--preset", "Five", "--db", db]) == 2
+
+
 def test_cli(setup, capsys):
     s = setup
     db = str(s["db"])

@@ -165,6 +165,7 @@ class Inspector(QWidget):
     collectionChanged = Signal(list, str, bool)  # uids, collection uid, member?
     suggestionDecided = Signal(int, bool)  # suggestion id, accepted?
     historyUndo = Signal(int, str)  # curation log id, what it did
+    requisitionRequested = Signal(list)  # uids
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -213,9 +214,11 @@ class Inspector(QWidget):
         self.requisition = QPushButton("Requisition to…")
         self.requisition.setObjectName("primary")
         self.copy = QPushButton("Copy to…")
+        self.requisition.setToolTip("Plan getting this into an environment, then queue it")
+        self.requisition.clicked.connect(lambda: self.targets and self.requisitionRequested.emit(list(self.targets)))
+        self.copy.setEnabled(False)
+        self.copy.setToolTip("Copying between environments arrives in Roadmap phase 5")
         for button in (self.requisition, self.copy):
-            button.setEnabled(False)
-            button.setToolTip("Requisitions arrive in Roadmap phase 4")
             actions.addWidget(button)
         outer.addLayout(actions)
         self.show_detail(None)

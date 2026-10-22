@@ -38,7 +38,7 @@ from exchange.locks import Lock
 from exchange.paths import data_dir, fold, is_within, rel_under
 from exchange.pipelines.manifest import step_params
 from exchange.pipelines.operations import Artifact, Checkpoint, Context, OperationError, accepts
-from exchange.pipelines.registry import PipelinePackage, Registry, check_prerequisites, ready
+from exchange.pipelines.registry import PipelinePackage, Registry, check_prerequisites, ready, resolve_tool
 from exchange.requisitions.endpoints import Endpoint, default_endpoint
 from exchange.requisitions.sidecars import write_sidecar
 
@@ -268,7 +268,7 @@ def _run_item(conn, definitions, registry, req, item, log: _Log, tools) -> tuple
             resuming = bool(state.get("resume")) and pi == state["pipeline"] and si == start
             try:
                 result = _run_step(req["uid"], package, step, spec, inputs, step_params(step, values, dossier),
-                                   dossier, log, resuming)
+                                   dossier, log, resuming, tools)
             except Checkpoint as cp:
                 state.update(pipeline=pi, step=si, resume=False)
                 _save_state(state_path, state)
@@ -311,7 +311,21 @@ def _fill(template: str, values: dict, dossier: dict) -> str:
         raise RequisitionError(f"bad output folder {template!r}: {exc}") from exc
 
 
-def _run_step(req_uid, package, step, spec, inputs, params, dossier, log: _Log, resuming: bool) -> Artifact:
+def bridges_for(package: PipelinePackage, tools, workdir: Path, log: Callable[[str], None]):
+    """What ``ctx.bridge(app)`` returns for a package's step: the bridge to that app, at the path
+    its prerequisite resolves to."""
+    def get(app: str):
+        from exchange.bridges import make_bridge
+
+        path = resolve_tool(package, app, tools)
+        if path is None:
+            raise OperationError(f"{app} is not set up; set it with: exchange tools set {app} PATH")
+        return make_bridge(app, Path(path), workdir / f"bridge-{app}", log)
+    return get
+
+
+def _run_step(req_uid, package, step, spec, inputs, params, dossier, log: _Log, resuming: bool,
+              tools=None) -> Artifact:
     key = hashlib.sha1(json.dumps([package.id, package.manifest.version, step.operation,
                                    [a.fingerprint() for a in inputs], params], sort_keys=True, default=str).encode())
     folder = work_dir(req_uid) / "cache" / key.hexdigest()[:20]
@@ -319,7 +333,9 @@ def _run_step(req_uid, package, step, spec, inputs, params, dossier, log: _Log, 
     if marker.is_file() and not resuming:
         log(step.id, f"{step.operation}: reused an earlier result")
         return Artifact.from_json(json.loads(marker.read_text(encoding="utf-8")))
-    ctx = Context(folder / "work", dossier, lambda message: log(step.id, message), resuming=resuming)
+    say = lambda message: log(step.id, message)  # noqa: E731
+    ctx = Context(folder / "work", dossier, say, resuming=resuming,
+                  bridges=bridges_for(package, tools, folder / "work", say))
     log(step.id, f"{step.operation} {params}" if params else step.operation)
     result = spec.func(ctx, *inputs, **params)
     if not isinstance(result, Artifact):
@@ -363,7 +379,9 @@ def test_pipeline(conn: sqlite3.Connection, folder: Path, uid: str, out_dir: Pat
         spec = package.operation(step.operation)
         params = step_params(step, resolved, dossier)
         log(step.id, f"{step.operation} {params}" if params else step.operation)
-        ctx = Context(work / step.id, dossier, lambda message, s=step.id: log(s, message), resuming=True)
+        say = lambda message, s=step.id: log(s, message)  # noqa: E731
+        ctx = Context(work / step.id, dossier, say, resuming=True,
+                      bridges=bridges_for(package, None, work / step.id, say))
         result = spec.func(ctx, *[produced[name] for name in step.inputs], **params)
         if not isinstance(result, Artifact) or not accepts(spec.output, result.type):
             raise OperationError(f"{step.operation} should make an Artifact of type {spec.output}")

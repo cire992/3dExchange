@@ -57,6 +57,8 @@ def add_parsers(commands, common: argparse.ArgumentParser) -> None:
     p.add_argument("--endpoint", help="write here instead of the environment's default")
     p.add_argument("--on-collision", choices=("ask", "overwrite", "rename", "skip"), default="ask")
     p.add_argument("--name", help="the requisition's name")
+    p.add_argument("--preset", help="start from a preset's options (--param still wins)")
+    p.add_argument("--save-preset", metavar="NAME", help="save the plan's options as a preset")
     p.add_argument("--queue", action="store_true", help="add it to the queue")
     p = rq.add_parser("list", parents=[common], help="the queue and finished requisitions")
     p.add_argument("--state", action="append", help="only these states")
@@ -80,6 +82,13 @@ def add_parsers(commands, common: argparse.ArgumentParser) -> None:
     p = rq.add_parser("rebuild", parents=[common], help="queue a stale requisition again")
     p.add_argument("id")
 
+    presets = commands.add_parser("presets", help="requisition presets: options for every pipeline of a plan")
+    pre = presets.add_subparsers(dest="presets_command", required=True)
+    pre.add_parser("list", parents=[common], help="list presets")
+    for name, text in (("show", "show one preset"), ("delete", "delete one of your presets")):
+        p = pre.add_parser(name, parents=[common], help=text)
+        p.add_argument("name")
+
     test = commands.add_parser("test-pipeline", parents=[common],
                                help="run a pipeline folder on one asset into a temporary folder")
     test.add_argument("folder", type=Path)
@@ -89,11 +98,11 @@ def add_parsers(commands, common: argparse.ArgumentParser) -> None:
     test.add_argument("--out", type=Path, help="where to write (default: a new temporary folder)")
 
 
-COMMANDS = ("pipelines", "tools", "requisition", "test-pipeline")
+COMMANDS = ("pipelines", "tools", "requisition", "presets", "test-pipeline")
 
 
 def run(args, definitions) -> int:
-    handler = {"pipelines": _pipelines, "tools": _tools, "requisition": _requisition,
+    handler = {"pipelines": _pipelines, "tools": _tools, "requisition": _requisition, "presets": _presets,
                "test-pipeline": _test}[args.command]
     return handler(args, definitions)
 
@@ -180,6 +189,7 @@ def _tools(args, definitions) -> int:
 def _requisition(args, definitions) -> int:
     from exchange.requisitions import lifecycle
     from exchange.requisitions.plan import plan_requisition, queue_plan, routes
+    from exchange.requisitions.presets import load_presets, save_preset
     from exchange.requisitions.runner import run_queue
 
     registry = load_registry()
@@ -192,10 +202,24 @@ def _requisition(args, definitions) -> int:
                                         f" (entry {r['source_entry_id']})" for r in rows)
                   or "No ready pipeline takes it there.")
         elif c == "plan":
+            defaults = {}
+            if args.preset:
+                found = load_presets(registry).get(args.preset)
+                if found is None:
+                    raise ExchangeError(f"no preset {args.preset!r} (see: exchange presets list)")
+                defaults = found.params()
             plan = plan_requisition(conn, definitions, registry, _uid(conn, args.uid), args.env,
                                     pipelines=args.pipeline, source_entry_id=args.source_entry,
-                                    params=_params(args.param), endpoint_folder=args.endpoint,
+                                    params=_params(args.param), defaults=defaults, endpoint_folder=args.endpoint,
                                     on_collision=args.on_collision, name=args.name)
+            if args.save_preset:
+                options: dict = {}
+                for i in plan.items:
+                    for pipeline, values in i.params.items():
+                        options.setdefault(pipeline, values)
+                save_preset(args.save_preset, options,
+                            environment=conn.execute("SELECT type_id FROM environment WHERE id = ?",
+                                                     (args.env,)).fetchone()[0])
             queued = queue_plan(conn, plan, registry) if args.queue else None
             data = {"name": plan.name, "endpoint": plan.endpoint.__dict__, "warnings": plan.warnings,
                     "items": [i.__dict__ for i in plan.items], "queued": queued}
@@ -244,7 +268,11 @@ def _requisition(args, definitions) -> int:
             ran = run_queue(args.db, definitions, registry, only=[int(i) for i in args.ids] or None, progress=progress)
             conn = open_library(args.db)
             rows = [lifecycle.detail(conn, i) for i in ran]
-            _emit(args, {"ran": [{"id": r["id"], "state": r["state"], "message": r["message"]} for r in rows]},
+            data = {"ran": [{"id": r["id"], "state": r["state"], "message": r["message"]} for r in rows]}
+            if args.progress_json:  # the window reads this last line
+                print(json.dumps({"event": "result", "data": data}, ensure_ascii=False, default=str), flush=True)
+                return 0
+            _emit(args, data,
                   "\n".join(f"  {r['id']:>4}  {r['state']}  {r['name']}" + (f"  ({r['message']})" if r["message"] else "")
                             for r in rows) or "Nothing queued.")
         elif c == "resume":
@@ -269,6 +297,29 @@ def _requisition(args, definitions) -> int:
         return 0
     finally:
         conn.close()
+
+
+def _presets(args, definitions) -> int:
+    from exchange.requisitions.presets import delete_preset, load_presets
+
+    registry = load_registry()
+    found = load_presets(registry)
+    if args.presets_command == "list":
+        rows = [{"name": p.name, "description": p.description, "pipelines": p.pipelines, "shipped": p.shipped,
+                 "environment": p.environment} for p in found.values()]
+        _emit(args, rows, "\n".join(f"  {r['name']}  ({', '.join(r['pipelines'])})"
+                                    + ("  [shipped]" if r["shipped"] else "") for r in rows) or "No presets yet.")
+    elif args.presets_command == "show":
+        preset = found.get(args.name)
+        if preset is None:
+            raise ExchangeError(f"no preset {args.name!r}")
+        _emit(args, preset.__dict__, "\n".join([f"{preset.name}  ({preset.source})", *(
+            f"  {pipeline}: " + ", ".join(f"{k}={v!r}" for k, v in values.items())
+            for pipeline, values in preset.options.items())]))
+    else:
+        delete_preset(args.name, registry)
+        _emit(args, {"deleted": args.name}, f"Deleted preset {args.name}")
+    return 0
 
 
 def _test(args, definitions) -> int:

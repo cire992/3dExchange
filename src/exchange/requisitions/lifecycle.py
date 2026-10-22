@@ -46,7 +46,9 @@ def list_requisitions(conn: sqlite3.Connection, states: tuple[str, ...] = ()) ->
            " v.name AS environment FROM requisition r JOIN environment v ON v.id = r.environment_id")
     if states:
         sql += f" WHERE r.state IN ({','.join('?' * len(states))})"
-    rows = conn.execute(sql + " ORDER BY r.state NOT IN ('queued', 'held', 'running', 'needs_attention'), r.position",
+    # Waiting or running first, in queue order; then the finished ones, newest first.
+    active = "r.state IN ('queued', 'held', 'running', 'needs_attention')"
+    rows = conn.execute(sql + f" ORDER BY NOT {active}, CASE WHEN {active} THEN r.position ELSE -r.id END",
                         states).fetchall()
     return [dict(r) for r in rows]
 
