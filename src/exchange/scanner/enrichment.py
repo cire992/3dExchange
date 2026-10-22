@@ -161,7 +161,7 @@ def _merge_duplicates(conn, stats, report) -> None:
                 for entry in repo.entries_of(conn, loser):
                     ledger_id = repo.ensure_ledger(conn, target, entry["environment_id"])
                     status = "unknown" if entry["status"] == "origin" else entry["status"]
-                    repo.move_entry(conn, entry["id"], ledger_id, status)
+                    repo.move_entry(conn, entry["id"], ledger_id, status, moved_from=uid)
                 repo.delete_dossier(conn, loser)
                 stats.merged += 1
             repo.index_dossiers(conn, [target])

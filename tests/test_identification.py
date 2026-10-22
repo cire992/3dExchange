@@ -35,14 +35,14 @@ def entry_files(conn, dossier_id):
 def test_daz_products_from_manifests(scan, daz_library, library):
     report = scan(daz_library)
     stats = root_report(report, "daz_studio").identification
-    assert (stats.containers, stats.products, stats.dossiers) == (1, 2, 7)
+    assert (stats.containers, stats.products, stats.dossiers) == (1, 3, 8)
     assert stats.unattached_files == 1  # Runtime/Textures/random.png
 
     conn = library()
     d = dossiers(conn, "daz_studio")
     marius = d["Marius HD-8K for Genesis 9"]
     assert marius["type_id"] == "product"
-    assert marius["confidence"] == 0.9
+    assert marius["confidence_base"] == 0.9
     assert marius["container"] == ""  # container = the content directory
     f = fields(conn, marius["id"])
     assert f["daz_product_token"] == "12345"
@@ -55,7 +55,7 @@ def test_daz_products_from_manifests(scan, daz_library, library):
 
     # Children come from the manifest's assets, typed by their Daz ContentType.
     head = d["Marius Head"]
-    assert (head["type_id"], head["confidence"]) == ("daz_morph", 0.85)
+    assert (head["type_id"], head["confidence_base"]) == ("daz_morph", 0.85)
     assert head["parent_name"] == "Marius HD-8K for Genesis 9"
     head_fields = fields(conn, head["id"])
     assert head_fields["variant"] == "genesis_9"  # from the asset's compatibility
@@ -70,9 +70,12 @@ def test_daz_products_from_manifests(scan, daz_library, library):
     assert dress["parent_name"] == "Summer Dress for Genesis 8 Female"
     assert fields(conn, dress["id"])["variant"] == "genesis_8"
 
-    boots = d["Loose Boots"]  # installed by hand: no product, but still recognized
-    assert boots["parent_id"] is None
-    assert boots["type_id"] == "daz_wearable"
+    # Installed by hand (no manifest): its folder becomes a product holding the wearable.
+    boots = conn.execute(
+        "SELECT d.*, p.name AS parent_name, p.type_id AS parent_type, p.confidence_base AS parent_confidence"
+        " FROM dossier d JOIN dossier p ON p.id = d.parent_id"
+        " WHERE d.name = 'Loose Boots' AND d.type_id = 'daz_wearable'").fetchone()
+    assert (boots["parent_type"], boots["parent_name"], boots["parent_confidence"]) == ("product", "Loose Boots", 0.6)
     tokens = [r[0] for r in conn.execute(
         "SELECT token FROM dossier_token WHERE dossier_id = ? ORDER BY position", (boots["id"],))]
     assert tokens == ["loose", "boots"]
@@ -93,12 +96,12 @@ def test_mo2_mods_are_containers_and_products(scan, mo2_instance, library):
     d = dossiers(conn, "skyrim_se")
     lard = d["Lard Lads Donuts"]
     assert lard["container"] == "mods/Lard Lads Donuts"
-    assert lard["confidence"] == 0.95
+    assert lard["confidence_base"] == 0.95
     f = fields(conn, lard["id"])
     assert f["nexus_mod_id"] == 12345
     assert f["version"] == "1.2.0"
     assert f["source"] == "Nexus"
-    assert d["Test Requisitions"]["confidence"] == 0.9  # no meta.ini
+    assert d["Test Requisitions"]["confidence_base"] == 0.9  # no meta.ini
     assert d["donut01"]["type_id"] == "mesh"  # static vs skinned is decided in phase 3
     assert d["donut01"]["parent_name"] == "Lard Lads Donuts"
 
@@ -122,9 +125,9 @@ def test_loose_files_use_folder_heuristics(scan, loose_folder, library):
 
     d = dossiers(library(), "loose_files")
     assert d["props"]["type_id"] == "product"
-    assert d["props"]["confidence"] == 0.3
+    assert d["props"]["confidence_base"] == 0.3
     assert d["Donut01_Pink"]["parent_name"] == "props"
-    assert d["Donut01_Pink"]["confidence"] == pytest.approx(0.56)
+    assert d["Donut01_Pink"]["confidence_base"] == pytest.approx(0.56)
     assert d["Barrel01"]["parent_id"] is None  # a lone asset needs no product
     assert d["ding"]["type_id"] == "audio"
 

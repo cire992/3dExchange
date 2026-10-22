@@ -1,0 +1,56 @@
+# Texture channels: an image whose name ends in one of these (before any UDIM or index number)
+# is a texture of the mesh with the rest of the name: Barrel01_D.png, Barrel01_N.png -> Barrel01.
+
+[lexicon]
+id = "texture_channel"
+name = "Texture channels"
+kind = "texture_channel"
+format_version = 1
+
+[[term]]
+value = "BaseColor"
+words = ["d", "diff", "diffuse", "albedo", "basecolor", "base color", "col", "colour", "bc", "alb"]
+
+[[term]]
+value = "Normal"
+words = ["n", "nrm", "nor", "norm", "normal", "normalmap", "nm"]
+
+[[term]]
+value = "Roughness"
+words = ["r", "rough", "roughness", "rgh"]
+
+[[term]]
+value = "Metallic"
+words = ["m", "met", "metal", "metallic", "metalness"]
+
+[[term]]
+value = "ORM"
+words = ["orm", "arm", "rma", "mra", "mask", "masks"]
+
+[[term]]
+value = "AO"
+words = ["ao", "occlusion", "ambientocclusion", "ambient occlusion"]
+
+[[term]]
+value = "Height"
+words = ["h", "height", "disp", "displacement", "bump", "parallax"]
+
+[[term]]
+value = "Specular"
+words = ["s", "spec", "specular", "spc"]
+
+[[term]]
+value = "Gloss"
+words = ["g", "gloss", "glossiness"]
+
+[[term]]
+value = "Emissive"
+words = ["e", "emissive", "emission", "glow", "illum"]
+
+[[term]]
+value = "Opacity"
+words = ["a", "alpha", "opacity", "transparency", "cutout"]
+
+[[term]]
+value = "Subsurface"
+words = ["sss", "subsurface", "translucency", "trans"]

@@ -1,8 +1,9 @@
 """Load environment and dossier-type definitions from TOML files.
 
 Search order: the built-ins shipped with Exchange, then the user's definitions folder, then any
-extra folders passed in. Each folder holds ``environments/*.toml`` and ``dossier_types/*.toml``.
-A later file with the same ``id`` replaces an earlier one.
+extra folders passed in. Each folder holds ``environments/*.toml``, ``dossier_types/*.toml`` and
+``lexicons/*.toml``. A later file with the same ``id`` replaces an earlier one, which is how the
+user's lexicon edits (written to their definitions folder) take effect.
 
 Validation is strict (unknown keys are errors) so a typo in a hand- or AI-written definition is
 reported with its file and key instead of being silently ignored.
@@ -23,9 +24,13 @@ from exchange.definitions.schema import (
     TYPE_SCOPES,
     VARIANT_LEVELS,
     DefinitionSet,
+    GENERATED_LEXICON_KINDS,
+    LEXICON_KINDS,
     DossierTypeDefinition,
     EnvironmentDefinition,
     IdentifyRule,
+    Lexicon,
+    LexiconTerm,
     Signature,
     Variant,
 )
@@ -49,6 +54,7 @@ def load_definitions(
 
     environments: dict[str, EnvironmentDefinition] = {}
     dossier_types: dict[str, DossierTypeDefinition] = {}
+    lexicons: dict[str, Lexicon] = {}
     for base in dirs:
         for item in _toml_files(base, "environments"):
             env = parse_environment(_read_toml(item), str(item))
@@ -56,8 +62,11 @@ def load_definitions(
         for item in _toml_files(base, "dossier_types"):
             dtype = parse_dossier_type(_read_toml(item), str(item))
             dossier_types[dtype.id] = dtype
+        for item in _toml_files(base, "lexicons"):
+            lexicon = parse_lexicon(_read_toml(item), str(item))
+            lexicons[lexicon.id] = lexicon
 
-    definitions = DefinitionSet(environments, dossier_types)
+    definitions = DefinitionSet(environments, dossier_types, lexicons)
     validate(definitions)
     return definitions
 
@@ -210,6 +219,32 @@ def _variant(t: _Table) -> Variant:
                       for i, m in enumerate(t.get("match", list)))
         return Variant(_identifier(t), t.get("name", str), level, match=match)
     return Variant(_identifier(t), t.get("name", str), level, globs=t.strings("globs"))
+
+
+# Lexicons -----------------------------------------------------------------------------------------
+
+
+def parse_lexicon(data: dict[str, Any], source: str) -> Lexicon:
+    top = _Table(data, source, "", ["lexicon", "term"])
+    lex = top.table("lexicon", ["id", "name", "format_version", "kind", "exclude"])
+    version = lex.get("format_version", int)
+    if version != FORMAT_VERSION:
+        raise DefinitionError(source, f"unsupported format_version {version} (expected {FORMAT_VERSION})")
+    kind = lex.get("kind", str, choices=LEXICON_KINDS)
+    terms = []
+    for t in top.tables("term", ["value", "words", "patterns"]):
+        words = tuple(w.strip() for w in t.strings("words") if w.strip())
+        patterns = t.strings("patterns")
+        if not words and not patterns:
+            raise DefinitionError(source, f"{t.where} needs words or patterns")
+        value = t.get("value", str, "")
+        if not value and kind not in ("ignore", "index"):
+            raise DefinitionError(source, f"{t.where}.value is required for a {kind} lexicon")
+        terms.append(LexiconTerm(value, words, patterns))
+    exclude = tuple(w.strip() for w in lex.strings("exclude") if w.strip())
+    if exclude and kind not in GENERATED_LEXICON_KINDS:
+        raise DefinitionError(source, f"lexicon.exclude is only for generated lexicons ({', '.join(GENERATED_LEXICON_KINDS)})")
+    return Lexicon(_identifier(lex), lex.get("name", str), kind, source, tuple(terms), exclude)
 
 
 # Dossier-type definitions -----------------------------------------------------------------------

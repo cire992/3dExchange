@@ -1,0 +1,34 @@
+# Variant words: assets whose names differ only by these (Donut01_Pink, Donut01_Blue) are proposed
+# as one dossier with variants. The value is the kind of variation.
+
+[lexicon]
+id = "variant"
+name = "Variants"
+kind = "variant"
+format_version = 1
+
+[[term]]
+value = "Color"
+words = ["red", "green", "blue", "yellow", "orange", "purple", "violet", "pink", "magenta", "cyan",
+         "teal", "turquoise", "black", "white", "grey", "gray", "brown", "beige", "tan", "gold",
+         "golden", "silver", "bronze", "copper", "navy", "maroon", "crimson", "ivory", "cream",
+         "olive", "lime", "dark", "pale"]
+
+[[term]]
+value = "Condition"
+words = ["damaged", "broken", "cracked", "clean", "dirty", "worn", "old", "aged", "weathered",
+         "rusty", "rusted", "burnt", "burned", "destroyed", "ruined", "pristine", "bloody", "wet"]
+
+[[term]]
+value = "Material"
+words = ["wood", "wooden", "metal", "metallic", "steel", "iron", "stone", "marble", "leather",
+         "fabric", "cloth", "silk", "velvet", "glass", "plastic", "ceramic", "brass"]
+
+[[term]]
+value = "Size"
+words = ["small", "medium", "large", "big", "tiny", "huge", "short", "tall", "long", "wide",
+         "narrow", "mini"]
+
+[[term]]
+value = "State"
+words = ["open", "opened", "closed", "empty", "full", "lit", "unlit", "on", "off"]

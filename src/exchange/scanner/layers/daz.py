@@ -20,11 +20,14 @@ from __future__ import annotations
 import re
 import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from urllib.parse import unquote
 
+from exchange.definitions.schema import GENERATED_LEXICON_KINDS
 from exchange.globs import glob_match
+from exchange.lexicons import LexiconIndex, with_generated
 from exchange.paths import fold, normalize_rel
+from exchange.scanner.tokenize import tokenize
 from exchange.scanner.layers.base import (
     ChildSpec,
     ContainerSpec,
@@ -108,6 +111,7 @@ def identify(ctx: LayerContext) -> LayerResult:
             return unlisted_by_tail[tail], True
         return None, False
 
+    claimed: set[str] = set()  # folded paths some manifest accounts for
     per_manifest = Counter(f.rel for f, _ in parsed)
     for index, (f, product) in enumerate(parsed):
         members, children, relocated, missing = [], [], 0, 0
@@ -150,6 +154,17 @@ def identify(ctx: LayerContext) -> LayerResult:
             children_only=True,
         ))
 
+    for product in result.products:
+        claimed.update(fold(r) for r in product.primary + product.members)
+    in_cloud = {fold(f.rel) for files in cloud.values() for f in files}
+    words = LexiconIndex(replace(ctx.definitions, lexicons={  # words other lexicons know
+        k: lex for k, lex in ctx.definitions.lexicons.items() if lex.kind not in GENERATED_LEXICON_KINDS}))
+    result.generated["authors"] = _found_authors([p for _, p in parsed], ctx.files, words)
+    index = LexiconIndex(with_generated(ctx.definitions, result.generated))
+    result.products += _folder_products([f.rel for f in ctx.files if fold(f.rel) not in claimed
+                                         and fold(f.rel) not in in_cloud
+                                         and not glob_match(manifest_glob, f.rel)], index)
+
     for folder, files in sorted(cloud.items()):
         sku = _CLOUD_FOLDER.match(folder).group(2)
         result.products.append(ProductSpec(
@@ -164,6 +179,145 @@ def identify(ctx: LayerContext) -> LayerResult:
             type_root=folder,
         ))
     return result
+
+
+# Unmanifested content -----------------------------------------------------------------------------
+
+# Subfolders that hold part of a product rather than a product of their own.
+_PART_FOLDERS = frozenset({
+    "materials", "material", "mat", "mats", "iray", "3delight", "3dl", "filament", "textures", "texture",
+    "poses", "pose", "morphs", "morph", "presets", "preset", "shaders", "shader", "utilities", "utility",
+    "scripts", "hide", "show", "fits", "fit", "expressions", "expression", "options", "addons", "extras",
+    "parts", "props", "lights", "cameras", "render settings", "!presets", "!utilities", "readme", "readmes",
+})
+UNMANIFESTED_CONFIDENCE = 0.6
+VENDOR_FOLDER_CONFIDENCE = 0.75  # an author taken from a vendor folder's name
+_NOT_VENDORS = frozenset({"cloud", "auto_adapted"})  # data/ folders that are not vendors
+_MAX_DATA_PLACES = 3  # data/<vendor>/<Product>, its textures, a morphs folder
+
+
+def _found_authors(manifests: list[ManifestProduct], files: list[FileInfo],
+                   index: LexiconIndex) -> list[tuple[str, str]]:
+    """Known authors in a content directory: manifest artists and ``data/<vendor>/`` folders.
+
+    Short names (``dm``) come only from these two places, never from folders elsewhere. A data/
+    folder is not taken as a vendor when it is named after a figure (``data/Genesis 8 Female``,
+    as ``People/Genesis 8 Female``) or its name is all words other lexicons know (Plants, Silver).
+    """
+    found = {(name, name) for m in manifests for a in m.fields.get("authors", ()) if (name := _author_name(a))}
+    figures = set()
+    vendors = set()
+    for f in files:
+        parts = f.rel.split("/", 2)
+        if len(parts) < 3:
+            continue
+        top = fold(parts[0])
+        if top == "people":
+            figures.add(fold(parts[1]))
+        elif top == "data" and fold(parts[1]) not in _NOT_VENDORS:
+            vendors.add(parts[1])
+    for folder in vendors:
+        name = _author_name(folder)
+        tokens = tokenize(folder)
+        if name and fold(folder) not in figures and not _GENERATED_DATA_FOLDER.search(folder) \
+                and not all(index.known(t) or t.isdigit() for t in tokens):
+            found.add((name, folder))
+    return sorted(found)
+
+
+# Folders Daz Studio makes when importing Poser or OBJ content: an asset name and a number
+# (data/u2Lamp1_707, data/pPlane(11sg000)1). They are not vendors.
+_GENERATED_DATA_FOLDER = re.compile(r"_\d+$|\(")
+
+
+def _author_name(text: str) -> str | None:
+    """An author's name tidied (" -dragonfly3d- " -> "dragonfly3d"); None if it is not a name."""
+    name = text.strip().strip("!-_'\".,;:()[]{} \t\r\n")
+    return name if len(name) >= 2 and any(ch.isalpha() for ch in name) else None
+
+
+def _folder_products(unlisted: list[str], index: LexiconIndex) -> list[ProductSpec]:
+    """Content no manifest lists (installed by hand, or manifests lost) grouped by product folder.
+
+    A product folder is the folder holding user-facing ``.duf`` files, walking up out of part
+    subfolders (Materials/Iray ...): ``People/Genesis 9/Clothing/Loose Boots``. Lexicons tell
+    products from the folders people sort them into:
+
+    * a **category folder** (its whole name is theme words or category names: ``Sci-Fi``,
+      ``Fantasy Props``; or it starts with ``!``: ``!! Sorted``) is never a product;
+    * a **vendor folder** (its whole name is a known author: ``dm``) is never a product, and the
+      products below it get that author;
+    * otherwise a product folder inside another is part of the outer one (Wolf 2/Materials/Eyes).
+
+    Its data and textures elsewhere (``data/<vendor>/Loose Boots``,
+    ``Runtime/Textures/<vendor>/Loose Boots``) join it when the folder name is unambiguous.
+    """
+    products: dict[str, str] = {}  # folded product folder -> original
+    for rel in unlisted:
+        if not rel.lower().endswith(".duf") or "/" not in rel:
+            continue
+        parts = rel.split("/")[:-1]
+        while len(parts) > 1 and fold(parts[-1]) in _PART_FOLDERS:
+            parts.pop()
+        top = fold(parts[0])
+        if top in ("data", "runtime") or len(parts) < (4 if top == "people" else 2):
+            continue  # too shallow to be one product (People/Genesis 9, Props)
+        if _grouping_folder(parts[-1], index):
+            continue  # loose files in a category or vendor folder belong to no product
+        folder = "/".join(parts)
+        products.setdefault(fold(folder), folder)
+    # A product folder inside another is part of it (Wolf 2/Materials/Eyes, Wolf 2/Poses/Tail).
+    outer = {key: next((key[:i] for i, ch in enumerate(key) if ch == "/" and key[:i] in products), key)
+             for key in products}
+
+    products = {key: folder for key, folder in products.items() if outer[key] == key}
+
+    # Product names that find the product's data/ and Runtime/ files: names of exactly one
+    # product that also name only a few folders there (data/Cayman/Darts and its textures).
+    # Generic names (Chest, Genesis 3, Character) name many folders and are not used.
+    places: dict[str, set[str]] = defaultdict(set)
+    for rel in unlisted:
+        segments = fold(rel).split("/")[:-1]
+        if segments and segments[0] in ("data", "runtime"):
+            for i in range(1, len(segments)):
+                places[segments[i]].add("/".join(segments[: i + 1]))
+    by_name: dict[str, list[str]] = defaultdict(list)
+    for key in products:
+        by_name[key.rsplit("/", 1)[-1]].append(key)
+    unique = {name: keys[0] for name, keys in by_name.items()
+              if len(keys) == 1 and len(name) >= 4 and name not in _PART_FOLDERS
+              and len(places.get(name, ())) <= _MAX_DATA_PLACES}
+
+    members: dict[str, list[str]] = defaultdict(list)
+    for rel in unlisted:
+        key = fold(rel)
+        # The deepest product folder above the file; a few dict lookups, not a scan of all folders.
+        owner, cut = None, key.rfind("/")
+        while cut > 0 and owner is None:
+            key = key[:cut]
+            owner = key if key in products else None
+            cut = key.rfind("/")
+        if owner is None and fold(rel.split("/", 1)[0]) in ("data", "runtime"):
+            owner = next((unique[seg] for seg in map(fold, rel.split("/")[1:-1]) if seg in unique), None)
+        if owner is not None:
+            members[owner].append(rel)
+    specs = []
+    for key, files in sorted(members.items()):
+        folder = products[key]
+        signals, fields = [f"folder of unmanifested content {folder}"], {"installed_by": "hand (no manifest)"}
+        vendor = next((v for seg in reversed(folder.split("/")[:-1]) if (v := index.author(seg))), None)
+        if vendor:
+            fields["author"] = vendor
+            signals.append(f"vendor folder {vendor} ({VENDOR_FOLDER_CONFIDENCE})")
+        specs.append(ProductSpec(
+            container_rel="", identity_key=f"folder:{key}", name=folder.rsplit("/", 1)[-1],
+            confidence=UNMANIFESTED_CONFIDENCE, signals=signals, fields=fields, members=files))
+    return specs
+
+
+def _grouping_folder(name: str, index: LexiconIndex) -> bool:
+    """Whether a folder groups products (a category or vendor folder) rather than being one."""
+    return name.startswith("!") or index.is_category_folder(name) or index.author(name) is not None
 
 
 def _tail(rel: str) -> str:

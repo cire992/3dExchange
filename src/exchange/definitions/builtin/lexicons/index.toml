@@ -1,0 +1,11 @@
+# Index words number a series (Barrel01, Barrel02, Rock_A, Rock_B). Numbers always count as an
+# index; these words do too.
+
+[lexicon]
+id = "index"
+name = "Index"
+kind = "index"
+format_version = 1
+
+[[term]]
+words = ["a", "b", "c", "i", "ii", "iii", "iv", "v", "vi", "var", "variant", "variation", "alt"]

@@ -150,6 +150,8 @@ def forget_environment(conn: sqlite3.Connection, environment_id: int) -> int:
     conn.execute("DELETE FROM file WHERE environment_id = :env", p)
     conn.execute("DELETE FROM container WHERE environment_id = :env", p)
     conn.execute("DELETE FROM scan WHERE environment_id = :env", p)
+    conn.execute("DELETE FROM lexicon_generated WHERE root_id IN"
+                 " (SELECT id FROM environment_root WHERE environment_id = :env)", p)
     conn.execute("DELETE FROM environment_root WHERE environment_id = :env", p)
     conn.execute("DELETE FROM environment WHERE id = :env", p)
 
@@ -280,7 +282,7 @@ def find_entry(
     conn: sqlite3.Connection, container_id: int, identity_key: str
 ) -> sqlite3.Row | None:
     return conn.execute(
-        "SELECT e.id, e.status, e.ledger_id, l.dossier_id FROM entry e"
+        "SELECT e.id, e.status, e.ledger_id, e.moved_from, l.dossier_id FROM entry e"
         " JOIN ledger l ON l.id = e.ledger_id"
         " WHERE e.container_id = ? AND e.identity_key = ?",
         (container_id, identity_key),
@@ -302,13 +304,13 @@ def find_product_by_key(conn: sqlite3.Connection, environment_id: int, product_k
 
 def create_dossier(
     conn: sqlite3.Connection, *, type_id: str, name: str, parent_id: int | None,
-    confidence: float, signals: list[str],
+    confidence: float, signals: list[str], uid: str | None = None,
 ) -> int:
     stamp = now()
     cur = conn.execute(
-        "INSERT INTO dossier (uid, type_id, name, parent_id, confidence, signals, created_at,"
-        " updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (new_uid(), type_id, name, parent_id, confidence, to_json(signals), stamp, stamp),
+        "INSERT INTO dossier (uid, type_id, name, parent_id, confidence, confidence_base, signals,"
+        " created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (uid or new_uid(), type_id, name, parent_id, confidence, confidence, to_json(signals), stamp, stamp),
     )
     return cur.lastrowid
 
@@ -317,11 +319,14 @@ def update_dossier(
     conn: sqlite3.Connection, dossier_id: int, *, type_id: str, name: str,
     parent_id: int | None, confidence: float, signals: list[str],
 ) -> None:
-    """Refresh the scanned layer of a dossier. Overrides live elsewhere and are untouched."""
+    """Refresh the scanned layer of a dossier. Overrides live elsewhere and are untouched.
+
+    ``confidence`` is the identification's own; the classification pass adds evidence on top.
+    """
     conn.execute(
-        "UPDATE dossier SET type_id = ?, name = ?, parent_id = ?, confidence = ?, signals = ?,"
-        " updated_at = ? WHERE id = ?",
-        (type_id, name, parent_id, confidence, to_json(signals), now(), dossier_id),
+        "UPDATE dossier SET type_id = ?, name = ?, parent_id = ?, confidence = ?, confidence_base = ?,"
+        " signals = ?, updated_at = ? WHERE id = ?",
+        (type_id, name, parent_id, confidence, confidence, to_json(signals), now(), dossier_id),
     )
 
 
@@ -385,9 +390,17 @@ def retire_entries(conn: sqlite3.Connection, entry_ids: Iterable[int]) -> None:
     )
 
 
-def move_entry(conn: sqlite3.Connection, entry_id: int, ledger_id: int, status: str) -> None:
-    conn.execute("UPDATE entry SET ledger_id = ?, status = ? WHERE id = ?",
-                 (ledger_id, status, entry_id))
+def move_entry(conn: sqlite3.Connection, entry_id: int, ledger_id: int, status: str,
+               moved_from: str | None = None) -> None:
+    conn.execute("UPDATE entry SET ledger_id = ?, status = ?, moved_from = COALESCE(?, moved_from)"
+                 " WHERE id = ?", (ledger_id, status, moved_from, entry_id))
+
+
+def has_home_entry(conn: sqlite3.Connection, dossier_id: int) -> bool:
+    """True if the dossier has an entry of its own (not one moved onto it by a merge or link)."""
+    return conn.execute(
+        "SELECT EXISTS (SELECT 1 FROM entry e JOIN ledger l ON l.id = e.ledger_id"
+        " WHERE l.dossier_id = ? AND e.moved_from IS NULL)", (dossier_id,)).fetchone()[0] == 1
 
 
 def delete_dossier(conn: sqlite3.Connection, dossier_id: int) -> None:
@@ -551,7 +564,46 @@ def set_thumbnail(conn: sqlite3.Connection, dossier_id: int, *, rel_path: str, s
         (dossier_id, rel_path, source_kind, source_file_id, source_hash, now()))
 
 
+# Generated lexicon words --------------------------------------------------------------------------
+
+
+def generated_words(conn: sqlite3.Connection) -> dict[str, list[tuple[str, str]]]:
+    """(value, word) pairs scans found, by lexicon id, for ``lexicons.with_generated``."""
+    words: dict[str, list[tuple[str, str]]] = {}
+    for row in conn.execute("SELECT DISTINCT lexicon_id, value, word FROM lexicon_generated"
+                            " ORDER BY lexicon_id, value, word"):
+        words.setdefault(row[0], []).append((row[1], row[2]))
+    return words
+
+
+def replace_generated_words(conn: sqlite3.Connection, root_id: int,
+                            words: Mapping[str, Iterable[tuple[str, str]]]) -> None:
+    conn.execute("DELETE FROM lexicon_generated WHERE root_id = ?", (root_id,))
+    conn.executemany("INSERT OR IGNORE INTO lexicon_generated (lexicon_id, root_id, value, word) VALUES (?, ?, ?, ?)",
+                     [(lexicon_id, root_id, value, word) for lexicon_id, pairs in words.items()
+                      for value, word in pairs])
+
+
 # Search index -------------------------------------------------------------------------------------
+
+
+# dossier_tag_effective, split into its halves for per-row use: SQLite cannot push a correlated
+# filter into the view's UNION, so it would build the whole view once per outer query.
+# Expects ``t`` (dossier_tag) and ``d`` (a dossier row with uid) in scope.
+_TAG_REMOVED = ("EXISTS (SELECT 1 FROM override_tag r WHERE r.dossier_uid = d.uid AND r.tag = t.tag"
+                " AND r.action = 'remove')")
+
+
+def has_tag_sql() -> str:
+    """A condition true when dossier ``d`` effectively has the tag given as three ``?`` (any case).
+
+    It starts from the tag (index ``dossier_tag_lower``), not from each dossier: tags are selective.
+    """
+    return ("((d.id IN (SELECT t.dossier_id FROM dossier_tag t WHERE lower(t.tag) = lower(?))"
+            " AND NOT EXISTS (SELECT 1 FROM override_tag r WHERE r.dossier_uid = d.uid"
+            " AND lower(r.tag) = lower(?) AND r.action = 'remove'))"
+            " OR d.uid IN (SELECT o.dossier_uid FROM override_tag o WHERE o.action = 'add'"
+            " AND lower(o.tag) = lower(?)))")
 
 
 def index_dossiers(conn: sqlite3.Connection, dossier_ids: Iterable[int]) -> None:
@@ -562,7 +614,10 @@ def index_dossiers(conn: sqlite3.Connection, dossier_ids: Iterable[int]) -> None
         rows = conn.execute(
             f"SELECT d.id, d.name,"
             f" (SELECT group_concat(t.token, ' ') FROM dossier_token t WHERE t.dossier_id = d.id) AS tokens,"
-            f" (SELECT group_concat(g.tag, ' ') FROM dossier_tag_effective g WHERE g.dossier_uid = d.uid) AS tags,"
+            f" trim(coalesce((SELECT group_concat(t.tag, ' ') FROM dossier_tag t WHERE t.dossier_id = d.id"
+            f"   AND NOT {_TAG_REMOVED}), '') || ' ' ||"
+            f"  coalesce((SELECT group_concat(o.tag, ' ') FROM override_tag o WHERE o.dossier_uid = d.uid"
+            f"   AND o.action = 'add'), '')) AS tags,"
             f" (SELECT group_concat(DISTINCT c.name) FROM ledger l JOIN entry e ON e.ledger_id = l.id"
             f"   JOIN container c ON c.id = e.container_id WHERE l.dossier_id = d.id) AS places"
             f" FROM dossier_effective d WHERE d.id IN ({marks})", batch).fetchall()

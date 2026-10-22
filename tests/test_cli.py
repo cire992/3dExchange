@@ -22,7 +22,7 @@ def test_scan_json(capsys, mixed, db_path):
     report = json.loads(capsys.readouterr().out)
     assert {e["type_id"] for e in report["environments"]} == {"daz_studio", "skyrim_se", "loose_files"}
     daz = next(e for e in report["environments"] if e["type_id"] == "daz_studio")
-    assert daz["roots"][0]["identification"]["products"] == 2
+    assert daz["roots"][0]["identification"]["products"] == 3  # two manifests, one hand-installed
 
 
 def test_dry_run(capsys, mixed, db_path):

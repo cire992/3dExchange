@@ -1,0 +1,13 @@
+# Known authors (vendors). Scans add authors found in the library itself: DIM manifest artists and
+# the vendor folders under Daz's data/. A folder named after an author is a vendor folder, never a
+# product; hand-installed products under it get that author.
+#
+# Edit with "exchange lexicon add authors <Author> <spelling>" and "exchange lexicon remove ...".
+# Your copy (lexicons/authors.toml in your definitions folder) holds your additions, and in
+# "exclude" the found names you removed, which scans never add back.
+
+[lexicon]
+id = "authors"
+name = "Known authors"
+kind = "author"
+format_version = 1

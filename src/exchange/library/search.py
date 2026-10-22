@@ -13,14 +13,17 @@
 from __future__ import annotations
 
 import re
+import sqlite3
 from dataclasses import dataclass
 
+from exchange.db import repository as repo
 from exchange.definitions.schema import DefinitionSet
 from exchange.errors import ExchangeError
 from exchange.scanner.tokenize import tokenize
 
 ENTRY_STATUSES = ("origin", "requisitioned", "copied", "unknown", "modified", "stale", "retired")
-FILTER_KEYS = ("env", "type", "tag", "author", "status", "container", "variant", "is", "has")
+FILTER_KEYS = ("env", "type", "tag", "author", "status", "container", "variant", "is", "has", "collection")
+MAX_COLLECTION_DEPTH = 4  # smart collections may use collection: themselves, but not endlessly
 _TERM = re.compile(r'(-?)(?:(\w+):)?(?:"([^"]*)"|(\S+))')
 
 
@@ -48,25 +51,57 @@ def parse_query(text: str) -> list[Term]:
     return terms
 
 
-def compile_query(text: str, definitions: DefinitionSet, *,
-                  threshold: float = 0.5) -> tuple[str, list]:
-    """SQL condition (over ``dossier_effective d``) and its parameters."""
+def compile_query(text: str, definitions: DefinitionSet, *, threshold: float = 0.5,
+                  conn: sqlite3.Connection | None = None, _depth: int = 0) -> tuple[str, list]:
+    """SQL condition (over ``dossier_effective d``) and its parameters.
+
+    ``conn`` is needed only for ``collection:`` (to look the collection up).
+    """
     clauses: list[str] = []
     params: list = []
-    wants_retired = False
+    wants_retired = wants_structural = False
     for term in parse_query(text):
-        sql, args = _clause(term, definitions, threshold)
+        if term.key == "collection":
+            sql, args = _collection(term.value, definitions, threshold, conn, _depth)
+        else:
+            sql, args = _clause(term, definitions, threshold)
         if term.key == "status" and term.value.lower() == "retired" and not term.negated:
             wants_retired = True
+        if term.key == "is" and term.value.lower() == "structural":
+            wants_structural = True
         clauses.append(f"NOT ({sql})" if term.negated else f"({sql})")
         params.extend(args)
+    if not wants_structural:
+        clauses.insert(0, f"NOT {_STRUCTURAL}")
     if not wants_retired:
         clauses.insert(0, _LIVE)
     return " AND ".join(clauses) or "1", params
 
 
-_LIVE = ("EXISTS (SELECT 1 FROM ledger l JOIN entry e ON e.ledger_id = l.id"
-         " WHERE l.dossier_id = d.id AND e.status != 'retired')")
+# A dossier is live while it has a live entry, or the user created it (a product they made).
+_LIVE = ("(EXISTS (SELECT 1 FROM ledger l JOIN entry e ON e.ledger_id = l.id"
+         " WHERE l.dossier_id = d.id AND e.status != 'retired')"
+         " OR EXISTS (SELECT 1 FROM override_field u WHERE u.dossier_uid = d.uid AND u.field = 'user_created'))")
+# Parts of another mesh (collision shapes, LOD1 and up) stay out of sight unless asked for.
+_STRUCTURAL = ("EXISTS (SELECT 1 FROM dossier_field s WHERE s.dossier_id = d.id AND s.field = 'structural_role'"
+               " AND (s.value = '\"collision\"' OR EXISTS (SELECT 1 FROM dossier_field g WHERE g.dossier_id = d.id"
+               " AND g.field = 'lod_level' AND CAST(g.value AS INTEGER) >= 1)))")
+
+
+def _collection(name: str, definitions: DefinitionSet, threshold: float,
+                conn: sqlite3.Connection | None, depth: int) -> tuple[str, list]:
+    if conn is None:
+        raise SearchError("collection: needs the library")
+    row = conn.execute("SELECT uid, query FROM collection WHERE name = ? OR uid = ?", (name, name)).fetchone()
+    if row is None:
+        raise SearchError(f"no collection {name!r}")
+    if row[1] is None:
+        return ("EXISTS (SELECT 1 FROM collection_member m WHERE m.collection_uid = ?"
+                " AND m.dossier_uid = d.uid)"), [row[0]]
+    if depth >= MAX_COLLECTION_DEPTH:
+        raise SearchError(f"collection {name!r} refers to collections too deeply (or to itself)")
+    inner, args = compile_query(row[1], definitions, threshold=threshold, conn=conn, _depth=depth + 1)
+    return f"d.id IN (SELECT d.id FROM dossier_effective d WHERE {inner})", args
 
 
 def _entry_exists(condition: str) -> str:
@@ -108,8 +143,7 @@ def _clause(term: Term, definitions: DefinitionSet, threshold: float) -> tuple[s
         types = sorted({t for t in definitions.dossier_types if any(definitions.is_a(t, k) for k in known)})
         return f"d.type_id IN ({','.join('?' * len(types))})", types
     if key == "tag":
-        return ("EXISTS (SELECT 1 FROM dossier_tag_effective t WHERE t.dossier_uid = d.uid"
-                " AND lower(t.tag) = lower(?))"), [value]
+        return repo.has_tag_sql(), [value] * 3
     if key == "author":
         fields = ("authors", "author")
         return _field_like(fields), [*fields, _like(value), *fields, _like(value)]
@@ -128,8 +162,16 @@ def _clause(term: Term, definitions: DefinitionSet, threshold: float) -> tuple[s
         if value.lower() == "product":
             return "d.type_id = 'product'", []
         if value.lower() == "overridden":
-            return "(d.name_overridden OR d.type_overridden OR d.parent_overridden)", []
-        raise SearchError(f"unknown is:{value} (is:unidentified, is:product, is:overridden)")
+            return ("(d.name_overridden OR d.type_overridden OR d.parent_overridden"
+                    " OR EXISTS (SELECT 1 FROM override_field o WHERE o.dossier_uid = d.uid)"
+                    " OR EXISTS (SELECT 1 FROM override_tag o WHERE o.dossier_uid = d.uid))"), []
+        if value.lower() == "linked":
+            return _entry_exists("e.status != 'retired' AND EXISTS (SELECT 1 FROM entry_file ef"
+                                 " WHERE ef.entry_id = e.id AND ef.role = 'linked')"), []
+        if value.lower() == "structural":
+            return _STRUCTURAL, []
+        raise SearchError(f"unknown is:{value} "
+                          "(is:unidentified, is:product, is:overridden, is:linked, is:structural)")
     if key == "has":
         v = value.lower()
         if v == "thumbnail":
@@ -137,7 +179,12 @@ def _clause(term: Term, definitions: DefinitionSet, threshold: float) -> tuple[s
         if v in ("broken", "broken-dependency"):
             return ("EXISTS (SELECT 1 FROM dossier_dependency x WHERE x.dossier_id = d.id"
                     " AND x.status = 'broken')"), []
+        if v == "variants":
+            return _entry_exists("e.status != 'retired' AND e.variant IS NOT NULL"), []
+        if v in ("suggestion", "suggestions"):
+            return ("EXISTS (SELECT 1 FROM suggestion s WHERE s.subject_uid = d.uid"
+                    " AND s.state = 'pending')"), []
         if v == "candidate":
             raise SearchError("has:candidate needs pipelines, which arrive in Roadmap phase 4")
-        raise SearchError(f"unknown has:{value} (has:thumbnail, has:broken)")
+        raise SearchError(f"unknown has:{value} (has:thumbnail, has:broken, has:variants, has:suggestion)")
     raise SearchError(f"unknown filter {key}:")  # parse_query already rejects these

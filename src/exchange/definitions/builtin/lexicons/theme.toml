@@ -1,0 +1,57 @@
+# Theme words: genres and settings people sort content by (Vehicles/!!Sorted/Sci-Fi). A folder whose
+# whole name is theme words or category names (Props, Vehicles) is a category folder, never a
+# product: hand-installed Daz products are looked for below it. Names that only contain a theme
+# word ("Anime Girl Outfit") are unaffected. Edit by copying this file to your definitions folder
+# (lexicons/theme.toml); your copy replaces this one.
+
+[lexicon]
+id = "theme"
+name = "Themes"
+kind = "theme"
+format_version = 1
+
+[[term]]
+value = "Sci-Fi"
+words = ["sci-fi", "scifi", "science fiction", "futuristic", "cyberpunk"]
+
+[[term]]
+value = "Fantasy"
+words = ["fantasy", "dark fantasy", "high fantasy", "fairy tale", "fairytale", "myth", "mythology",
+         "mythical"]
+
+[[term]]
+value = "Anime"
+words = ["anime", "manga", "cartoon", "toon", "toons", "chibi"]
+
+[[term]]
+value = "Contemporary"
+words = ["contemporary", "modern", "urban", "casual", "everyday"]
+
+[[term]]
+value = "Historical"
+words = ["historical", "history", "ancient", "medieval", "renaissance", "victorian", "steampunk",
+         "egyptian", "egypt", "roman", "greek", "viking", "norse", "celtic", "feudal", "samurai",
+         "western", "wild west", "pirate", "pirates", "colonial", "regency", "baroque", "gothic"]
+
+[[term]]
+value = "Regional"
+words = ["asian", "japanese", "chinese", "korean", "indian", "arabian", "african", "nordic", "tribal"]
+
+[[term]]
+value = "Military"
+words = ["military", "army", "ww1", "ww2", "wwii", "modern warfare"]
+
+[[term]]
+value = "Horror"
+words = ["horror", "creepy", "spooky", "zombie apocalypse", "post apocalyptic", "post-apocalyptic",
+         "apocalyptic", "dystopian"]
+
+[[term]]
+value = "Holiday"
+words = ["holiday", "holidays", "christmas", "xmas", "halloween", "easter", "valentine", "valentines",
+         "seasonal"]
+
+[[term]]
+value = "Genre"
+words = ["superhero", "superheroes", "sports", "sport", "fitness",
+         "nature", "rural", "industrial"]

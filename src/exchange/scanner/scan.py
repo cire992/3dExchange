@@ -87,6 +87,8 @@ class ScanReport:
     errors: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     cancelled: bool = False
+    classification: object | None = None  # ClassifyStats
+    suggestions: dict | None = None  # new suggestions by kind
 
 
 def run_scan(
@@ -131,6 +133,8 @@ def run_scan(
     try:
         session = _Session(conn, definitions, report, dry_run, threshold, progress, cancel)
         session.scan_folder(folder)
+        if not dry_run and not report.cancelled:
+            session.classify()
         if enrich and not dry_run and not report.cancelled:
             session.enrich()
     finally:
@@ -171,11 +175,42 @@ def run_rescan(
                 session.scan_folder(path)
             else:
                 session.mark_offline(root)
+        if not report.cancelled:
+            session.classify()
         if enrich and not report.cancelled:
             session.enrich()
     finally:
         conn.close()
     return report
+
+
+def regroup(conn: sqlite3.Connection, definitions: DefinitionSet, *,
+            environment_ids: Iterable[int] | None = None, threshold: float = DEFAULT_THRESHOLD) -> int:
+    """Re-run identification on the files already recorded, without walking the disk.
+
+    For lexicon edits that change how files group into products (category and vendor folders).
+    Roots that are offline are skipped. Returns the number of roots regrouped.
+    """
+    wanted = set(environment_ids) if environment_ids is not None else None
+    count = 0
+    for root in repo.list_roots(conn):
+        if wanted is not None and root["environment_id"] not in wanted:
+            continue
+        path = Path(root["path"])
+        if not path.is_dir():
+            continue  # manifests are read from disk
+        env = repo.get_environment(conn, root["environment_id"])
+        definition = definitions.environments.get(env["type_id"])
+        if definition is None:
+            continue
+        present = [FileInfo(r["id"], r["rel_path"], r["size"], r["mtime_ns"], r["ext"])
+                   for r in repo.load_files(conn, root["id"]).values() if r["state"] != "gone"]
+        identify_root(
+            conn, environment_id=env["id"], root_id=root["id"], definition=definition,
+            definitions=definitions, root=path, files=present,
+            user_ignore=tuple(repo.user_config(conn, env["id"]).get("ignore", ())), threshold=threshold)
+        count += 1
+    return count
 
 
 def _peek_registered(db_path: Path, dry_run: bool) -> list[RegisteredEnvironment]:
@@ -356,6 +391,21 @@ class _Session:
             self.report.notes.append(
                 f"{root['path']} has been offline for {days} days; if it is gone for good, "
                 f"run: exchange env forget {env['id']}")
+
+    # End of phase 2: classification and suggestions ---------------------------------------------
+
+    def classify(self) -> None:
+        from exchange.scanner.classify import classify
+        from exchange.suggestions import generate
+
+        ids = [e.id for e in self.report.environments
+               if e.id is not None and any(r.status == "scanned" for r in e.roots)]
+        if not ids:
+            return
+        self.progress(ProgressEvent(2, "library", "classification"))
+        with repo.transaction(self.conn):
+            self.report.classification = classify(self.conn, self.definitions, environment_ids=ids)
+            self.report.suggestions = generate(self.conn, self.definitions, environment_ids=ids)
 
     # Phase 3 ----------------------------------------------------------------------------------
 

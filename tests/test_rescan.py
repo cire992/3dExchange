@@ -81,7 +81,7 @@ def test_user_overrides_survive_rescans(scan, daz_library, db_path):
     assert eff["name"] == "Cowboy Boots" and eff["name_overridden"]
     assert eff["parent_id"] == conn.execute("SELECT id FROM dossier WHERE uid = ?", (marius,)).fetchone()[0]
     assert repo.effective_fields(conn, boots)["license"] == "personal use"
-    assert repo.effective_tags(conn, boots) == {"Footwear"}
+    assert repo.effective_tags(conn, boots) == {"Footwear", "Clothing"}  # yours, and the lexicon's
     # The scanned layer is still the scanner's own and is shown when the override is reverted.
     assert conn.execute("SELECT name FROM dossier WHERE uid = ?", (boots,)).fetchone()[0] == "Loose Boots"
     with repo.transaction(conn):

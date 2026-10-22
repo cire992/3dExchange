@@ -70,7 +70,7 @@ def list_dossiers(
 ) -> Page:
     if group not in GROUPS:
         raise ValueError(f"group must be one of {GROUPS}")
-    where, params = compile_query(query, definitions, threshold=threshold)
+    where, params = compile_query(query, definitions, threshold=threshold, conn=conn)
     clauses, args = [where], list(params)
     if parent_uid is not None:
         clauses.append("d.parent_id = (SELECT id FROM dossier WHERE uid = ?)")
@@ -204,6 +204,7 @@ def dossier_detail(conn: sqlite3.Connection, definitions: DefinitionSet, uid: st
                 "id": e["id"], "container": e["container"], "container_kind": e["kind"],
                 "status": e["status"], "source_container": e["source_container"],
                 "created_at": e["created_at"], "retired_at": e["retired_at"],
+                "variant": e["variant"], "moved_from": e["moved_from"],
                 "files": [{**dict(f), "path": str(Path(e["root_path"]) / Path(*f["rel_path"].split("/")))}
                           for f in files],
             })
@@ -217,9 +218,17 @@ def dossier_detail(conn: sqlite3.Connection, definitions: DefinitionSet, uid: st
     required_by = conn.execute(
         "SELECT DISTINCT s.uid, s.name FROM dossier_dependency x JOIN dossier_effective s"
         " ON s.id = x.dossier_id WHERE x.target_dossier_id = ? ORDER BY lower(s.name)", (d["id"],)).fetchall()
-    history = [{"at": h["at"], "action": h["action"], "payload": json.loads(h["payload"])}
-               for h in conn.execute("SELECT * FROM curation_log WHERE json_extract(payload, '$.dossier') = ?"
-                                     " ORDER BY id", (uid,))]
+    history = []
+    for h in conn.execute(
+            "SELECT * FROM curation_log WHERE json_extract(payload, '$.dossier') = ?"
+            " OR EXISTS (SELECT 1 FROM json_each(payload, '$.dossiers') j WHERE j.value = ?) ORDER BY id",
+            (uid, uid)):
+        payload = json.loads(h["payload"])
+        undoable = "inverse" in payload
+        for key in ("changes", "inverse"):
+            payload.pop(key, None)
+        history.append({"id": h["id"], "at": h["at"], "action": h["action"], "payload": payload,
+                        "undoable": undoable})
     for ledger in ledgers:
         for e in ledger["entries"]:
             history.append({"at": e["created_at"], "action": "entry_added",
@@ -251,4 +260,47 @@ def dossier_detail(conn: sqlite3.Connection, definitions: DefinitionSet, uid: st
                           "target": {"uid": x["uid"], "name": x["name"]} if x["uid"] else None} for x in deps],
         "required_by": [dict(r) for r in required_by],
         "history": history,
+        # Curation (Roadmap phase 3)
+        "variants": sorted({e["variant"] for l in ledgers for e in l["entries"] if e["variant"]}),
+        "tag_sources": _tag_sources(conn, d["id"], uid),
+        "aliases": [dict(r) for r in conn.execute(
+            "SELECT a.alias_uid AS uid, x.name FROM dossier_alias a LEFT JOIN dossier_effective x ON x.uid = a.alias_uid"
+            " WHERE a.target_uid = ? ORDER BY a.set_at", (uid,))],
+        "suggestions": [{"id": s["id"], "kind": s["kind"], "payload": json.loads(s["payload"])} for s in conn.execute(
+            "SELECT * FROM suggestion WHERE subject_uid = ? AND state = 'pending' ORDER BY id", (uid,))],
+        "collections": [dict(r) for r in conn.execute(
+            "SELECT c.uid, c.name FROM collection_member m JOIN collection c ON c.uid = m.collection_uid"
+            " WHERE m.dossier_uid = ? ORDER BY c.name", (uid,))],
     }
+
+
+def _tag_sources(conn: sqlite3.Connection, dossier_id: int, uid: str) -> list[dict]:
+    """Each effective tag with where it came from (scan signals and/or you) and its confidence."""
+    tags: dict[str, dict] = {}
+    for r in conn.execute("SELECT tag, source, confidence FROM dossier_tag WHERE dossier_id = ?", (dossier_id,)):
+        t = tags.setdefault(r["tag"], {"tag": r["tag"], "sources": [], "confidence": 0.0, "user": None})
+        t["sources"].append(r["source"])
+        t["confidence"] = max(t["confidence"], r["confidence"])
+    for r in conn.execute("SELECT tag, action FROM override_tag WHERE dossier_uid = ?", (uid,)):
+        t = tags.setdefault(r["tag"], {"tag": r["tag"], "sources": [], "confidence": 1.0, "user": None})
+        t["user"] = r["action"]  # "add" or "remove" (a scanned tag the user hid)
+    return sorted(tags.values(), key=lambda t: t["tag"].casefold())
+
+
+def list_collections(conn: sqlite3.Connection, definitions: DefinitionSet, *,
+                     threshold: float = 0.5) -> list[dict]:
+    """Collections with their member counts (a smart collection counts its search's results)."""
+    out = []
+    for c in conn.execute("SELECT * FROM collection ORDER BY name COLLATE NOCASE"):
+        if c["query"] is None:
+            count = conn.execute("SELECT count(*) FROM collection_member WHERE collection_uid = ?",
+                                 (c["uid"],)).fetchone()[0]
+        else:
+            try:
+                count = list_dossiers(conn, definitions, query=f"collection:{c['uid']}", group="all",
+                                      limit=1, threshold=threshold).total
+            except Exception:  # a saved search that no longer compiles (e.g. a removed type)
+                count = None
+        out.append({"uid": c["uid"], "name": c["name"], "query": c["query"], "smart": c["query"] is not None,
+                    "count": count})
+    return out

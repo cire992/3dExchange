@@ -24,6 +24,8 @@ from typing import Any
 from exchange.db import repository as repo
 from exchange.definitions.schema import DefinitionSet, EnvironmentDefinition
 from exchange.globs import any_match
+from exchange.lexicons import with_generated
+from exchange.links import apply_file_links, linked_keys
 from exchange.paths import fold, rel_under
 from exchange.scanner.layers import HANDLERS
 from exchange.scanner.layers.base import FileInfo, LayerContext
@@ -81,8 +83,9 @@ class _Writer:
             dossier_id, entry_id = existing["dossier_id"], existing["id"]
             if existing["status"] == "retired":
                 repo.revive_entry(conn, entry_id, "origin")
-            elif existing["status"] == "unknown":
-                # A copy merged into another dossier by hash: the dossier's own scan owns it.
+            if existing["moved_from"] and repo.has_home_entry(conn, dossier_id):
+                # Moved onto this dossier by a merge (the user's, or a duplicate's): the dossier's
+                # own entries decide its name and type.
                 values = None
             if values is not None:
                 self._update(dossier_id, values, own_entry=True)
@@ -136,9 +139,12 @@ def identify_root(
     stats = IdentifyStats()
     ignore = definition.ignore_globs + tuple(user_ignore)
     content = [f for f in files if not any_match(ignore, f.rel)]
-    ctx = LayerContext(root, definition, definitions, content, files)
+    # Lexicons with the words earlier scans found (known authors), for the layer to group by.
+    known = with_generated(definitions, repo.generated_words(conn))
+    ctx = LayerContext(root, definition, known, content, files)
     result = HANDLERS[definition.handler](ctx)
     stats.layer_config, stats.warnings = result.layer_config, result.warnings
+    repo.replace_generated_words(conn, root_id, result.generated)
 
     ignored_keys = {fold(r) for r in result.ignored}
     content = [f for f in content if fold(f.rel) not in ignored_keys]
@@ -192,7 +198,9 @@ def identify_root(
         return spec
 
     writer = _Writer(conn, environment_id, definition.handler, definitions)
-    claimed: set[int] = set()  # files in some entry
+    # Files the user linked onto a dossier belong to it; they do not become dossiers of their own.
+    linked = {by_key[k].id for k in linked_keys(conn, root_id) if k in by_key}
+    claimed: set[int] = set(linked)  # files in some entry
     children: set[int] = set()  # files that already became a child dossier
 
     def count(spec: _Spec) -> None:
@@ -224,7 +232,7 @@ def identify_root(
         claimed.update(f.id for f in primary + members)
         explicit = {fold(c.rel): c for c in product.children}
         for m in members:
-            if m.id in children:
+            if m.id in children or m.id in linked:
                 continue
             given = explicit.get(fold(m.rel))
             if given is not None:
@@ -258,6 +266,7 @@ def identify_root(
             count(spec)
 
     stats.unattached_files = sum(f.id not in claimed for f in content)
+    writer.seen_entries |= apply_file_links(conn, root_id)
     stale = repo.live_entry_ids(conn, root_id) - writer.seen_entries
     repo.retire_entries(conn, stale)
     stats.retired_entries = len(stale)
