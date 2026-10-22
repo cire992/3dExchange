@@ -1,6 +1,6 @@
 # Exchange: progress and handoff
 
-Last updated 2026-10-22, during Roadmap phase 4. `main` has phases 1-3. PRs 4a (#10, the requisition engine), 4b (#11, bridges) and 4c (requisitions in the window) are open, each stacked on the one before. 204 tests pass.
+Last updated 2026-10-22, during Roadmap phase 4. `main` has phases 1-3. PRs 4a (#10, the requisition engine), 4b (#11, bridges) and 4c (#12, requisitions in the window) are open, each stacked on the one before. 204 tests pass.
 
 Read this first, then `docs/DESIGN_SPEC.md` (the source of truth; use its terms exactly) and
 `docs/USEFUL_PATHS.md` (real asset folders and tools on the dev machine, for testing). The
@@ -15,7 +15,7 @@ pipeline (Daz cross-figure, G9/G2 → G8).** The phase 4 plan was approved with 
 answers (see Decisions).
 
 **Next:**
-- **Merging:** in order: #10, then #11, then 4c. Point each next PR at `main` after the one before it merges. GitHub does that by itself only if the merged branch is deleted.
+- **Merging:** in order: #10, then #11, then #12. Point each next PR at `main` after the one before it merges. GitHub does that by itself only if the merged branch is deleted.
 - **4d** waits for the user's answer to open question 1: what cross-figure converts first, and with which tool.
 - **Daz Studio bridge:** check it against the real app when the user is at the computer (see Known gaps).
 
@@ -32,7 +32,7 @@ answers (see Decisions).
 | #9 | 3c: Unidentified desk (low-confidence dossiers, unattached files by folder, suggestions in batches), lexicon editor, file watcher (`watchdog`); split, fold and promote in the window | merged |
 | #10 | 4a: requisition engine: pipeline packages (manifest, trust, prerequisites, core operations), planning (routes, chains, product plans), queue and runner (checkpoints, cached steps, collisions), endpoints, sidecars, staleness, removal, CLI, test harness | open |
 | #11 | 4b: bridges: Blender (headless), Daz Studio (DazScript at launch), command-line tools; one job per app; built-in Convert mesh (Blender) | open, stacked on #10 |
-| 4c | Requisitions in the window: Requisition to… (plan tree, option forms, presets, last-used options, batch), the queue view, Settings › Pipelines and Endpoints | branch `phase-4c-requisitions-ui` (on 4b), PR to open |
+| #12 | 4c: requisitions in the window: Requisition to… (plan tree, option forms, presets, last-used options, batch), the queue view, Settings › Pipelines and Endpoints | open, stacked on #11 |
 | 4d | First pipeline: Daz cross-figure (G9/G2 → G8) | needs the user's answer to open question 1 |
 
 ## How we work
