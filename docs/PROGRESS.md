@@ -1,6 +1,6 @@
 # Exchange: progress and handoff
 
-Last updated 2026-10-21, during Roadmap phase 3. `main` has phases 1 and 2 and PR 3a. PR 3b (editing in the main window) is on branch `phase-3b-editing`. 173 tests pass.
+Last updated 2026-10-21, during Roadmap phase 3. `main` has phases 1 and 2 and PRs 3a and 3b. PR 3c (desk, lexicon editor, watcher) is #9, on branch `phase-3c-desk-lexicons-watcher`. 181 tests pass.
 
 Read this first, then `docs/DESIGN_SPEC.md` (the source of truth; use its terms exactly) and
 `docs/USEFUL_PATHS.md` (real asset folders and tools on the dev machine, for testing). The
@@ -21,8 +21,8 @@ file watcher).** The phase 3 plan was approved with all recommended answers (see
 | #5 | 2c: add-environment wizard | merged |
 | #6 | This handoff doc | merged |
 | #7 | 3a: curation core: lexicons, classification, undoable curation, suggestions, collections, hand-installed Daz products, CLI | merged |
-| 3b | Editing in the main window: inspector editing + revert markers, bulk edit, drag and drop linking, collections in the sidebar, context-menu actions, Ctrl+Z/Ctrl+Y | branch `phase-3b-editing`, PR to open |
-| 3c | Unidentified desk (low-confidence dossiers, unattached files by folder, suggestions in batches), lexicon editor, file watcher (`watchdog`) | after 3b |
+| #8 | 3b: editing in the main window: inspector editing + revert markers, bulk edit, drag and drop linking, collections in the sidebar, context-menu actions, Ctrl+Z/Ctrl+Y | merged |
+| #9 | 3c: Unidentified desk (low-confidence dossiers, unattached files by folder, suggestions in batches), lexicon editor, file watcher (`watchdog`); split, fold and promote in the window | open |
 
 ## How we work
 
@@ -69,7 +69,7 @@ Phase 1:
 
 Phase 2:
 - **Daz Studio:** one environment per PC, holding every content directory (including Daz Connect).
-- **Dependencies:** Pillow and numpy are core dependencies; PySide6 is the optional `ui` extra.
+- **Dependencies:** Pillow and numpy are core dependencies; PySide6 and watchdog (3c, the file watcher) are the optional `ui` extra.
 - **Mesh thumbnails:** a small numpy/Pillow renderer for glTF/GLB/OBJ. Other formats get an icon until the Blender bridge (phase 4).
 - **Inspector:** read-only in phase 2; editable since PR 3b.
 - **Exact duplicates:** merged automatically, with *unknown provenance*. Never for dossiers the user has edited.
@@ -93,6 +93,11 @@ Phase 3:
 6. **Default lexicons:** tight, about 15 tags; tune them against real folders. Mesh-size and topology signals come later.
 7. **Bulk edit:** tags, type, author, license, notes, and adding to collections. Names stay single-item.
 8. **Undo:** unlimited within a session. The log is permanent but isn't replayed across restarts.
+9. **Desk actions (3c, within the approved plan):**
+   - *Not an asset* is a user field (`not_an_asset`). Dismissed dossiers leave Unidentified and default views; `is:dismissed` finds them.
+   - *Ignore this folder* adds `<folder>/**` to the environment's ignore rules. It is an undoable curation action, and the folder's unattached files leave the desk at once.
+   - A folder of more than 5,000 unattached files can't be made into a product or linked: that's a category, not an asset.
+   - Accepting a batch of suggestions is one undo step.
 
 ## Architecture in one page
 
@@ -123,14 +128,17 @@ src/exchange/            core, never imports Qt (a test enforces this)
   curation.py            Curator: every user change as logged, undoable state changes
   suggestions.py         texture-link and variant-group proposals; listing
   links.py               applying user file links (override layer) to entries
-  library/               search language (FTS5 + filters), query API (pages, sidebar, detail, collections)
+  library/               search language (FTS5 + filters), query API (pages, sidebar, detail, collections),
+                         desk (unattached files by folder, one level at a time over the (root, rel_key) index)
   autodiscover.py        Steam, Epic, Unreal recent projects, Daz registry, MO2 instances
   environments.py        register_root (user's type wins), excluded folders
   cli.py cli_curation.py command line
 src/exchange_ui/         PySide6 app: main_window, models (paged browser, sidebar with collections), delegates,
                          views (grid and sidebar with drag and drop), inspector (editing, bulk edit),
                          service (reads + edits via Curator, session undo/redo), wizard,
-                         scanning (scans run as `python -m exchange ... --progress-json`)
+                         desk (unattached-files and suggestions panels; counts on worker threads),
+                         settings (lexicon editor), pickers (asset search, split), watcher (watchdog),
+                         scanning (scans and `classify` run as `python -m exchange ...`)
 tests/                   pytest; fixtures in tests/fixtures/envs; builders.py makes GLB/uasset/PNG/Unreal/
                          Daz Connect content and holds report helpers; tests/ui uses pytest-qt offscreen
 ```
@@ -182,6 +190,12 @@ Key ideas:
 - **UI:** a page of 200 takes 0.2-0.7 s, the sidebar 1.7 s (main thread), search about 0.25 s.
 - **Edits (3b, on a copy of the library):** a rename takes 0.2 s, and changing a field, tag or collection on 200 assets takes under 0.1 s. Undo takes 0.1 s, a dossier's detail 0.2 s, a collection's page 0.8 s.
   - Bulk tagging was 2.7 s: its suggestion inserts each committed on their own. They now commit together, and a bulk tag only proposes words shared by at least two of the names.
+- **Desk (3c):**
+  - **Unattached files:** 1.55M in total. Counting the top level takes about 7 s and `Runtime/Libraries` about 2 s, on a worker thread. 580k of them are Poser content in `Runtime/Libraries` (392k in `Character`).
+  - **Suggestions:** a page of 300 loads in 0.01 s. It was 4.6 s, because the name was joined from the effective-dossier view.
+  - **Batch accept:** 300 variant groups take 1.3 s to accept and 0.3 s to undo once the cache is warm, and 5-8 s for the first batch after opening.
+    - It was 100 s: each moved entry checked all 235k ledgers for emptiness. Now only the ledger it left is checked.
+  - **Watcher:** watching `D:\Daz 3D\Studio\My Library` starts at once, and reported no events while idle.
 - **First open:** migrating a 1.6 GB library takes about 17 s, mostly the backup.
 
 **Loose folders** (`Z:\Content Farm\Sketchfab` and `SWBF Model and Textures`), checked in 3a:
@@ -195,9 +209,10 @@ Key ideas:
 
 ## Known gaps and good next candidates
 
-- **3c** (see the table above). Its core is in 3a: `Curator`, `list_suggestions`, `list_collections`, and the extended `dossier_detail`.
-- **Not in the window yet** (CLI only): split, fold variant and promote variant; linking files by picking them from a list (drag from Explorer works for scanned files).
-- **Edits that change counts** (merge, new product, accepted suggestion, retype, undo) reload the sidebar, which takes about 1.7 s on the real library on the UI thread.
+- **Phase 3 is complete once 3b and 3c merge.** Phase 4 (requisitions) is next.
+- **Edits run on the UI thread.** Those that change counts (merge, new product, accepted suggestions, retype, undo) reload the sidebar, about 1.7 s on the real library. The first big batch after opening can take several seconds while the database warms up.
+- **Settings has only Lexicons.** Dossier types, environments and storage pages are still to come; dossier types are edited as TOML files for now.
+- **Known authors from older scans:** a library scanned before the import-folder filter (`data/<asset>_<number>`) keeps those names until its next rescan.
 - **Speed:**
   - The sidebar query (1.7 s on the real library) runs on the UI thread. Move it to a worker.
   - Enrichment (hashing) has not been run on the full 3.56M-file library.

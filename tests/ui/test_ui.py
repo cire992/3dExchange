@@ -122,7 +122,7 @@ def test_search_and_unidentified(window):
     window.search.clear()
     window._apply_search()
     window.unidentified_button.setChecked(True)
-    assert window.title.text() == "Unidentified"
+    assert window.title.text() == "Low confidence" and window.breadcrumb.text() == "Unidentified desk"
     assert bricks(window) == ["props"]
     window.tree.setCurrentIndex(find(window, "environment", "Daz Studio"))
     assert not window.unidentified_button.isChecked()

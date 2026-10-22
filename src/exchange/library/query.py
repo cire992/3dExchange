@@ -13,7 +13,7 @@ from pathlib import Path
 
 from exchange.db import repository as repo
 from exchange.definitions.schema import DefinitionSet
-from exchange.library.search import compile_query
+from exchange.library.search import DISMISSED, compile_query
 
 GROUPS = ("product", "type", "all")
 
@@ -136,7 +136,7 @@ def sidebar(conn: sqlite3.Connection, definitions: DefinitionSet, *, threshold: 
         "all": conn.execute(f"SELECT count(DISTINCT dossier_id) FROM ({live})").fetchone()[0],
         "unidentified_dossiers": conn.execute(
             f"SELECT count(DISTINCT x.dossier_id) FROM ({live}) x JOIN dossier d ON d.id = x.dossier_id"
-            " WHERE d.confidence < ?", (threshold,)).fetchone()[0],
+            f" WHERE d.confidence < ? AND NOT {DISMISSED}", (threshold,)).fetchone()[0],
         # Counted when each root was last scanned; counting live is too slow for big libraries.
         "unattached_files": conn.execute(
             "SELECT COALESCE(sum(s.unattached_files), 0) FROM scan s WHERE s.id IN"

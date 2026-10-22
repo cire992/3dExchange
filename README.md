@@ -28,6 +28,12 @@ It indexes Daz Studio libraries, Unreal Engine projects, Mod Organizer 2 instanc
   - **In the window:** edit any field in the inspector; your edits are marked and have a revert button. Select several assets to edit them together.
   - **Drag and drop:** drop assets on a product, on another asset (link its files or merge), or on a collection in the sidebar. Drop scanned files from Explorer onto an asset to link them.
   - **Undo and redo** with Ctrl+Z and Ctrl+Y.
+- **Has an Unidentified desk** for sorting what scans couldn't place:
+  - **Low confidence:** assets below the confidence threshold, to retype, tag or dismiss as not an asset.
+  - **Unattached files:** files no asset holds, folder by folder. Make a product from a folder, link its files to an asset, or ignore it from now on.
+  - **Suggestions:** texture links, variant groups and lexicon words, to accept or reject in batches.
+- **Watches your folders.** An environment whose files change is marked *changes detected*; you rescan when you're ready.
+- **Edits lexicons** in Settings (⚙): add or remove words, then apply them to the library.
 - **Suggests links and groupings.** `Barrel01_D.png` + `Barrel01_N.png` → `Barrel01.glb`; `Donut01_Pink` + `Donut01_Blue` → one asset with two variants. You accept or reject them in batches.
 - **Lets you browse and search.** A desktop window with a sidebar, a thumbnail grid and an inspector, plus a search language: `donut env:skyrim_se tag:food -is:product`, `type:mesh has:broken`, `collection:"Lard Lads assets"`.
 
@@ -88,6 +94,7 @@ Or use the command line. A few examples:
 | `suggest list / accept / reject` | Review suggestions. |
 | `curate …`, `collection …` | Edit dossiers and collections (`set`, `tag`, `link`, `merge`, `fold`, `split`, `product` …). |
 | `history`, `undo ID` | Recent curation actions; undo one (undo an undo to redo). |
+| `desk [ROOT [FOLDER]]` | Unattached files by folder; `curate dismiss` and `curate ignore-folder` act on the desk. |
 
 Every command takes `--json` for machine-readable output, and `--db PATH` to use another library.
 

@@ -49,6 +49,15 @@ class SidebarModel(QStandardItemModel):
         self.service = service
         self.unidentified = 0
         self.unattached = 0
+        self.changed: set[int] = set()  # environments with changes on disk since their last scan
+        self._env_details: dict[int, str] = {}
+
+    def env_detail(self, environment_id: int) -> str:
+        """The grey text after an environment's name: its layer, status and pending changes."""
+        detail = self._env_details.get(environment_id, "")
+        if environment_id in self.changed:
+            detail = f"{detail} · changes detected".strip(" ·")
+        return detail
 
     def reload(self) -> None:
         data = self.service.sidebar()
@@ -65,7 +74,9 @@ class SidebarModel(QStandardItemModel):
             detail = _LAYER_LABELS.get(env["type_id"], "")
             if env["status"] != "online":
                 detail = f"{detail} · {env['status']}".strip(" ·")
-            env_item = _item(env["name"], "environment", count=env["count"], env_id=env["id"], detail=detail)
+            self._env_details[env["id"]] = detail
+            env_item = _item(env["name"], "environment", count=env["count"], env_id=env["id"],
+                             detail=self.env_detail(env["id"]))
             containers = [c for c in env["containers"] if c["count"]]
             if len(containers) > 1:
                 parent = env_item

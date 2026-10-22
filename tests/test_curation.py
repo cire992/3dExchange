@@ -1,6 +1,7 @@
 """Phase 3 core: lexicons, classification, curation (with undo), suggestions and collections."""
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -11,7 +12,7 @@ from exchange.db import repository as repo
 from exchange.definitions import load_definitions
 from exchange.errors import DefinitionError
 from exchange.lexicons import LexiconIndex, with_generated, word_forms
-from exchange.library.query import dossier_detail, list_collections, list_dossiers
+from exchange.library.query import dossier_detail, list_collections, list_dossiers, sidebar
 from exchange.scanner.classify import classify
 from exchange.scanner.tokenize import tokenize
 from exchange.suggestions import list_suggestions
@@ -388,6 +389,76 @@ def test_known_authors_are_found_and_user_edits_win(scan, tmp_path, library, def
     curator.undo(log_id)
     assert "exclude" not in (user / "lexicons" / "authors.toml").read_text(encoding="utf-8")
     assert "Vendor X" in {t.value for t in with_generated(defs, repo.generated_words(conn)).lexicons["authors"].terms}
+
+
+# The Unidentified desk ------------------------------------------------------------------------------
+
+
+@pytest.fixture
+def desk(scan, tmp_path, library, defs):
+    folder = copy_fixture("loose_files", tmp_path / "scan" / "Loose")
+    for name in ("a.dat", "b.dat"):
+        write(folder / "Junk" / "Cache" / name, b"x")
+    write(folder / "Junk" / "c.dat", b"x")
+    scan(folder)
+    conn = library()
+    root = conn.execute("SELECT id, environment_id FROM environment_root").fetchone()
+    return conn, Curator(conn, defs), root["id"], root["environment_id"]
+
+
+def test_unattached_folders(desk):
+    from exchange.library.desk import unattached_files, unattached_folders
+
+    conn, _, root, _ = desk
+    top = unattached_folders(conn, root)
+    junk = next(f for f in top["folders"] if f["name"] == "Junk")
+    assert junk == {"name": "Junk", "path": "Junk", "count": 3}
+    assert top["files"] >= 1  # notes.txt, directly in the root
+    level = unattached_folders(conn, root, "junk")  # any case
+    assert level == {"folders": [{"name": "Cache", "path": "Junk/Cache", "count": 2}], "files": 1, "total": 3}
+    assert [f["rel_path"] for f in unattached_files(conn, root, "Junk")] == [
+        "Junk/c.dat", "Junk/Cache/a.dat", "Junk/Cache/b.dat"]
+
+
+def test_product_from_folder_and_ignoring_a_folder(desk, scan, defs):
+    from exchange.library.desk import unattached_files, unattached_folders
+
+    conn, curator, root, env = desk
+    files = [(root, f["rel_key"]) for f in unattached_files(conn, root, "Junk/Cache")]
+    log_id, uid = curator.create_product("Cache stuff", [], files=files)
+    assert unattached_folders(conn, root, "Junk")["total"] == 1
+    assert len([f for e in dossier_detail(conn, defs, uid)["ledgers"][0]["entries"] for f in e["files"]]) == 2
+    curator.undo(log_id)
+    assert unattached_folders(conn, root, "Junk")["total"] == 3
+
+    log_id = curator.ignore_folder(env, "Junk")
+    assert unattached_folders(conn, root)["folders"] == [f for f in unattached_folders(conn, root)["folders"]
+                                                         if f["name"] != "Junk"]
+    assert repo.user_config(conn, env)["ignore"] == ["Junk/**"]
+    scan(Path(conn.execute("SELECT path FROM environment_root").fetchone()[0]))
+    assert not any(f["name"] == "Junk" for f in unattached_folders(conn, root)["folders"])  # rescans keep it out
+    curator.undo(log_id)
+    assert "ignore" not in repo.user_config(conn, env)
+    assert unattached_folders(conn, root, "Junk")["total"] == 3
+
+
+def test_dismissing_and_accepting_in_batches(lib, defs):
+    conn, curator = lib
+    props = uid_of(conn, "props", "product")
+    assert "props" in names(conn, defs, "is:unidentified")
+    log_id = curator.dismiss(props)
+    assert "props" not in names(conn, defs, "is:unidentified")
+    assert names(conn, defs, "is:dismissed") == {"props"}
+    assert sidebar(conn, defs)["unidentified_dossiers"] == 0
+    curator.undo(log_id)
+    assert "props" in names(conn, defs, "is:unidentified")
+
+    pending = [s["id"] for s in list_suggestions(conn) if s["kind"] != "lexicon_word"]
+    assert len(pending) >= 2
+    log_id = curator.accept_many(pending)
+    assert not [s for s in list_suggestions(conn) if s["id"] in pending]
+    curator.undo(log_id)  # one step for the whole batch
+    assert {s["id"] for s in list_suggestions(conn)} >= set(pending)
 
 
 # CLI ------------------------------------------------------------------------------------------------

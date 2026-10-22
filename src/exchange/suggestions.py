@@ -176,14 +176,15 @@ def _variant_groups(conn, index: LexiconIndex, env_ids: list[int]) -> list:
 
 
 def list_suggestions(conn: sqlite3.Connection, *, state: str = "pending", kind: str | None = None,
-                     limit: int = 200) -> list[dict]:
-    sql = ("SELECT s.*, d.name AS subject_name FROM suggestion s LEFT JOIN dossier_effective d ON d.uid = s.subject_uid"
-           " WHERE s.state = ?")
+                     limit: int = 200, offset: int = 0) -> list[dict]:
+    # The name per returned row: joining the effective-dossier view first takes seconds on a big library.
+    sql = ("SELECT s.*, (SELECT d.name FROM dossier_effective d WHERE d.uid = s.subject_uid) AS subject_name"
+           " FROM suggestion s WHERE s.state = ?")
     params: list = [state]
     if kind:
         sql += " AND s.kind = ?"
         params.append(kind)
-    rows = conn.execute(sql + " ORDER BY s.id LIMIT ?", [*params, limit]).fetchall()
+    rows = conn.execute(sql + " ORDER BY s.id LIMIT ? OFFSET ?", [*params, limit, offset]).fetchall()
     return [{"id": r["id"], "kind": r["kind"], "subject": r["subject_uid"], "subject_name": r["subject_name"],
              "confidence": r["confidence"], "state": r["state"], "payload": json.loads(r["payload"])} for r in rows]
 

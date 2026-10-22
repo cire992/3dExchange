@@ -614,6 +614,8 @@ class Inspector(QWidget):
 
 def describe_event(action: str, p: dict) -> str:
     """One history entry in words."""
+    files = p.get("files", [])
+    files = len(files) if isinstance(files, list) else files  # a list of files, or a count
     return {
         "entry_added": f"Found in {p.get('environment')} · {p.get('container')}",
         "entry_retired": f"No longer in {p.get('environment')} · {p.get('container')}",
@@ -625,13 +627,15 @@ def describe_event(action: str, p: dict) -> str:
         "revert_tag": f"You reverted tag {p.get('tag')}",
         "set_parent": "You moved it into a product" if p.get("parent") else "You took it out of its product",
         "revert_parent": "You reverted its product",
-        "link_files": f"You linked {len(p.get('files', []))} file(s)",
-        "unlink_files": f"You unlinked {len(p.get('files', []))} file(s)",
+        "link_files": f"You linked {files} file{'s' * (files != 1)}",
+        "unlink_files": f"You unlinked {files} file{'s' * (files != 1)}",
         "merge": "You merged assets",
         "fold_variant": f"You folded in variant {p.get('variant')}",
         "split": "You split it",
         "promote_variant": f"You made variant {p.get('variant')} its own asset",
-        "create_product": f"You made product {p.get('name')}",
+        "create_product": f"You made product {p.get('name')}" + (f" from {files} files" if files else ""),
+        "dismiss": "You marked it as not an asset",
+        "undismiss": "You counted it as an asset again",
         "add_to_collection": "You added it to a collection",
         "remove_from_collection": "You removed it from a collection",
         "undo": f"You undid: {p.get('undone_action', '').replace('_', ' ')}",
