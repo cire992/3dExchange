@@ -22,6 +22,7 @@ from __future__ import annotations
 import hashlib
 import importlib
 import json
+import re
 import shutil
 import sys
 import types
@@ -241,14 +242,33 @@ class PrerequisiteStatus:
     detail: str  # the path found, or how to fix it
 
 
+def _expand(path: str) -> list[str]:
+    """A path, or a glob's matches newest version first ("Blender */blender.exe" finds them all)."""
+    if not any(c in path for c in "*?["):
+        return [path]
+    anchor = Path(path).anchor or "."
+    matches = [str(p) for p in Path(anchor).glob(str(Path(path).relative_to(anchor)))]
+    natural = lambda s: [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", s)]  # noqa: E731
+    return sorted(matches, key=natural, reverse=True)
+
+
+def resolve_tool(package: PipelinePackage, tool: str, tools: dict[str, str] | None = None) -> str | None:
+    """Where a package's tool is: the user's setting first, then the paths its manifest suggests."""
+    tools = tool_paths() if tools is None else tools
+    candidates = [tools[tool]] if tool in tools else []
+    for p in package.manifest.prerequisites:
+        if p.kind == "tool" and p.tool == tool:
+            candidates += [c for path in p.paths for c in _expand(path)]
+    return next((c for c in candidates if Path(c).is_file()), None)
+
+
 def check_prerequisites(package: PipelinePackage, tools: dict[str, str] | None = None) -> list[PrerequisiteStatus]:
     """Each prerequisite, green or red with a fix hint. Cheap: paths only, nothing is run."""
     tools = tool_paths() if tools is None else tools
     out = []
     for p in package.manifest.prerequisites:
         if p.kind == "tool":
-            candidates = ([tools[p.tool]] if p.tool in tools else []) + list(p.paths)
-            found = next((c for c in candidates if Path(c).is_file()), None)
+            found = resolve_tool(package, p.tool, tools)
             out.append(PrerequisiteStatus(p.id, p.label, found is not None, found or (
                 f"not found; set it with: exchange tools set {p.tool} PATH" + (f" ({p.hint})" if p.hint else ""))))
         else:
@@ -283,5 +303,8 @@ def validate(package: PipelinePackage) -> list[str]:
         for wanted, name in zip(spec.inputs, step.inputs):
             if not accepts(wanted, produced[name]):
                 problems.append(f"step {step.id}: {step.operation} wants {wanted}, but {name} gives {produced[name]}")
+        if spec.app and not any(p.kind == "tool" and p.tool == spec.app for p in package.manifest.prerequisites):
+            problems.append(f"step {step.id}: {step.operation} runs in {spec.app}; declare it as a "
+                            f"[[prerequisite]] with kind = \"tool\" and tool = \"{spec.app}\"")
         produced[step.id] = spec.output
     return problems

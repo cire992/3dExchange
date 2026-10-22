@@ -1,6 +1,6 @@
 # Exchange: progress and handoff
 
-Last updated 2026-10-22, during Roadmap phase 4. `main` has phases 1-3. PR 4a (the requisition engine) is on branch `phase-4a-requisition-engine`. 193 tests pass.
+Last updated 2026-10-22, during Roadmap phase 4. `main` has phases 1-3. PR 4a (the requisition engine) is #10; PR 4b (bridges) is on branch `phase-4b-bridges`, based on 4a. 199 tests pass.
 
 Read this first, then `docs/DESIGN_SPEC.md` (the source of truth; use its terms exactly) and
 `docs/USEFUL_PATHS.md` (real asset folders and tools on the dev machine, for testing). The
@@ -26,8 +26,8 @@ still needs the user's answer before 4d.
 | #7 | 3a: curation core: lexicons, classification, undoable curation, suggestions, collections, hand-installed Daz products, CLI | merged |
 | #8 | 3b: editing in the main window: inspector editing + revert markers, bulk edit, drag and drop linking, collections in the sidebar, context-menu actions, Ctrl+Z/Ctrl+Y | merged |
 | #9 | 3c: Unidentified desk (low-confidence dossiers, unattached files by folder, suggestions in batches), lexicon editor, file watcher (`watchdog`); split, fold and promote in the window | merged |
-| 4a | Requisition engine: pipeline packages (manifest, trust, prerequisites, core operations), planning (routes, chains, product plans), queue and runner (checkpoints, cached steps, collisions), endpoints, sidecars, staleness, removal, CLI, test harness | branch `phase-4a-requisition-engine`, PR to open |
-| 4b | Bridges: Blender (headless), Daz Studio (DazScript at launch), command-line tools; one job per app | after 4a |
+| #10 | 4a: requisition engine: pipeline packages (manifest, trust, prerequisites, core operations), planning (routes, chains, product plans), queue and runner (checkpoints, cached steps, collisions), endpoints, sidecars, staleness, removal, CLI, test harness | open |
+| 4b | Bridges: Blender (headless), Daz Studio (DazScript at launch), command-line tools; one job per app; built-in Convert mesh (Blender) | branch `phase-4b-bridges` (on 4a), PR to open |
 | 4c | Requisitions in the window: plan view with option forms and presets, the queue, Settings › Pipelines | after 4b |
 | 4d | First pipeline: Daz cross-figure (G9/G2 → G8) | needs the user's answer to open question 1 |
 
@@ -155,6 +155,9 @@ src/exchange/            core, never imports Qt (a test enforces this)
                          sidecars (written and read back by identification), lifecycle (resume,
                          hold, move, remove, stale, rebuild)
   cli_requisitions.py    pipelines, tools, requisition, test-pipeline
+  bridges/               base (run with timeout and log, one job per app, close the whole process
+                         tree), blender (headless wrapper), daz (DazScript wrapper, separate
+                         instance), command-line tools; operations reach them via ctx.bridge(app)
   library/               search language (FTS5 + filters), query API (pages, sidebar, detail, collections),
                          desk (unattached files by folder, one level at a time over the (root, rel_key) index)
   autodiscover.py        Steam, Epic, Unreal recent projects, Daz registry, MO2 instances
@@ -227,6 +230,10 @@ Key ideas:
 - **Requisitions (4a, a copy of the library, writing to a scratch folder):** copying a real Daz product ("XI Japanese Racing Bike": 4 children, 18 files) takes 3.3 s, including the rescan.
   - The output keeps its content layout (`data/`, `Runtime/Support/`, `Vehicles/…`). It becomes 5 *copied* entries on the original dossiers, with no new dossiers, even with a copied DIM manifest.
   - It took 92 s at first: the rescan of the new root reclassified and re-suggested the whole Daz environment. Scans now classify and suggest only for the roots they scanned.
+- **Blender (4b):** the built-in *Convert mesh* pipeline turned a real Sketchfab glTF (*Dwarf Helmet*, copied to a scratch folder) into FBX, OBJ, glTF and GLB. Blender 4.1 was found by a glob over `Blender */`.
+  - **Speed:** about 3 s of Blender per conversion.
+  - **Result:** each became a requisitioned entry of the one *Dwarf Helmet* asset.
+  - **Fix:** the glTF importer packs textures into the file, so OBJ and separate glTF exports came without them. The script now writes each packed image's original bytes beside the export.
 
 **Loose folders** (`Z:\Content Farm\Sketchfab` and `SWBF Model and Textures`), checked in 3a:
 - **Tags:** 77% of 4,728 dossiers got one. SWBF's many *Weapon* tags are correct: the folder is mostly weapon sound effects.
@@ -243,7 +250,11 @@ Key ideas:
 - **Not in 4a:**
   - Presets and last-used options (4c, with the plan view).
   - The `new-pipeline` scaffold and the authoring guide (phase 6).
-  - Bridges (4b): operations with an `app` cannot run yet.
+  - Parallel command-line operations: the runner does one step at a time.
+- **The Daz Studio bridge is untested against the real Daz Studio** (4b): it opens a window and may stop on a prompt, so it waits until the user is at the computer.
+  - **What's checked:** a stand-in tests the wrapper, the arguments, the error reporting, and closing Daz Studio once the result is written.
+  - **Assumed from Daz's docs, not the 4.5 SDK headers:** the flags (`-instanceName`, `-noPrompt`, `-noDefaultScene`), `include()`, and `App.delayedExit`. The SDK on the machine is older than the app.
+  - **Next:** run a trivial DazScript job and look at Daz's own log.
 - **Rebuilding from sidecars after a lost database** keeps each output with its asset's original uid. The source environment's rescan makes a new uid for the same asset, so the two show as separate assets until merged.
 - **Overwriting another requisition's output:** both sidecars list the files, so the asset shows an entry for each until one is removed.
 - **Edits run on the UI thread.** Those that change counts (merge, new product, accepted suggestions, retype, undo) reload the sidebar, about 1.7 s on the real library. The first big batch after opening can take several seconds while the database warms up.
