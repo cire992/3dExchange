@@ -1,6 +1,6 @@
 # Exchange: progress and handoff
 
-Last updated 2026-10-22, during Roadmap phase 4. `main` has phases 1-3. PRs 4a (#10, the requisition engine), 4b (#11, bridges) and 4c (#12, requisitions in the window) are open, each stacked on the one before. 204 tests pass.
+Last updated 2026-10-22, during Roadmap phase 4. `main` has phases 1-3 and 4a (#10). 4b (#11) and 4c (#12) are merged too, but into their stacked base branches, so they reach `main` through #13. 204 tests pass.
 
 Read this first, then `docs/DESIGN_SPEC.md` (the source of truth; use its terms exactly) and
 `docs/USEFUL_PATHS.md` (real asset folders and tools on the dev machine, for testing). The
@@ -15,7 +15,8 @@ pipeline (Daz cross-figure, G9/G2 → G8).** The phase 4 plan was approved with 
 answers (see Decisions).
 
 **Next:**
-- **Merging:** in order: #10, then #11, then #12. Point each next PR at `main` after the one before it merges. GitHub does that by itself only if the merged branch is deleted.
+- **Merging:** #13 brings 4b, 4c and this doc to `main`. #11 merged into the 4a branch and #12 into the 4b branch (their bases weren't moved to `main` first), so `main` only got 4a.
+- **Stacked PRs next time:** after merging one, change the next PR's base to `main` before merging it (or delete the merged branch, and GitHub moves it).
 - **4d** waits for the user's answer to open question 1: what cross-figure converts first, and with which tool.
 - **Daz Studio bridge:** check it against the real app when the user is at the computer (see Known gaps).
 
@@ -30,9 +31,10 @@ answers (see Decisions).
 | #7 | 3a: curation core: lexicons, classification, undoable curation, suggestions, collections, hand-installed Daz products, CLI | merged |
 | #8 | 3b: editing in the main window: inspector editing + revert markers, bulk edit, drag and drop linking, collections in the sidebar, context-menu actions, Ctrl+Z/Ctrl+Y | merged |
 | #9 | 3c: Unidentified desk (low-confidence dossiers, unattached files by folder, suggestions in batches), lexicon editor, file watcher (`watchdog`); split, fold and promote in the window | merged |
-| #10 | 4a: requisition engine: pipeline packages (manifest, trust, prerequisites, core operations), planning (routes, chains, product plans), queue and runner (checkpoints, cached steps, collisions), endpoints, sidecars, staleness, removal, CLI, test harness | open |
-| #11 | 4b: bridges: Blender (headless), Daz Studio (DazScript at launch), command-line tools; one job per app; built-in Convert mesh (Blender) | open, stacked on #10 |
-| #12 | 4c: requisitions in the window: Requisition to… (plan tree, option forms, presets, last-used options, batch), the queue view, Settings › Pipelines and Endpoints | open, stacked on #11 |
+| #10 | 4a: requisition engine: pipeline packages (manifest, trust, prerequisites, core operations), planning (routes, chains, product plans), queue and runner (checkpoints, cached steps, collisions), endpoints, sidecars, staleness, removal, CLI, test harness | merged |
+| #11 | 4b: bridges: Blender (headless), Daz Studio (DazScript at launch), command-line tools; one job per app; built-in Convert mesh (Blender) | merged into the 4a branch; reaches `main` with #13 |
+| #12 | 4c: requisitions in the window: Requisition to… (plan tree, option forms, presets, last-used options, batch), the queue view, Settings › Pipelines and Endpoints | merged into the 4b branch; reaches `main` with #13 |
+| #13 | 4b and 4c onto `main`, with this doc | open |
 | 4d | First pipeline: Daz cross-figure (G9/G2 → G8) | needs the user's answer to open question 1 |
 
 ## How we work
@@ -288,7 +290,7 @@ Key ideas:
 
 ## Known gaps and good next candidates
 
-- **4c and 4d** (see the table above). 4d needs the user's answer on what cross-figure converts first.
+- **4d** (see the table above) needs the user's answer on what cross-figure converts first.
 - **Not done yet in phase 4:**
   - The `new-pipeline` scaffold and the authoring guide (phase 6).
   - **Manual checkpoints in the window:** they show as *Needs attention* with the pipeline's message, and Resume continues. There's no button yet to open the work folder in the app at that point.
