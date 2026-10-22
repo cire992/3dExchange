@@ -1,6 +1,6 @@
 # Exchange: progress and handoff
 
-Last updated 2026-10-22, during Roadmap phase 4. `main` has phases 1-3 and 4a-4c (#10-#13). The Daz Studio bridge has been checked against the real Daz Studio; its fixes aren't committed yet. 205 tests pass.
+Last updated 2026-10-22, during Roadmap phase 4. `main` has phases 1-3 and 4a-4c (#10-#13). The Daz Studio bridge has been checked against the real Daz Studio; its fixes are #14. 205 tests pass.
 
 Read this first, then `docs/DESIGN_SPEC.md` (the source of truth; use its terms exactly) and
 `docs/USEFUL_PATHS.md` (real asset folders and tools on the dev machine, for testing). The
@@ -15,7 +15,7 @@ pipeline (Daz cross-figure, G9/G2 → G8).** The phase 4 plan was approved with 
 answers (see Decisions).
 
 **Next:**
-- **Daz Studio bridge fixes** (settings copied from the main instance, Daz's own log in errors, a longer exit grace): uncommitted, to go in a small PR off `main`.
+- **Daz Studio bridge fixes** (settings copied from the main instance, Daz's own log in errors, a longer exit grace): #14, open.
 - **Stacked PRs next time:** after merging one, change the next PR's base to `main` before merging it (or delete the merged branch, and GitHub moves it). #11 and #12 merged into their base branches and needed #13 to reach `main`.
 - **4d** waits for the user's answer to open question 1: what cross-figure converts first, and with which tool.
 
@@ -34,7 +34,7 @@ answers (see Decisions).
 | #11 | 4b: bridges: Blender (headless), Daz Studio (DazScript at launch), command-line tools; one job per app; built-in Convert mesh (Blender) | merged (via #13) |
 | #12 | 4c: requisitions in the window: Requisition to… (plan tree, option forms, presets, last-used options, batch), the queue view, Settings › Pipelines and Endpoints | merged (via #13) |
 | #13 | 4b and 4c onto `main`, with this doc | merged |
-| — | Daz Studio bridge, checked against the real app: instance settings from the main instance, Daz's log in errors | uncommitted |
+| #14 | Daz Studio bridge, checked against the real app: instance settings from the main instance, Daz's log in errors | open |
 | 4d | First pipeline: Daz cross-figure (G9/G2 → G8) | needs the user's answer to open question 1 |
 
 ## How we work
