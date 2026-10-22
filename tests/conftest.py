@@ -16,6 +16,16 @@ def isolated_data_dir(tmp_path_factory, monkeypatch):
     monkeypatch.setenv("EXCHANGE_DATA_DIR", str(tmp_path_factory.mktemp("exchange-data")))
 
 
+@pytest.fixture(autouse=True)
+def isolated_daz_instance(tmp_path_factory, monkeypatch):
+    """Keep the user's real Daz Studio settings and log out of every test."""
+    from exchange.bridges import daz
+
+    monkeypatch.setattr(daz, "REGISTRY_KEY", r"Software\ExchangeTests\DAZ")
+    folder = tmp_path_factory.mktemp("daz-instance")
+    monkeypatch.setattr(daz, "instance_folder", lambda: folder)
+
+
 @pytest.fixture(scope="session")
 def definitions() -> DefinitionSet:
     return load_definitions(include_user_dir=False)

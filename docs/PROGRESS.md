@@ -1,6 +1,6 @@
 # Exchange: progress and handoff
 
-Last updated 2026-10-22, during Roadmap phase 4. `main` has phases 1-3 and 4a (#10). 4b (#11) and 4c (#12) are merged too, but into their stacked base branches, so they reach `main` through #13. 204 tests pass.
+Last updated 2026-10-22, during Roadmap phase 4. `main` has phases 1-3 and 4a-4c (#10-#13). The Daz Studio bridge has been checked against the real Daz Studio; its fixes aren't committed yet. 205 tests pass.
 
 Read this first, then `docs/DESIGN_SPEC.md` (the source of truth; use its terms exactly) and
 `docs/USEFUL_PATHS.md` (real asset folders and tools on the dev machine, for testing). The
@@ -15,10 +15,9 @@ pipeline (Daz cross-figure, G9/G2 → G8).** The phase 4 plan was approved with 
 answers (see Decisions).
 
 **Next:**
-- **Merging:** #13 brings 4b, 4c and this doc to `main`. #11 merged into the 4a branch and #12 into the 4b branch (their bases weren't moved to `main` first), so `main` only got 4a.
-- **Stacked PRs next time:** after merging one, change the next PR's base to `main` before merging it (or delete the merged branch, and GitHub moves it).
+- **Daz Studio bridge fixes** (settings copied from the main instance, Daz's own log in errors, a longer exit grace): uncommitted, to go in a small PR off `main`.
+- **Stacked PRs next time:** after merging one, change the next PR's base to `main` before merging it (or delete the merged branch, and GitHub moves it). #11 and #12 merged into their base branches and needed #13 to reach `main`.
 - **4d** waits for the user's answer to open question 1: what cross-figure converts first, and with which tool.
-- **Daz Studio bridge:** check it against the real app when the user is at the computer (see Known gaps).
 
 | PR | What | State |
 | --- | --- | --- |
@@ -32,9 +31,10 @@ answers (see Decisions).
 | #8 | 3b: editing in the main window: inspector editing + revert markers, bulk edit, drag and drop linking, collections in the sidebar, context-menu actions, Ctrl+Z/Ctrl+Y | merged |
 | #9 | 3c: Unidentified desk (low-confidence dossiers, unattached files by folder, suggestions in batches), lexicon editor, file watcher (`watchdog`); split, fold and promote in the window | merged |
 | #10 | 4a: requisition engine: pipeline packages (manifest, trust, prerequisites, core operations), planning (routes, chains, product plans), queue and runner (checkpoints, cached steps, collisions), endpoints, sidecars, staleness, removal, CLI, test harness | merged |
-| #11 | 4b: bridges: Blender (headless), Daz Studio (DazScript at launch), command-line tools; one job per app; built-in Convert mesh (Blender) | merged into the 4a branch; reaches `main` with #13 |
-| #12 | 4c: requisitions in the window: Requisition to… (plan tree, option forms, presets, last-used options, batch), the queue view, Settings › Pipelines and Endpoints | merged into the 4b branch; reaches `main` with #13 |
-| #13 | 4b and 4c onto `main`, with this doc | open |
+| #11 | 4b: bridges: Blender (headless), Daz Studio (DazScript at launch), command-line tools; one job per app; built-in Convert mesh (Blender) | merged (via #13) |
+| #12 | 4c: requisitions in the window: Requisition to… (plan tree, option forms, presets, last-used options, batch), the queue view, Settings › Pipelines and Endpoints | merged (via #13) |
+| #13 | 4b and 4c onto `main`, with this doc | merged |
+| — | Daz Studio bridge, checked against the real app: instance settings from the main instance, Daz's log in errors | uncommitted |
 | 4d | First pipeline: Daz cross-figure (G9/G2 → G8) | needs the user's answer to open question 1 |
 
 ## How we work
@@ -124,8 +124,9 @@ Phase 3:
 Phase 4 (approved 2026-10-22, all recommended answers):
 1. **First conversion** (open): what cross-figure converts first (characters, clothing, hair) and with which tool. The recommendation was clothing via Transfer Utility and auto-fit, pending the user's own workflow.
 2. **VaM backporting and DS3 legacy conversion** move to phase 5, with the VaM environment.
-3. **Daz output:** an `Exchange Conversions` folder beside the library. Exchange never edits Daz Studio's settings; adding it in the Content Directory Manager is the user's one-time step.
+3. **Daz output:** an `Exchange Conversions` folder beside the library. Exchange never edits the user's Daz Studio settings; adding it in the Content Directory Manager (of the main instance) is the user's one-time step.
 4. **Daz Studio window:** accepted during jobs, as a separate instance (`-instanceName Exchange`).
+   - **Its settings** (decided 2026-10-22): before each job, Exchange copies the update setting (`AutoUpdate`) and the content, Poser, import and MDL directory lists from the main instance's registry key (`HKCU\Software\DAZ\Studio4`) into the Exchange instance's (`Studio4[Exchange]`). The main key is only read. So a folder added in the main instance reaches jobs too.
 5. **Pipelines:** built-ins ship with Exchange; the user's go in `<data>/pipelines/`, trusted before they run.
 6. **Types:** operations take and make named artifact types (`Files` accepts any), checked along the chain. Dossier types are unchanged.
 7. **Execution:** one worker process runs the queue, reporting progress like scans.
@@ -279,6 +280,15 @@ Key ideas:
 - **The window's requisition flow (4c, on that scratch library):** *Requisition to…* → *Convert mesh* (GLB, scale 0.5) → *Add and run*. The background runner fulfilled it in 5.2 s, and the queue view showed it with its log.
   - **Crash found by the tests:** unchecking a plan row rebuilt the tree inside that row's own change signal, deleting the row Qt was still updating. That was an intermittent access violation; only the summary is rebuilt now.
 
+- **Daz Studio bridge (real Daz Studio 4.24, 2026-10-22):** a trivial DazScript job (report the version and scene, write a file) through `DazBridge`, with `EXCHANGE_DATA_DIR` in scratch.
+  - **First two runs failed:** a new `Exchange` instance checks for updates at every start. It found a newer Daz Studio and showed its update dialog despite `-noPrompt` (Daz logs `UpdateDlg displayed while -noPrompt is used`), then quit before running the script, with exit code -1.
+  - **Also found:** the instance had found its own content directories, not the user's three (no `Studio3/content`, no `Personal Library`).
+  - **Fix:** the bridge copies those settings from the main instance (Decisions, phase 4, item 4), and errors quote Daz's own log (`%APPDATA%\DAZ 3D\Studio4 [Exchange]\log.txt`, copied into the work folder as `daz_studio_log.txt`). The console output was only the content database's `pg_ctl` lines.
+  - **Confirmed:** `-instanceName`, `-noPrompt`, `-noDefaultScene`, `include()`, `JSON`, `App.instanceName()` and `App.delayedExit` all work. Arguments with `é` and `✓` arrive intact. The update check reads *Disabled* with `AutoUpdate = 3`.
+  - **Timing:** about 22 s per job: 10 s of startup, then the script, then about 8 s for Daz to shut itself down (exit code 0). The bridge used to close it 2 s after the result, mid-shutdown; Daz now gets 15 s (`exit_grace`).
+  - **Left running:** Daz's PostgreSQL content database stays up after Daz exits. That's Daz's own behaviour, and it's shared with the user's instance.
+  - **Noise in the log:** the user's *Big Bat Send-to-Daz* plugin loads in the Exchange instance too, polling its `cmd.json`. It didn't interfere.
+
 **Loose folders** (`Z:\Content Farm\Sketchfab` and `SWBF Model and Textures`), checked in 3a:
 - **Tags:** 77% of 4,728 dossiers got one. SWBF's many *Weapon* tags are correct: the folder is mostly weapon sound effects.
 - **Texture links:** 62 suggestions. They're correct on the samples checked, including `DwarfHelmet_Base_Color` and PBR sets.
@@ -297,10 +307,7 @@ Key ideas:
   - **Queue mode:** the queue only runs when you press Run; there's no "run immediately" setting yet.
   - Parallel command-line operations: the runner does one step at a time.
   - Blender thumbnails for formats the small renderer can't draw.
-- **The Daz Studio bridge is untested against the real Daz Studio** (4b): it opens a window and may stop on a prompt, so it waits until the user is at the computer.
-  - **What's checked:** a stand-in tests the wrapper, the arguments, the error reporting, and closing Daz Studio once the result is written.
-  - **Assumed from Daz's docs, not the 4.5 SDK headers:** the flags (`-instanceName`, `-noPrompt`, `-noDefaultScene`), `include()`, and `App.delayedExit`. The SDK on the machine is older than the app.
-  - **Next:** run a trivial DazScript job and look at Daz's own log.
+- **The Daz Studio bridge has run only a trivial job** (version, scene, one file written), not a real conversion. That's for 4d.
 - **Rebuilding from sidecars after a lost database** keeps each output with its asset's original uid. The source environment's rescan makes a new uid for the same asset, so the two show as separate assets until merged.
 - **Overwriting another requisition's output:** both sidecars list the files, so the asset shows an entry for each until one is removed.
 - **Edits run on the UI thread.** Those that change counts (merge, new product, accepted suggestions, retype, undo) reload the sidebar, about 1.7 s on the real library. The first big batch after opening can take several seconds while the database warms up.
