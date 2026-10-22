@@ -11,6 +11,7 @@ from pathlib import Path
 from exchange.curation import EDITABLE_FIELDS, CurationError, Curator, history
 from exchange.db import open_library
 from exchange.db import repository as repo
+from exchange.lexicons import with_generated
 from exchange.paths import fold
 
 
@@ -18,6 +19,8 @@ def add_parsers(commands, common: argparse.ArgumentParser) -> None:
     classify = commands.add_parser("classify", parents=[common],
                                    help="re-run classification and suggestions (after editing lexicons)")
     classify.add_argument("--env", type=int, action="append", metavar="ID", help="only this environment")
+    classify.add_argument("--regroup", action="store_true",
+                          help="also regroup files into products (after editing theme or author lexicons)")
 
     lexicon = commands.add_parser("lexicon", help="show and edit lexicons")
     lex = lexicon.add_subparsers(dest="lexicon_command", required=True)
@@ -133,14 +136,17 @@ def run(args, definitions) -> int:
 
 def _classify(args, definitions, conn, curator) -> int:
     from exchange.scanner.classify import classify
+    from exchange.scanner.scan import regroup
     from exchange.suggestions import generate
 
     ids = args.env or [e["id"] for e in repo.list_environments(conn)]
     with repo.transaction(conn):
+        roots = regroup(conn, definitions, environment_ids=ids, threshold=args.threshold) if args.regroup else 0
         stats = classify(conn, definitions, environment_ids=ids)
         new = generate(conn, definitions, environment_ids=ids)
-    data = {"classification": dataclasses.asdict(stats), "suggestions": new}
-    _emit(args, data, f"{stats.dossiers} dossiers classified · {stats.tagged} tagged · "
+    data = {"classification": dataclasses.asdict(stats), "suggestions": new, "regrouped_roots": roots}
+    _emit(args, data, (f"{roots} roots regrouped\n" if args.regroup else "") +
+                      f"{stats.dossiers} dossiers classified · {stats.tagged} tagged · "
                       f"{stats.structural} structural · {stats.changed_confidence} confidences changed\n"
                       f"new suggestions: {new['texture_link']} texture links, {new['variant_group']} variant "
                       f"groups ({new['stale']} no longer apply)")
@@ -148,7 +154,7 @@ def _classify(args, definitions, conn, curator) -> int:
 
 
 def _lexicon(args, definitions, conn, curator) -> int:
-    lexicons = definitions.lexicons
+    lexicons = with_generated(definitions, repo.generated_words(conn)).lexicons  # with authors scans found
     if args.lexicon_command == "list":
         rows = [{"id": l.id, "name": l.name, "kind": l.kind, "terms": len(l.terms), "source": l.source}
                 for l in lexicons.values()]
@@ -166,7 +172,8 @@ def _lexicon(args, definitions, conn, curator) -> int:
     log_id = curator.set_lexicon_word(args.id, args.value, args.word, present=args.lexicon_command == "add")
     verb = "Added" if args.lexicon_command == "add" else "Removed"
     _emit(args, {"log_id": log_id}, f"{verb} {args.word!r} ({args.value}) · undo with: exchange undo {log_id}\n"
-                                    f"Apply it to the library with: exchange classify")
+                                    f"Apply it to the library with: exchange classify"
+                                    + (" --regroup" if lexicon.kind in ("theme", "author", "category") else ""))
     return 0
 
 

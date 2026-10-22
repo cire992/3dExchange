@@ -24,6 +24,7 @@ from typing import Any
 from exchange.db import repository as repo
 from exchange.definitions.schema import DefinitionSet, EnvironmentDefinition
 from exchange.globs import any_match
+from exchange.lexicons import with_generated
 from exchange.links import apply_file_links, linked_keys
 from exchange.paths import fold, rel_under
 from exchange.scanner.layers import HANDLERS
@@ -138,9 +139,12 @@ def identify_root(
     stats = IdentifyStats()
     ignore = definition.ignore_globs + tuple(user_ignore)
     content = [f for f in files if not any_match(ignore, f.rel)]
-    ctx = LayerContext(root, definition, definitions, content, files)
+    # Lexicons with the words earlier scans found (known authors), for the layer to group by.
+    known = with_generated(definitions, repo.generated_words(conn))
+    ctx = LayerContext(root, definition, known, content, files)
     result = HANDLERS[definition.handler](ctx)
     stats.layer_config, stats.warnings = result.layer_config, result.warnings
+    repo.replace_generated_words(conn, root_id, result.generated)
 
     ignored_keys = {fold(r) for r in result.ignored}
     content = [f for f in content if fold(f.rel) not in ignored_keys]

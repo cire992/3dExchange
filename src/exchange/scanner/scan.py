@@ -184,6 +184,35 @@ def run_rescan(
     return report
 
 
+def regroup(conn: sqlite3.Connection, definitions: DefinitionSet, *,
+            environment_ids: Iterable[int] | None = None, threshold: float = DEFAULT_THRESHOLD) -> int:
+    """Re-run identification on the files already recorded, without walking the disk.
+
+    For lexicon edits that change how files group into products (category and vendor folders).
+    Roots that are offline are skipped. Returns the number of roots regrouped.
+    """
+    wanted = set(environment_ids) if environment_ids is not None else None
+    count = 0
+    for root in repo.list_roots(conn):
+        if wanted is not None and root["environment_id"] not in wanted:
+            continue
+        path = Path(root["path"])
+        if not path.is_dir():
+            continue  # manifests are read from disk
+        env = repo.get_environment(conn, root["environment_id"])
+        definition = definitions.environments.get(env["type_id"])
+        if definition is None:
+            continue
+        present = [FileInfo(r["id"], r["rel_path"], r["size"], r["mtime_ns"], r["ext"])
+                   for r in repo.load_files(conn, root["id"]).values() if r["state"] != "gone"]
+        identify_root(
+            conn, environment_id=env["id"], root_id=root["id"], definition=definition,
+            definitions=definitions, root=path, files=present,
+            user_ignore=tuple(repo.user_config(conn, env["id"]).get("ignore", ())), threshold=threshold)
+        count += 1
+    return count
+
+
 def _peek_registered(db_path: Path, dry_run: bool) -> list[RegisteredEnvironment]:
     """Known roots, read without writing (the database may not be migrated yet)."""
     try:

@@ -24,6 +24,7 @@ from exchange.definitions.schema import (
     TYPE_SCOPES,
     VARIANT_LEVELS,
     DefinitionSet,
+    GENERATED_LEXICON_KINDS,
     LEXICON_KINDS,
     DossierTypeDefinition,
     EnvironmentDefinition,
@@ -225,7 +226,7 @@ def _variant(t: _Table) -> Variant:
 
 def parse_lexicon(data: dict[str, Any], source: str) -> Lexicon:
     top = _Table(data, source, "", ["lexicon", "term"])
-    lex = top.table("lexicon", ["id", "name", "format_version", "kind"])
+    lex = top.table("lexicon", ["id", "name", "format_version", "kind", "exclude"])
     version = lex.get("format_version", int)
     if version != FORMAT_VERSION:
         raise DefinitionError(source, f"unsupported format_version {version} (expected {FORMAT_VERSION})")
@@ -240,7 +241,10 @@ def parse_lexicon(data: dict[str, Any], source: str) -> Lexicon:
         if not value and kind not in ("ignore", "index"):
             raise DefinitionError(source, f"{t.where}.value is required for a {kind} lexicon")
         terms.append(LexiconTerm(value, words, patterns))
-    return Lexicon(_identifier(lex), lex.get("name", str), kind, source, tuple(terms))
+    exclude = tuple(w.strip() for w in lex.strings("exclude") if w.strip())
+    if exclude and kind not in GENERATED_LEXICON_KINDS:
+        raise DefinitionError(source, f"lexicon.exclude is only for generated lexicons ({', '.join(GENERATED_LEXICON_KINDS)})")
+    return Lexicon(_identifier(lex), lex.get("name", str), kind, source, tuple(terms), exclude)
 
 
 # Dossier-type definitions -----------------------------------------------------------------------

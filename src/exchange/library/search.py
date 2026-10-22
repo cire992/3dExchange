@@ -16,6 +16,7 @@ import re
 import sqlite3
 from dataclasses import dataclass
 
+from exchange.db import repository as repo
 from exchange.definitions.schema import DefinitionSet
 from exchange.errors import ExchangeError
 from exchange.scanner.tokenize import tokenize
@@ -142,8 +143,7 @@ def _clause(term: Term, definitions: DefinitionSet, threshold: float) -> tuple[s
         types = sorted({t for t in definitions.dossier_types if any(definitions.is_a(t, k) for k in known)})
         return f"d.type_id IN ({','.join('?' * len(types))})", types
     if key == "tag":
-        return ("EXISTS (SELECT 1 FROM dossier_tag_effective t WHERE t.dossier_uid = d.uid"
-                " AND lower(t.tag) = lower(?))"), [value]
+        return repo.has_tag_sql(), [value] * 3
     if key == "author":
         fields = ("authors", "author")
         return _field_like(fields), [*fields, _like(value), *fields, _like(value)]

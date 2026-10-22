@@ -81,6 +81,8 @@ class LayerResult:
     ignored: set[str] = field(default_factory=set)  # env-relative paths that are not content
     layer_config: dict[str, Any] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
+    # Words for generated lexicons found in this root: lexicon id -> (value, word) pairs.
+    generated: dict[str, list[tuple[str, str]]] = field(default_factory=dict)
 
 
 class LayerContext:

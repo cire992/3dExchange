@@ -10,7 +10,7 @@ from exchange.curation import CurationError, Curator, history
 from exchange.db import repository as repo
 from exchange.definitions import load_definitions
 from exchange.errors import DefinitionError
-from exchange.lexicons import LexiconIndex, word_forms
+from exchange.lexicons import LexiconIndex, with_generated, word_forms
 from exchange.library.query import dossier_detail, list_collections, list_dossiers
 from exchange.scanner.classify import classify
 from exchange.scanner.tokenize import tokenize
@@ -298,6 +298,88 @@ def test_unmanifested_daz_products(scan, tmp_path, library):
     assert (hair["type_id"], hair["parent_id"]) == ("daz_hair", row["id"])
 
 
+def test_folder_products_use_category_and_vendor_folders(defs):
+    from exchange.scanner.layers.daz import _folder_products
+    index = LexiconIndex(with_generated(defs, {"authors": [("dm", "dm"), ("Aeon Soul", "AeonSoul")]}))
+    products = {p.name: p for p in _folder_products([
+        "Animals/AM/Wolf 2/Wolf 2.duf",
+        "Animals/AM/Wolf 2/Materials/Eyes/Wolf Eyes Gold.duf",  # Eyes is no part-folder word: folds in
+        "Animals/AM/Wolf 2/Poses/Tail/Tail Up.duf",
+        "Runtime/Textures/AM/Wolf 2/wolf_d.jpg",  # the product's name finds its data and textures
+        "data/AM/Wolf 2/Morphs/Snout.dsf",
+        "Runtime/Textures/AM/Eyes/eye_d.jpg",  # unmatched: only product names are used
+        "Props/!! Sorted/Stray.duf",  # a sorting folder is never a product...
+        "Props/!! Sorted/Barrel/Barrel.duf",  # ...and a category word (barrel) is not a category name
+        *[f"data/{v}/Barrel/b.dsf" for v in ("V1", "V2", "V3", "V4")],  # a generic name: not used
+        "Vehicles/!!sorted/Sci-Fi/Loose.duf",  # theme folder: never a product
+        "Vehicles/!!sorted/Sci-Fi/Star Hopper/Star Hopper.duf",
+        "Vehicles/!!sorted/Sci-Fi/Fantasy Props/Old.duf",  # theme + category name
+        "Vehicles/!!sorted/Sci-Fi/Anime Girl Outfit/Outfit.duf",  # only contains a theme word
+        "People/Genesis 8 Female/Poses/dm/Stray.duf",  # vendor folder: never a product
+        "People/Genesis 8 Female/Poses/dm/Dance Poses/Spin.duf",
+        "People/Genesis 8 Female/Poses/dm/Dance Poses/Part 2/Leap.duf",
+        "Props/AeonSoul/Lamp/Lamp.duf",  # any spelling of a known author
+    ], index)}
+    assert {name: sorted(p.members) for name, p in products.items()} == {
+        "Wolf 2": ["Animals/AM/Wolf 2/Materials/Eyes/Wolf Eyes Gold.duf", "Animals/AM/Wolf 2/Poses/Tail/Tail Up.duf",
+                   "Animals/AM/Wolf 2/Wolf 2.duf", "Runtime/Textures/AM/Wolf 2/wolf_d.jpg",
+                   "data/AM/Wolf 2/Morphs/Snout.dsf"],
+        "Barrel": ["Props/!! Sorted/Barrel/Barrel.duf"],
+        "Star Hopper": ["Vehicles/!!sorted/Sci-Fi/Star Hopper/Star Hopper.duf"],
+        "Anime Girl Outfit": ["Vehicles/!!sorted/Sci-Fi/Anime Girl Outfit/Outfit.duf"],
+        "Dance Poses": ["People/Genesis 8 Female/Poses/dm/Dance Poses/Part 2/Leap.duf",
+                        "People/Genesis 8 Female/Poses/dm/Dance Poses/Spin.duf"],
+        "Lamp": ["Props/AeonSoul/Lamp/Lamp.duf"],
+    }
+    assert products["Dance Poses"].fields["author"] == "dm"
+    assert products["Lamp"].fields["author"] == "Aeon Soul"
+    assert "author" not in products["Barrel"].fields
+
+
+def test_found_authors_are_tidied_and_filtered(defs):
+    from exchange.scanner.layers.base import FileInfo
+    from exchange.scanner.layers.daz import ManifestProduct, _found_authors
+    manifests = [ManifestProduct("A", {"authors": [" -dragonfly3d- ", "'", "\nRiverSoft Art"]})]
+    files = [FileInfo(i, rel, 1, 1, "") for i, rel in enumerate([
+        "data/Genesis 8 Female/Morphs/x.dsf", "People/Genesis 8 Female/Poses/p.duf",  # a figure
+        "data/Plants/Tree/t.dsf",  # words other lexicons know
+        "data/Arki/Hair/h.dsf", "data/cloud/1_2/c.dsf",
+        "data/u2Lamp1_707/Lamp/l.dsf", "data/pPlane(11sg000)1/p/p.dsf"])]  # made by Daz imports
+    assert _found_authors(manifests, files, LexiconIndex(defs)) == [
+        ("Arki", "Arki"), ("RiverSoft Art", "RiverSoft Art"), ("dragonfly3d", "dragonfly3d")]
+
+
+def test_known_authors_are_found_and_user_edits_win(scan, tmp_path, library, defs):
+    lib = copy_fixture("fake_daz_library", tmp_path / "scan" / "Daz")
+    write(lib / "data" / "Vendor X" / "Coat" / "Coat.dsf", b"{}")
+    write(lib / "People" / "Genesis 9" / "Clothing" / "Vendor X" / "Coat" / "Coat.duf", b"{}")
+    write(lib / "People" / "Genesis 9" / "Clothing" / "Vendor X" / "Stray.duf", b"{}")
+    scan(lib)
+    conn = library()
+    known = with_generated(defs, repo.generated_words(conn)).lexicons["authors"]
+    assert "Vendor X" in {t.value for t in known.terms}
+    coat = conn.execute("SELECT d.id FROM dossier d WHERE d.name = 'Coat' AND d.type_id = 'product'").fetchone()
+    assert repo.effective_fields(conn, repo.get_dossier(conn, coat[0])["uid"])["author"] == "Vendor X"
+    assert not conn.execute("SELECT 1 FROM dossier WHERE name = 'Vendor X' AND type_id = 'product'").fetchone()
+
+    # Removing a found author excludes it: the next regroup makes Vendor X a product again,
+    # rescans never add it back, and undo restores it.
+    user = tmp_path / "user"
+    curator = Curator(conn, defs, user_dir=user)
+    log_id = curator.set_lexicon_word("authors", "Vendor X", "Vendor X", present=False)
+    assert "exclude = [\"Vendor X\"]" in (user / "lexicons" / "authors.toml").read_text(encoding="utf-8")
+    from exchange.scanner.scan import regroup
+    with repo.transaction(conn):
+        regroup(conn, defs)
+    assert conn.execute("SELECT 1 FROM dossier WHERE name = 'Vendor X' AND type_id = 'product'"
+                        " AND EXISTS (SELECT 1 FROM ledger l JOIN entry e ON e.ledger_id = l.id"
+                        " WHERE l.dossier_id = dossier.id AND e.status != 'retired')").fetchone()
+    assert "Vendor X" not in {t.value for t in with_generated(defs, repo.generated_words(conn)).lexicons["authors"].terms}
+    curator.undo(log_id)
+    assert "exclude" not in (user / "lexicons" / "authors.toml").read_text(encoding="utf-8")
+    assert "Vendor X" in {t.value for t in with_generated(defs, repo.generated_words(conn)).lexicons["authors"].terms}
+
+
 # CLI ------------------------------------------------------------------------------------------------
 
 
@@ -333,5 +415,9 @@ def test_cli(capsys, mixed, db_path):
     assert "accept_texture_link" in out and "undo" in out
     code, out, _ = run(capsys, "classify", "--db", db_path)
     assert code == 0 and "dossiers classified" in out
+    code, out, _ = run(capsys, "classify", "--regroup", "--db", db_path)
+    assert code == 0 and "roots regrouped" in out
+    code, out, _ = run(capsys, "lexicon", "show", "authors", "--db", db_path, "--json")
+    assert code == 0 and json.loads(out)["kind"] == "author" and json.loads(out)["terms"]  # found by the scan
     code, _, err = run(capsys, "curate", "merge", "zzzz", uid[:10], "--db", db_path)
     assert code == 2 and "0 dossiers match" in err

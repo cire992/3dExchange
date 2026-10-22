@@ -21,9 +21,9 @@ from pathlib import Path
 from typing import Any
 
 from exchange.db import repository as repo
-from exchange.definitions.schema import DefinitionSet
+from exchange.definitions.schema import GENERATED_LEXICON_KINDS, DefinitionSet
 from exchange.errors import ExchangeError
-from exchange.lexicons import LexiconIndex, has_word, set_word
+from exchange.lexicons import LexiconIndex, has_word, set_word, word_state
 from exchange.links import apply_file_links
 from exchange.scanner.tokenize import tokenize
 
@@ -256,7 +256,9 @@ class Curator:
         """Add (or remove) a lexicon word; written to the user's lexicon file, and undoable."""
         if self.definitions is None or lexicon_id not in self.definitions.lexicons:
             raise CurationError(f"no lexicon {lexicon_id!r}")
-        return self._run("lexicon_word", [("lexicon", (lexicon_id, value, word), True if present else None)], [],
+        generated = self.definitions.lexicons[lexicon_id].kind in GENERATED_LEXICON_KINDS
+        target = True if present else "excluded" if generated else None
+        return self._run("lexicon_word", [("lexicon", (lexicon_id, value, word), target)], [],
                          {"lexicon": lexicon_id, "value": value, "word": word, "present": present})
 
     # Suggestions -----------------------------------------------------------------------------------
@@ -408,7 +410,7 @@ class Curator:
             row = c.execute("SELECT state, decided_at FROM suggestion WHERE id = ?", key).fetchone()
             return {"state": row[0], "decided_at": row[1]} if row else None
         if kind == "lexicon":
-            return True if has_word(self.definitions, *key) else None
+            return word_state(self.definitions, *key)
         raise CurationError(f"unknown state kind {kind!r}")
 
     def _write(self, kind: str, key: tuple, value: Any, roots: set[int]) -> set[str]:
@@ -497,7 +499,9 @@ class Curator:
                       (value["state"], value["decided_at"], key[0]))
             return set()
         if kind == "lexicon":
-            set_word(self.definitions, *key, present=value is not None, user_dir=self.user_dir)
+            # True: in the user's file; "excluded": removed from a generated lexicon; None: neither.
+            set_word(self.definitions, *key, present=value is True, user_dir=self.user_dir,
+                     excluded=value == "excluded")
             return set()
         raise CurationError(f"unknown state kind {kind!r}")
 

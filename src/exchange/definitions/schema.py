@@ -77,7 +77,10 @@ class DossierTypeDefinition:
     identify: tuple[IdentifyRule, ...] = ()
 
 
-LEXICON_KINDS = ("category", "variant", "texture_channel", "structural", "index", "ignore")
+LEXICON_KINDS = ("category", "variant", "texture_channel", "structural", "index", "ignore", "theme", "author")
+# Kinds the scanner adds words to (from the library itself); the lexicon file holds the user's
+# additions and, in ``exclude``, the words they removed, which the scanner never adds back.
+GENERATED_LEXICON_KINDS = ("author",)
 
 
 @dataclass(frozen=True)
@@ -94,6 +97,7 @@ class Lexicon:
     kind: str
     source: str
     terms: tuple[LexiconTerm, ...] = ()
+    exclude: tuple[str, ...] = ()  # generated words the user removed
 
 
 @dataclass

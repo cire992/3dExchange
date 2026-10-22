@@ -68,3 +68,17 @@ CREATE TABLE suggestion (
     log_id      INTEGER                                  -- curation_log row of the accepting action
 );
 CREATE INDEX suggestion_state ON suggestion(state, kind);
+
+-- tag: searches start from the tag.
+CREATE INDEX dossier_tag_lower ON dossier_tag(lower(tag));
+
+-- Words scans found for generated lexicons (known authors: manifest artists, data/<vendor>
+-- folders), per root so a rescan replaces that root's. Merged with the user's lexicon file,
+-- whose exclude list wins.
+CREATE TABLE lexicon_generated (
+    lexicon_id TEXT    NOT NULL,
+    root_id    INTEGER NOT NULL,
+    value      TEXT    NOT NULL,
+    word       TEXT    NOT NULL,
+    PRIMARY KEY (lexicon_id, root_id, value, word)
+);

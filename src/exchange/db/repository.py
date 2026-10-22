@@ -150,6 +150,8 @@ def forget_environment(conn: sqlite3.Connection, environment_id: int) -> int:
     conn.execute("DELETE FROM file WHERE environment_id = :env", p)
     conn.execute("DELETE FROM container WHERE environment_id = :env", p)
     conn.execute("DELETE FROM scan WHERE environment_id = :env", p)
+    conn.execute("DELETE FROM lexicon_generated WHERE root_id IN"
+                 " (SELECT id FROM environment_root WHERE environment_id = :env)", p)
     conn.execute("DELETE FROM environment_root WHERE environment_id = :env", p)
     conn.execute("DELETE FROM environment WHERE id = :env", p)
 
@@ -562,7 +564,46 @@ def set_thumbnail(conn: sqlite3.Connection, dossier_id: int, *, rel_path: str, s
         (dossier_id, rel_path, source_kind, source_file_id, source_hash, now()))
 
 
+# Generated lexicon words --------------------------------------------------------------------------
+
+
+def generated_words(conn: sqlite3.Connection) -> dict[str, list[tuple[str, str]]]:
+    """(value, word) pairs scans found, by lexicon id, for ``lexicons.with_generated``."""
+    words: dict[str, list[tuple[str, str]]] = {}
+    for row in conn.execute("SELECT DISTINCT lexicon_id, value, word FROM lexicon_generated"
+                            " ORDER BY lexicon_id, value, word"):
+        words.setdefault(row[0], []).append((row[1], row[2]))
+    return words
+
+
+def replace_generated_words(conn: sqlite3.Connection, root_id: int,
+                            words: Mapping[str, Iterable[tuple[str, str]]]) -> None:
+    conn.execute("DELETE FROM lexicon_generated WHERE root_id = ?", (root_id,))
+    conn.executemany("INSERT OR IGNORE INTO lexicon_generated (lexicon_id, root_id, value, word) VALUES (?, ?, ?, ?)",
+                     [(lexicon_id, root_id, value, word) for lexicon_id, pairs in words.items()
+                      for value, word in pairs])
+
+
 # Search index -------------------------------------------------------------------------------------
+
+
+# dossier_tag_effective, split into its halves for per-row use: SQLite cannot push a correlated
+# filter into the view's UNION, so it would build the whole view once per outer query.
+# Expects ``t`` (dossier_tag) and ``d`` (a dossier row with uid) in scope.
+_TAG_REMOVED = ("EXISTS (SELECT 1 FROM override_tag r WHERE r.dossier_uid = d.uid AND r.tag = t.tag"
+                " AND r.action = 'remove')")
+
+
+def has_tag_sql() -> str:
+    """A condition true when dossier ``d`` effectively has the tag given as three ``?`` (any case).
+
+    It starts from the tag (index ``dossier_tag_lower``), not from each dossier: tags are selective.
+    """
+    return ("((d.id IN (SELECT t.dossier_id FROM dossier_tag t WHERE lower(t.tag) = lower(?))"
+            " AND NOT EXISTS (SELECT 1 FROM override_tag r WHERE r.dossier_uid = d.uid"
+            " AND lower(r.tag) = lower(?) AND r.action = 'remove'))"
+            " OR d.uid IN (SELECT o.dossier_uid FROM override_tag o WHERE o.action = 'add'"
+            " AND lower(o.tag) = lower(?)))")
 
 
 def index_dossiers(conn: sqlite3.Connection, dossier_ids: Iterable[int]) -> None:
@@ -573,7 +614,10 @@ def index_dossiers(conn: sqlite3.Connection, dossier_ids: Iterable[int]) -> None
         rows = conn.execute(
             f"SELECT d.id, d.name,"
             f" (SELECT group_concat(t.token, ' ') FROM dossier_token t WHERE t.dossier_id = d.id) AS tokens,"
-            f" (SELECT group_concat(g.tag, ' ') FROM dossier_tag_effective g WHERE g.dossier_uid = d.uid) AS tags,"
+            f" trim(coalesce((SELECT group_concat(t.tag, ' ') FROM dossier_tag t WHERE t.dossier_id = d.id"
+            f"   AND NOT {_TAG_REMOVED}), '') || ' ' ||"
+            f"  coalesce((SELECT group_concat(o.tag, ' ') FROM override_tag o WHERE o.dossier_uid = d.uid"
+            f"   AND o.action = 'add'), '')) AS tags,"
             f" (SELECT group_concat(DISTINCT c.name) FROM ledger l JOIN entry e ON e.ledger_id = l.id"
             f"   JOIN container c ON c.id = e.container_id WHERE l.dossier_id = d.id) AS places"
             f" FROM dossier_effective d WHERE d.id IN ({marks})", batch).fetchall()

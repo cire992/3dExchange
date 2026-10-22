@@ -22,6 +22,8 @@ It indexes Daz Studio libraries, Unreal Engine projects, Mod Organizer 2 instanc
      - Daz dependencies, with broken references flagged
      - thumbnails, from previews, Unreal packages, images or a small mesh renderer
 - **Classifies with lexicons.** Editable word lists turn names, folders and source categories into tags, variant words and texture channels. LOD and collision meshes are recognized and kept out of the way.
+  - Theme words and a list of known authors tell hand-installed Daz products apart from the category and vendor folders you sort them into.
+  - Scans fill the author list from manifests and `data/` folders; you can add to it or remove from it.
 - **Lets you curate.** Rename, retype, tag, link textures onto meshes, merge, split, fold variants, build products and collections. Every action can be undone, and your edits always survive rescans.
 - **Suggests links and groupings.** `Barrel01_D.png` + `Barrel01_N.png` → `Barrel01.glb`; `Donut01_Pink` + `Donut01_Blue` → one asset with two variants. You accept or reject them in batches.
 - **Lets you browse and search.** A desktop window with a sidebar, a thumbnail grid and an inspector, plus a search language: `donut env:skyrim_se tag:food -is:product`, `type:mesh has:broken`, `collection:"Lard Lads assets"`.
@@ -79,7 +81,7 @@ Or use the command line. A few examples:
 | `env list / show / add / config / exclude / forget` | Manage environments, their settings and excluded folders. |
 | `discover` | List environments found on this PC. |
 | `search QUERY`, `show UID` | Search the library; show one dossier with its ledgers, files and dependencies. |
-| `classify`, `lexicon …` | Re-run classification; show and edit lexicons. |
+| `classify`, `lexicon …` | Re-run classification (`--regroup` also regroups files into products, after editing theme or author lexicons); show and edit lexicons. |
 | `suggest list / accept / reject` | Review suggestions. |
 | `curate …`, `collection …` | Edit dossiers and collections (`set`, `tag`, `link`, `merge`, `fold`, `split`, `product` …). |
 | `history`, `undo ID` | Recent curation actions; undo one (undo an undo to redo). |
