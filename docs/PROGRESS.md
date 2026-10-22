@@ -1,6 +1,6 @@
 # Exchange: progress and handoff
 
-Last updated 2026-10-22, during Roadmap phase 4. `main` has phases 1-3. PR 4a (the requisition engine) is #10; PR 4b (bridges) is on branch `phase-4b-bridges`, based on 4a. 199 tests pass.
+Last updated 2026-10-22, during Roadmap phase 4. `main` has phases 1-3. PR 4a (the requisition engine) is #10 and PR 4b (bridges) is #11, stacked on #10; both are open. 199 tests pass.
 
 Read this first, then `docs/DESIGN_SPEC.md` (the source of truth; use its terms exactly) and
 `docs/USEFUL_PATHS.md` (real asset folders and tools on the dev machine, for testing). The
@@ -12,8 +12,13 @@ Read this first, then `docs/DESIGN_SPEC.md` (the source of truth; use its terms 
 v1) is in progress, split into four PRs: 4a the requisition engine (core and CLI), 4b bridges
 (Blender, Daz Studio, command-line tools), 4c requisitions in the window, 4d the first real
 pipeline (Daz cross-figure, G9/G2 → G8).** The phase 4 plan was approved with all recommended
-answers (see Decisions); open question 1 (what cross-figure converts first, and with which tool)
-still needs the user's answer before 4d.
+answers (see Decisions).
+
+**Next:**
+- **Merging:** #10 first, then point #11 at `main`. GitHub does that by itself only if the 4a branch is deleted when #10 merges.
+- **4c** can be built without the user at the computer.
+- **4d** waits for the user's answer to open question 1: what cross-figure converts first, and with which tool.
+- **Daz Studio bridge:** check it against the real app when the user is at the computer (see Known gaps).
 
 | PR | What | State |
 | --- | --- | --- |
@@ -27,7 +32,7 @@ still needs the user's answer before 4d.
 | #8 | 3b: editing in the main window: inspector editing + revert markers, bulk edit, drag and drop linking, collections in the sidebar, context-menu actions, Ctrl+Z/Ctrl+Y | merged |
 | #9 | 3c: Unidentified desk (low-confidence dossiers, unattached files by folder, suggestions in batches), lexicon editor, file watcher (`watchdog`); split, fold and promote in the window | merged |
 | #10 | 4a: requisition engine: pipeline packages (manifest, trust, prerequisites, core operations), planning (routes, chains, product plans), queue and runner (checkpoints, cached steps, collisions), endpoints, sidecars, staleness, removal, CLI, test harness | open |
-| 4b | Bridges: Blender (headless), Daz Studio (DazScript at launch), command-line tools; one job per app; built-in Convert mesh (Blender) | branch `phase-4b-bridges` (on 4a), PR to open |
+| #11 | 4b: bridges: Blender (headless), Daz Studio (DazScript at launch), command-line tools; one job per app; built-in Convert mesh (Blender) | open, stacked on #10 |
 | 4c | Requisitions in the window: plan view with option forms and presets, the queue, Settings › Pipelines | after 4b |
 | 4d | First pipeline: Daz cross-figure (G9/G2 → G8) | needs the user's answer to open question 1 |
 
@@ -42,6 +47,14 @@ still needs the user's answer before 4d.
 - **Check against real data.**
   - Read-only scans of the user's real libraries (into a temp database, never into the scanned folder) found real bugs in every phase.
   - Dry-run detection (`exchange scan PATH --dry-run`) only lists folders.
+  - **Requisitions write,** so their real-data checks use:
+    - a copy of the scanned database
+    - an endpoint in a scratch folder (`--endpoint`), or a copy of the source assets
+    - `EXCHANGE_DATA_DIR` pointed at scratch, keeping work folders, logs, locks, tool paths and the trust list out of the user's real Exchange folder
+
+    Nothing in a real environment is written to.
+  - **Apps with windows:** Blender runs headless and can be checked any time. Daz Studio opens a window and may stop on a prompt, so it is only launched while the user is at the computer.
+  - **A full real scan takes about 10 minutes;** the 3a slowdowns only showed at that size, so run one before a PR that touches scanning.
 - **Constraints from the kickoff:**
   - Windows and Python 3.11+, using `pathlib`.
   - Scanning is strictly read-only.
@@ -63,6 +76,7 @@ still needs the user's answer before 4d.
   - PowerShell `Get-Content`/`Set-Content` mangle UTF-8 (they garbled PR descriptions once). Write files from Python.
   - Python one-liners in bash heredocs that contain `\n`/`\u` escapes got mangled. Use the Edit tool for code edits containing escapes.
   - Don't edit the source while a long real-library scan runs: some modules are imported partway through, and one run crashed that way.
+  - Bash heredocs holding Python with triple quotes sometimes fail to parse ("unexpected EOF"). Write the script to a file with the Write tool, then run it.
 
 ## Decisions made (do not reopen without the user)
 
@@ -77,7 +91,7 @@ Phase 1:
 Phase 2:
 - **Daz Studio:** one environment per PC, holding every content directory (including Daz Connect).
 - **Dependencies:** Pillow and numpy are core dependencies; PySide6 and watchdog (3c, the file watcher) are the optional `ui` extra.
-- **Mesh thumbnails:** a small numpy/Pillow renderer for glTF/GLB/OBJ. Other formats get an icon until the Blender bridge (phase 4).
+- **Mesh thumbnails:** a small numpy/Pillow renderer for glTF/GLB/OBJ. Other formats get an icon. The Blender bridge exists since 4b, but thumbnails don't use it yet.
 - **Inspector:** read-only in phase 2; editable since PR 3b.
 - **Exact duplicates:** merged automatically, with *unknown provenance*. Never for dossiers the user has edited.
 - **File watcher:** deferred to phase 3 (PR 3c). There is a *Rescan changed* button for now.
@@ -132,7 +146,7 @@ src/exchange/            core, never imports Qt (a test enforces this)
                           authors (generated: scans add words; the user's file adds and excludes)
   db/                    connection (migrations, backup before migrating, busy_timeout), repository
     migrations/          0001 initial · 0002 roots/deps/thumbnails/FTS · 0003 scan.unattached_files
-                         · 0004 library_setting (excluded roots) · 0005 curation
+                         · 0004 library_setting (excluded roots) · 0005 curation · 0006 requisitions
   scanner/
     discovery.py         phase 1: walk (never follows links; skips excluded folders)
     detection.py         signature scoring, split into roots, same-type nesting collapsed
@@ -149,7 +163,8 @@ src/exchange/            core, never imports Qt (a test enforces this)
   links.py               applying user file links (override layer) to entries
   locks.py               cross-process locks (one queue worker; one job per external app)
   pipelines/             packages: manifest (pipeline.toml), operations (API), core_ops,
-                         registry (find, trust, load, prerequisites, tool paths), builtin/copy_entry
+                         registry (find, trust, load, prerequisites, tool paths with globs),
+                         builtin/copy_entry, builtin/convert_mesh (Blender)
   requisitions/          plan (routes, chains, product plans, queueing), endpoints, runner (queue,
                          work folders, cached steps, checkpoints, writing, sidecars, rescans),
                          sidecars (written and read back by identification), lifecycle (resume,
@@ -170,7 +185,9 @@ src/exchange_ui/         PySide6 app: main_window, models (paged browser, sideba
                          settings (lexicon editor), pickers (asset search, split), watcher (watchdog),
                          scanning (scans and `classify` run as `python -m exchange ...`)
 tests/                   pytest; fixtures in tests/fixtures/envs; builders.py makes GLB/uasset/PNG/Unreal/
-                         Daz Connect content and holds report helpers; tests/ui uses pytest-qt offscreen
+                         Daz Connect content and holds report helpers; tests/ui uses pytest-qt offscreen;
+                         fixtures/pipelines holds test packages (stamp_images, bridge_demo) and
+                         fixtures/fake_apps stand-ins for blender.exe and DAZStudio.exe
 ```
 
 Key ideas:
@@ -191,6 +208,22 @@ Key ideas:
   - The window reads on a read-only connection. Edits go through `LibraryService.edit()` on a second connection with a 1.5 s busy timeout, so an edit made while a scan holds the write lock fails with a message instead of freezing the window.
   - `edit()` keeps a session undo/redo stack of curation log ids. Redo undoes the undo, as in the core.
   - The inspector's signals carry the dossier uids its editors were built for, so a field committed as the selection moves still edits the right dossier.
+- **Requisitions (4a):**
+  - **Planning:** a requisition is planned (routes, chains, a product's children), queued, then run by one worker.
+  - **Running:** each step's result is cached in the requisition's work folder, so shared steps run once and resuming after a checkpoint redoes nothing.
+  - **Writing:** output goes only to the endpoint. Every write is logged in `requisition_write`, and replaced files go to the recycle folder.
+- **Sidecars connect output to its source:**
+  - **On disk:** `.exchange/<uid>.json` in the output container lists, per asset, its dossier uid, its source entry, the pipelines, the options and the files written.
+  - **When scanned:** identification reads sidecars, so the output files join the source dossier as *requisitioned* or *copied* entries (with `requisition_id` and `source_entry_id`) instead of becoming new dossiers. That works after a lost database too.
+- **Trust and code:**
+  - **Trusting:** a user pipeline's code is imported only once the package is trusted, by a fingerprint of its manifest and code; any change needs trusting again. Built-ins are trusted.
+  - **External apps:** operations reach them only through `ctx.bridge(app)`, and every app must be declared as a tool prerequisite.
+- **Bridges (4b):** every app job is the same shape, so pipelines never manage processes:
+  - the arguments go to a JSON file
+  - a generated wrapper (Python in Blender, DazScript in Daz Studio) runs the script and writes a result file
+  - errors quote the end of the app's log
+  - one job per app runs at a time
+  - the app's whole process tree is closed afterwards
 - **Confidence:** `dossier.confidence_base` is identification's own confidence. Classification adds evidence on top into `dossier.confidence`, so re-classifying never compounds.
 - **Read-only, enforced by tests:**
   - All file reads go through `scanner/readonly.py`.
@@ -246,11 +279,12 @@ Key ideas:
 
 ## Known gaps and good next candidates
 
-- **4b-4d** (see the table above). 4d needs the user's answer on what cross-figure converts first.
-- **Not in 4a:**
+- **4c and 4d** (see the table above). 4d needs the user's answer on what cross-figure converts first.
+- **Not done yet in phase 4:**
   - Presets and last-used options (4c, with the plan view).
   - The `new-pipeline` scaffold and the authoring guide (phase 6).
   - Parallel command-line operations: the runner does one step at a time.
+  - Blender thumbnails for formats the small renderer can't draw.
 - **The Daz Studio bridge is untested against the real Daz Studio** (4b): it opens a window and may stop on a prompt, so it waits until the user is at the computer.
   - **What's checked:** a stand-in tests the wrapper, the arguments, the error reporting, and closing Daz Studio once the result is written.
   - **Assumed from Daz's docs, not the 4.5 SDK headers:** the flags (`-instanceName`, `-noPrompt`, `-noDefaultScene`), `include()`, and `App.delayedExit`. The SDK on the machine is older than the app.
@@ -271,9 +305,7 @@ Key ideas:
   - Unattached Daz files (1.55M) are mostly `Runtime/Libraries` (Poser) content and data whose folder names are generic. The Unidentified desk (3c) groups them by folder.
   - Single-letter texture channels (`_D`, `_N`) only count for images whose base name matches a mesh.
 - **Unverified:** the Daz Connect folder layout (`data/cloud/<n>_<SKU>/`) hasn't been checked against a real Connect install. Connect products are named "Daz Connect product <SKU>" unless a DIM manifest names them.
-- **Not used yet:**
-  - The chosen MO2 profile is stored but unused.
-  - Endpoints and visibility are stored for phase 4.
+- **Not used yet:** the chosen MO2 profile is stored but unused. (Endpoints and visibility are used by requisitions since 4a.)
 - **Unreal:** no `.uasset` class detection (types come from name prefixes).
 - **Discovery noise:** Steam games without definitions make the wizard's found list long. Consider hiding them behind a toggle.
 - **Untracked files:** `docs/USEFUL_PATHS.md` and `KICKOFF_PROMPT.md` are the user's and haven't been committed. `.claude/launch.json` serves `docs/` on port 8765 to view the UI mockup (`docs/Exchange_Main_Window_Add_Environment.html`) in the browser pane.
