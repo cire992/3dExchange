@@ -35,8 +35,8 @@ def test_sidebar_model(service):
     model = SidebarModel(service)
     model.reload()
     rows = sidebar_rows(model)
-    assert rows[:5] == [("LIBRARY", "section"), ("All assets", "all"), ("COLLECTIONS", "section"),
-                        ("New collection…", "new_collection"), ("ENVIRONMENTS", "section")]
+    assert rows[:6] == [("LIBRARY", "section"), ("All assets", "all"), ("Requisitions", "queue"),
+                        ("COLLECTIONS", "section"), ("New collection…", "new_collection"), ("ENVIRONMENTS", "section")]
     envs = {name: model.index(i, 0) for i, (name, kind) in enumerate(rows) if kind == "environment"}
     children = dict(sidebar_rows(model, envs["Daz Studio"]))
     assert children["Daz morph"] == "type"  # one content directory: no container rows
@@ -53,7 +53,7 @@ def test_many_containers_are_grouped(scan, tmp_path, db_path, definitions):
     svc = LibraryService(db_path, definitions)
     model = SidebarModel(svc)
     model.reload()
-    assert ("Mods", "group") in sidebar_rows(model, model.index(5, 0))
+    assert ("Mods", "group") in sidebar_rows(model, model.index(6, 0))
     svc.close()
 
 

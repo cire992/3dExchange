@@ -134,14 +134,16 @@ def routes(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Regis
 
 def plan_requisition(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Registry, uid: str,
                      environment_id: int, *, pipelines: list[str] | None = None, source_entry_id: int | None = None,
-                     params: dict[str, Any] | None = None, endpoint_folder: str | None = None,
+                     params: dict[str, Any] | None = None, defaults: dict[str, Any] | None = None,
+                     endpoint_folder: str | None = None,
                      on_collision: str = "ask", name: str | None = None,
                      tools: dict[str, str] | None = None) -> Plan:
     """Plan getting a dossier (or a whole product) into an environment.
 
     ``pipelines`` picks a chain (otherwise the first route found, preferring conversion from the
     origin); ``params`` sets options, as ``{"size": 512}`` (any pipeline with that option) or
-    ``{"convert_textures.size": 512}``.
+    ``{"convert_mesh.format": "obj"}``. ``defaults`` (a preset, last-used options) are the same
+    shape but lenient: options a pipeline does not have, or values it would reject, are dropped.
     """
     dossier = conn.execute("SELECT * FROM dossier_effective WHERE uid = ?", (uid,)).fetchone()
     if dossier is None:
@@ -157,7 +159,7 @@ def plan_requisition(conn: sqlite3.Connection, definitions: DefinitionSet, regis
     items = []
     for subject in subjects:
         item = _plan_item(conn, definitions, registry, subject, environment_id, pipelines,
-                          source_entry_id if subject == uid else None, params or {}, tools)
+                          source_entry_id if subject == uid else None, params or {}, tools, defaults or {})
         if subject == uid and children and item.route == "none":
             continue  # a product with no pipeline of its own: its children carry the plan
         items.append(item)
@@ -168,7 +170,27 @@ def plan_requisition(conn: sqlite3.Connection, definitions: DefinitionSet, regis
     return plan
 
 
-def _plan_item(conn, definitions, registry, uid, environment_id, wanted, source_entry_id, params, tools) -> PlanItem:
+def _options(manifest, pipeline_id: str, given: dict[str, Any]) -> dict[str, Any]:
+    own = {k.split(".", 1)[1]: v for k, v in given.items() if k.startswith(f"{pipeline_id}.")}
+    shared = {k: v for k, v in given.items() if "." not in k and manifest.parameter(k) is not None}
+    return {**shared, **own}
+
+
+def _lenient(manifest, values: dict[str, Any]) -> dict[str, Any]:
+    out = {}
+    for key, value in values.items():
+        parameter = manifest.parameter(key)
+        if parameter is None:
+            continue
+        try:
+            out[key] = parameter.check(value)
+        except ValueError:
+            continue
+    return out
+
+
+def _plan_item(conn, definitions, registry, uid, environment_id, wanted, source_entry_id, params, tools,
+               defaults=None) -> PlanItem:
     d = conn.execute("SELECT name, type_id FROM dossier_effective WHERE uid = ?", (uid,)).fetchone()
     options = routes(conn, definitions, registry, uid, environment_id, tools)
     if source_entry_id is not None:
@@ -184,10 +206,9 @@ def _plan_item(conn, definitions, registry, uid, environment_id, wanted, source_
     problems = []
     for pipeline_id in chosen["pipelines"]:
         manifest = registry.get(pipeline_id).manifest
-        own = {k.split(".", 1)[1]: v for k, v in params.items() if k.startswith(f"{pipeline_id}.")}
-        shared = {k: v for k, v in params.items() if "." not in k and manifest.parameter(k) is not None}
+        soft = _lenient(manifest, _options(manifest, pipeline_id, defaults or {}))
         try:
-            values[pipeline_id] = manifest.resolve({**shared, **own})
+            values[pipeline_id] = manifest.resolve({**soft, **_options(manifest, pipeline_id, params)})
         except ValueError as exc:
             problems.append(str(exc))
     return PlanItem(uid, d["name"], d["type_id"], chosen["source_entry_id"], chosen["source"], chosen["route"],

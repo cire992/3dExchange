@@ -4,7 +4,7 @@ Exchange is a desktop application that gives modders and solo developers a god's
 
 It indexes Daz Studio libraries, Unreal Engine projects, Mod Organizer 2 instances and loose folders into one library of **dossiers** (what an asset *is*), each with **ledgers** recording where it lives. **Scanning is strictly read-only:** Exchange never writes to a scanned folder.
 
-> **Status:** Roadmap phases 1 (Foundations), 2 (Library) and 3 (Curation) are done. Phase 4 (Requisitions) is in progress: the engine, the command line and the bridges to Blender, Daz Studio and command-line tools are in; the window and the first real pipeline come next. See [docs/PROGRESS.md](docs/PROGRESS.md) for details and [docs/DESIGN_SPEC.md](docs/DESIGN_SPEC.md) for the full design.
+> **Status:** Roadmap phases 1 (Foundations), 2 (Library) and 3 (Curation) are done. Phase 4 (Requisitions) is in progress: the engine, the bridges to Blender, Daz Studio and command-line tools, and requisitions in the window are in; the first real pipeline (Daz cross-figure) comes next. See [docs/PROGRESS.md](docs/PROGRESS.md) for details and [docs/DESIGN_SPEC.md](docs/DESIGN_SPEC.md) for the full design.
 
 ## What it does today
 
@@ -34,7 +34,10 @@ It indexes Daz Studio libraries, Unreal Engine projects, Mod Organizer 2 instanc
   - **Suggestions:** texture links, variant groups and lexicon words, to accept or reject in batches.
 - **Watches your folders.** An environment whose files change is marked *changes detected*; you rescan when you're ready.
 - **Edits lexicons** in Settings (⚙): add or remove words, then apply them to the library.
-- **Runs requisitions** (command line for now): plan getting an asset or a whole product into an environment with a pipeline, queue it, run it.
+- **Runs requisitions:** plan getting an asset or a whole product into an environment with a pipeline, queue it, run it.
+  - **In the window:** right-click → *Requisition to…* (or the inspector's button) shows the plan, with option forms, presets and the options last used. Select several assets to queue them all.
+  - **The queue:** *Requisitions* in the sidebar runs it in the background, holds, reorders and resumes items, shows each item's log, and removes or rebuilds output.
+  - **Settings:** *Pipelines* installs and trusts packages and sets tool paths; *Endpoints* sets where each environment's output goes and whether it's publishable.
   - **Where output goes:** only to an endpoint (a new MO2 mod, an *Exchange Conversions* content directory), with a record of every file written and a `.exchange` sidecar beside the output.
   - **Afterwards:** the output joins the asset's ledgers. Removing it moves the files to a recycle folder. Requisitions whose source or pipeline changed show as stale and can be rebuilt.
   - **Built in:** *Copy to another container*, and *Convert mesh*: FBX, OBJ, glTF, DAE, STL or PLY to GLB, glTF, FBX or OBJ with Blender, which is found automatically.
@@ -101,7 +104,8 @@ Or use the command line. A few examples:
 | `history`, `undo ID` | Recent curation actions; undo one (undo an undo to redo). |
 | `desk [ROOT [FOLDER]]` | Unattached files by folder; `curate dismiss` and `curate ignore-folder` act on the desk. |
 | `pipelines list / show / check / install / trust`, `tools set` | Pipeline packages, their prerequisites, and where external tools are. |
-| `requisition routes / plan / list / show / run / resume / hold / move / remove / check-stale / rebuild` | Plan (`--queue`), run and manage requisitions. |
+| `requisition routes / plan / list / show / run / resume / hold / move / remove / check-stale / rebuild` | Plan (`--queue`, `--preset`, `--save-preset`), run and manage requisitions. |
+| `presets list / show / delete` | Requisition presets: options for every pipeline of a plan. |
 | `test-pipeline FOLDER UID` | Run a pipeline you are writing on one asset, into a temporary folder. |
 
 Every command takes `--json` for machine-readable output, and `--db PATH` to use another library.

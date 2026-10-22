@@ -1,5 +1,7 @@
-"""Run scans in a separate process (``python -m exchange ... --progress-json``) so the window
-never freezes, and turn its JSON lines into Qt signals."""
+"""Run scans and the requisition queue in a separate process (``python -m exchange ...
+--progress-json``) so the window never freezes, and turn its JSON lines into Qt signals.
+
+One runner does both, so a scan and a queue run never write to the library at the same time."""
 
 from __future__ import annotations
 
@@ -52,15 +54,25 @@ class ScanRunner(QObject):
         self._buffer = b""
         self._result: dict = {}
         self._stopped = False
+        self.kind = "scan"  # what is running: scan | requisitions
 
     @property
     def running(self) -> bool:
         return self.process is not None
 
     def scan(self, folder: Path) -> None:
+        self.kind = "scan"
         self._start(["scan", str(folder)])
 
+    def run_requisitions(self, ids: list[int] | None = None) -> None:
+        """Run the queue (or some requisitions) in the background."""
+        if self.running:
+            return
+        self.kind = "requisitions"
+        self._start(["requisition", "run", *map(str, ids or [])])
+
     def rescan(self, environment_ids: list[int] | None = None) -> None:
+        self.kind = "scan"
         args = ["rescan"]
         for env_id in environment_ids or []:
             args += ["--env", str(env_id)]
@@ -106,7 +118,8 @@ class ScanRunner(QObject):
         self._feed(bytes(process.readAllStandardOutput()) + b"\n")
         error = ""
         if self._stopped:
-            error = "Scan stopped; everything finished before that is saved."
+            error = ("Stopped; everything finished before that is saved." if self.kind == "scan" else
+                     "Stopped; the requisition that was running is queued again.")
         elif code != 0:
             stderr = bytes(process.readAllStandardError()).decode("utf-8", errors="replace").strip()
             error = stderr or f"scan failed (exit code {code})"

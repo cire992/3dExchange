@@ -66,6 +66,7 @@ class SidebarModel(QStandardItemModel):
         root = self.invisibleRootItem()
         root.appendRow(_item("LIBRARY", "section"))
         root.appendRow(_item("All assets", "all", count=data["all"]))
+        root.appendRow(_item("Requisitions", "queue", count=self._active_requisitions()))
         root.appendRow(_item("COLLECTIONS", "section"))
         for row in self._collection_rows():
             root.appendRow(row)
@@ -94,6 +95,20 @@ class SidebarModel(QStandardItemModel):
                                          type_id=t["type_id"]))
             root.appendRow(env_item)
 
+    def _active_requisitions(self) -> int:
+        try:
+            return sum(1 for r in self.service.requisitions() if r["state"] in ("queued", "held", "running",
+                                                                              "needs_attention"))
+        except Exception:  # an older library without requisitions yet
+            return 0
+
+    def reload_queue(self) -> None:
+        """Update the Requisitions row's count."""
+        for r in range(self.rowCount()):
+            index = self.index(r, 0)
+            if index.data(KIND) == "queue":
+                self.itemFromIndex(index).setData(self._active_requisitions(), COUNT)
+
     def _collection_rows(self) -> list[QStandardItem]:
         rows = []
         for c in self.service.collections():
@@ -108,9 +123,9 @@ class SidebarModel(QStandardItemModel):
 
     def reload_collections(self) -> None:
         """Rebuild only the collection rows (cheap; the full sidebar counts every environment)."""
-        kinds = [self.index(r, 0).data(KIND) for r in range(self.rowCount())]
-        start = kinds.index("section", 2) + 1  # after the COLLECTIONS header
-        end = kinds.index("section", start)  # the ENVIRONMENTS header
+        rows = [(self.index(r, 0).data(KIND), self.index(r, 0).data()) for r in range(self.rowCount())]
+        start = rows.index(("section", "COLLECTIONS")) + 1
+        end = next(r for r in range(start, len(rows)) if rows[r][0] == "section")  # the ENVIRONMENTS header
         self.removeRows(start, end - start)
         for offset, row in enumerate(self._collection_rows()):
             self.insertRow(start + offset, row)
