@@ -1,6 +1,6 @@
 # Exchange: progress and handoff
 
-Last updated 2026-10-21, during Roadmap phase 3. `main` has phases 1 and 2 and PR 3a. PR 3b (editing in the main window, #8) is open; PR 3c (desk, lexicon editor, watcher) is on branch `phase-3c-desk-lexicons-watcher`, based on 3b. 181 tests pass.
+Last updated 2026-10-21, during Roadmap phase 3. `main` has phases 1 and 2 and PRs 3a and 3b. PR 3c (desk, lexicon editor, watcher) is #9, on branch `phase-3c-desk-lexicons-watcher`. 181 tests pass.
 
 Read this first, then `docs/DESIGN_SPEC.md` (the source of truth; use its terms exactly) and
 `docs/USEFUL_PATHS.md` (real asset folders and tools on the dev machine, for testing). The
@@ -21,8 +21,8 @@ file watcher).** The phase 3 plan was approved with all recommended answers (see
 | #5 | 2c: add-environment wizard | merged |
 | #6 | This handoff doc | merged |
 | #7 | 3a: curation core: lexicons, classification, undoable curation, suggestions, collections, hand-installed Daz products, CLI | merged |
-| #8 | 3b: editing in the main window: inspector editing + revert markers, bulk edit, drag and drop linking, collections in the sidebar, context-menu actions, Ctrl+Z/Ctrl+Y | open |
-| 3c | Unidentified desk (low-confidence dossiers, unattached files by folder, suggestions in batches), lexicon editor, file watcher (`watchdog`); split, fold and promote in the window | branch `phase-3c-desk-lexicons-watcher` (on 3b), PR to open |
+| #8 | 3b: editing in the main window: inspector editing + revert markers, bulk edit, drag and drop linking, collections in the sidebar, context-menu actions, Ctrl+Z/Ctrl+Y | merged |
+| #9 | 3c: Unidentified desk (low-confidence dossiers, unattached files by folder, suggestions in batches), lexicon editor, file watcher (`watchdog`); split, fold and promote in the window | open |
 
 ## How we work
 
