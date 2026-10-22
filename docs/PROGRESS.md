@@ -1,6 +1,6 @@
 # Exchange: progress and handoff
 
-Last updated 2026-10-22, during Roadmap phase 4. `main` has phases 1-3. PR 4a (the requisition engine) is #10 and PR 4b (bridges) is #11, stacked on #10; both are open. 199 tests pass.
+Last updated 2026-10-22, during Roadmap phase 4. `main` has phases 1-3. PRs 4a (#10, the requisition engine), 4b (#11, bridges) and 4c (requisitions in the window) are open, each stacked on the one before. 204 tests pass.
 
 Read this first, then `docs/DESIGN_SPEC.md` (the source of truth; use its terms exactly) and
 `docs/USEFUL_PATHS.md` (real asset folders and tools on the dev machine, for testing). The
@@ -15,8 +15,7 @@ pipeline (Daz cross-figure, G9/G2 → G8).** The phase 4 plan was approved with 
 answers (see Decisions).
 
 **Next:**
-- **Merging:** #10 first, then point #11 at `main`. GitHub does that by itself only if the 4a branch is deleted when #10 merges.
-- **4c** can be built without the user at the computer.
+- **Merging:** in order: #10, then #11, then 4c. Point each next PR at `main` after the one before it merges. GitHub does that by itself only if the merged branch is deleted.
 - **4d** waits for the user's answer to open question 1: what cross-figure converts first, and with which tool.
 - **Daz Studio bridge:** check it against the real app when the user is at the computer (see Known gaps).
 
@@ -33,7 +32,7 @@ answers (see Decisions).
 | #9 | 3c: Unidentified desk (low-confidence dossiers, unattached files by folder, suggestions in batches), lexicon editor, file watcher (`watchdog`); split, fold and promote in the window | merged |
 | #10 | 4a: requisition engine: pipeline packages (manifest, trust, prerequisites, core operations), planning (routes, chains, product plans), queue and runner (checkpoints, cached steps, collisions), endpoints, sidecars, staleness, removal, CLI, test harness | open |
 | #11 | 4b: bridges: Blender (headless), Daz Studio (DazScript at launch), command-line tools; one job per app; built-in Convert mesh (Blender) | open, stacked on #10 |
-| 4c | Requisitions in the window: plan view with option forms and presets, the queue, Settings › Pipelines | after 4b |
+| 4c | Requisitions in the window: Requisition to… (plan tree, option forms, presets, last-used options, batch), the queue view, Settings › Pipelines and Endpoints | branch `phase-4c-requisitions-ui` (on 4b), PR to open |
 | 4d | First pipeline: Daz cross-figure (G9/G2 → G8) | needs the user's answer to open question 1 |
 
 ## How we work
@@ -165,7 +164,8 @@ src/exchange/            core, never imports Qt (a test enforces this)
   pipelines/             packages: manifest (pipeline.toml), operations (API), core_ops,
                          registry (find, trust, load, prerequisites, tool paths with globs),
                          builtin/copy_entry, builtin/convert_mesh (Blender)
-  requisitions/          plan (routes, chains, product plans, queueing), endpoints, runner (queue,
+  requisitions/          plan (routes, chains, product plans, queueing; lenient defaults), presets
+                         (files; last-used options), endpoints, runner (queue,
                          work folders, cached steps, checkpoints, writing, sidecars, rescans),
                          sidecars (written and read back by identification), lifecycle (resume,
                          hold, move, remove, stale, rebuild)
@@ -182,8 +182,10 @@ src/exchange_ui/         PySide6 app: main_window, models (paged browser, sideba
                          views (grid and sidebar with drag and drop), inspector (editing, bulk edit),
                          service (reads + edits via Curator, session undo/redo), wizard,
                          desk (unattached-files and suggestions panels; counts on worker threads),
-                         settings (lexicon editor), pickers (asset search, split), watcher (watchdog),
-                         scanning (scans and `classify` run as `python -m exchange ...`)
+                         settings (lexicon editor), settings_pipelines (Pipelines, Endpoints),
+                         requisition_dialog (Requisition to…), queue_view (the queue),
+                         pickers (asset search, split), watcher (watchdog),
+                         scanning (scans, the queue and `classify` run as `python -m exchange ...`)
 tests/                   pytest; fixtures in tests/fixtures/envs; builders.py makes GLB/uasset/PNG/Unreal/
                          Daz Connect content and holds report helpers; tests/ui uses pytest-qt offscreen;
                          fixtures/pipelines holds test packages (stamp_images, bridge_demo) and
@@ -218,6 +220,11 @@ Key ideas:
 - **Trust and code:**
   - **Trusting:** a user pipeline's code is imported only once the package is trusted, by a fingerprint of its manifest and code; any change needs trusting again. Built-ins are trusted.
   - **External apps:** operations reach them only through `ctx.bridge(app)`, and every app must be declared as a tool prerequisite.
+- **Requisitions in the window (4c):**
+  - **Planning:** the dialog plans each selected asset (batch) through the service's read connection, and queues through the write connection.
+  - **Options:** forms are generated from the manifests. They're filled from a preset if one is chosen, otherwise from each pipeline's last-used options; both are lenient, dropping options a pipeline no longer has.
+  - **Running:** the queue runs in the window's one background runner, so a scan and a queue run never write at once.
+  - **Removing output** runs as a background `exchange requisition remove`, since it rescans.
 - **Bridges (4b):** every app job is the same shape, so pipelines never manage processes:
   - the arguments go to a JSON file
   - a generated wrapper (Python in Blender, DazScript in Daz Studio) runs the script and writes a result file
@@ -267,6 +274,8 @@ Key ideas:
   - **Speed:** about 3 s of Blender per conversion.
   - **Result:** each became a requisitioned entry of the one *Dwarf Helmet* asset.
   - **Fix:** the glTF importer packs textures into the file, so OBJ and separate glTF exports came without them. The script now writes each packed image's original bytes beside the export.
+- **The window's requisition flow (4c, on that scratch library):** *Requisition to…* → *Convert mesh* (GLB, scale 0.5) → *Add and run*. The background runner fulfilled it in 5.2 s, and the queue view showed it with its log.
+  - **Crash found by the tests:** unchecking a plan row rebuilt the tree inside that row's own change signal, deleting the row Qt was still updating. That was an intermittent access violation; only the summary is rebuilt now.
 
 **Loose folders** (`Z:\Content Farm\Sketchfab` and `SWBF Model and Textures`), checked in 3a:
 - **Tags:** 77% of 4,728 dossiers got one. SWBF's many *Weapon* tags are correct: the folder is mostly weapon sound effects.
@@ -281,8 +290,9 @@ Key ideas:
 
 - **4c and 4d** (see the table above). 4d needs the user's answer on what cross-figure converts first.
 - **Not done yet in phase 4:**
-  - Presets and last-used options (4c, with the plan view).
   - The `new-pipeline` scaffold and the authoring guide (phase 6).
+  - **Manual checkpoints in the window:** they show as *Needs attention* with the pipeline's message, and Resume continues. There's no button yet to open the work folder in the app at that point.
+  - **Queue mode:** the queue only runs when you press Run; there's no "run immediately" setting yet.
   - Parallel command-line operations: the runner does one step at a time.
   - Blender thumbnails for formats the small renderer can't draw.
 - **The Daz Studio bridge is untested against the real Daz Studio** (4b): it opens a window and may stop on a prompt, so it waits until the user is at the computer.

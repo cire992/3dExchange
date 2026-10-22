@@ -16,7 +16,9 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QButtonGroup,
     QHBoxLayout,
+    QFileDialog,
     QInputDialog,
+    QMessageBox,
     QLabel,
     QLineEdit,
     QListView,
@@ -38,6 +40,7 @@ from exchange_ui.models import BRICK, COLLECTION_UID, DETAIL, ENV_ID, KIND, Brow
 from exchange_ui.scanning import ScanRunner
 from exchange_ui.service import EditError, Filter, LibraryService
 from exchange_ui.desk import SuggestionsPanel, UnattachedPanel
+from exchange_ui.queue_view import QueuePanel
 from exchange_ui.scanning import CliJob
 from exchange_ui.views import BrickGrid, SidebarTree
 from exchange_ui.watcher import ChangeWatcher
@@ -95,6 +98,7 @@ class MainWindow(QMainWindow):
         self.inspector.collectionChanged.connect(self._on_collection_member)
         self.inspector.suggestionDecided.connect(self._on_suggestion)
         self.inspector.historyUndo.connect(self._on_history_undo)
+        self.inspector.requisitionRequested.connect(self.open_requisition)
         self._set_choices()
 
         self.browser_model.totalChanged.connect(self._update_header)
@@ -258,6 +262,9 @@ class MainWindow(QMainWindow):
         self.suggestions_panel = SuggestionsPanel(self.service)
         self.stack.addWidget(self.unattached_panel)
         self.stack.addWidget(self.suggestions_panel)
+        self.queue_panel = QueuePanel(self.service)
+        self.queue_panel.requested.connect(self._on_queue_action)
+        self.stack.addWidget(self.queue_panel)
         layout.addSpacing(8)
         layout.addWidget(stack_host, 1)
         return center
@@ -349,8 +356,28 @@ class MainWindow(QMainWindow):
             self.unidentified_button.setChecked(False)
             self.unidentified_button.blockSignals(False)
             self._close_desk()
+        if index.data(KIND) == "queue":
+            self.show_queue()
+            return
+        self.showing_queue = False
         self.filter = filter_for(index, self.filter)
         self.browser_model.set_filter(self.filter)
+
+    def show_queue(self, select: int | None = None) -> None:
+        """The requisition queue in place of the grid."""
+        self.showing_queue = True
+        self.queue_panel.reload()
+        self.queue_panel.set_running(self.runner.running and self.runner.kind == "requisitions")
+        if select is not None:
+            self.queue_panel.select(select)
+        self.stack.setCurrentWidget(self.queue_panel)
+        self.breadcrumb.setText("Library")
+        self.title.setText("Requisitions")
+        active = self.queue_panel.active_count()
+        self.subtitle.setText(f"{active} waiting or running · {len(self.queue_panel.rows)} in all")
+        for button in self.group_buttons.buttons():
+            button.setVisible(False)
+        self.inspector.show_detail(None)
 
     def _on_unidentified(self, checked: bool) -> None:
         if checked:
@@ -454,6 +481,10 @@ class MainWindow(QMainWindow):
     def _update_header(self, total: int) -> None:
         if self.filter.unidentified and self.desk_mode != "low":
             return  # another pile of the desk is showing; the grid updates behind it
+        if getattr(self, "showing_queue", False):
+            return  # the queue is showing; the grid updates behind it
+        for button in self.group_buttons.buttons():
+            button.setVisible(True)
         index = self.tree.currentIndex()
         if self.filter.parent_uid:
             crumb, title = "Product contents · click the sidebar to go back", self.filter.parent_name
@@ -568,7 +599,8 @@ class MainWindow(QMainWindow):
         menu.addAction("Show in folder", lambda: self._show_in_folder(index))
         menu.addAction("Open in app", lambda: self._open_in_app(index))
         menu.addSeparator()
-        for label, phase in (("Requisition to…", 4), ("Copy to…", 5), ("Extract", 5)):
+        menu.addAction("Requisition to…", lambda: self.open_requisition(uids))
+        for label, phase in (("Copy to…", 5), ("Extract", 5)):
             action = QAction(label, menu)
             action.setEnabled(False)
             action.setToolTip(f"Arrives in Roadmap phase {phase}")
@@ -590,6 +622,16 @@ class MainWindow(QMainWindow):
         return menu
 
     # Editing ----------------------------------------------------------------------------------
+
+    def ask_file(self, title: str) -> str | None:
+        """A file the user picks, or None (tests replace this)."""
+        return QFileDialog.getOpenFileName(self, title)[0] or None
+
+    def ask_folder(self, title: str) -> str | None:
+        return QFileDialog.getExistingDirectory(self, title) or None
+
+    def confirm(self, title: str, text: str) -> bool:
+        return QMessageBox.question(self, title, text) == QMessageBox.StandardButton.Yes
 
     def ask_text(self, title: str, label: str, text: str = "") -> str | None:
         """A line of text from the user, or None if cancelled (tests replace this)."""
@@ -848,6 +890,12 @@ class MainWindow(QMainWindow):
         self.progress.setRange(0, 0)
 
     def _on_progress(self, event: dict) -> None:
+        if "requisition" in event:
+            self.status.setText(f"{event['requisition']} · {event.get('item')} · [{event.get('step')}] "
+                                f"{event.get('message', '')}"[:300])
+            self.progress.setRange(0, max(1, event.get("total", 1)))
+            self.progress.setValue(event.get("done", 0))
+            return
         phase = event.get("phase", 0)
         done, total = event.get("done", 0), event.get("total", 0)
         count = f" {done:,} / {total:,}" if total else ""
@@ -862,6 +910,9 @@ class MainWindow(QMainWindow):
             self.refresh()  # identification finished: products can appear now
 
     def _on_scan_finished(self, report: dict, error: str) -> None:
+        if self.runner.kind == "requisitions":
+            self._on_queue_finished(report, error)
+            return
         envs = report.get("environments", [])
         if error:
             self.status.setText(error)
@@ -913,6 +964,98 @@ class MainWindow(QMainWindow):
         self.rescan_button.style().polish(self.rescan_button)
 
     # Settings ---------------------------------------------------------------------------------
+
+    # Requisitions -----------------------------------------------------------------------------
+
+    def open_requisition(self, uids: list[str]):
+        """Requisition to…: plan, set options and queue (see requisition_dialog)."""
+        from exchange_ui.requisition_dialog import RequisitionDialog
+
+        if not self.service.environments():
+            self._say("Add an environment first.", error=True)
+            return None
+        dialog = RequisitionDialog(self, uids)
+        dialog.queued.connect(self._on_queued)
+        dialog.open()
+        return dialog
+
+    def _on_queued(self, ids: list[int], run: bool) -> None:
+        self._say(f"Queued {len(ids)} requisition{'s' * (len(ids) != 1)}"
+                  + (" · running" if run else " · run it from Requisitions"))
+        self.sidebar_model.reload_queue()
+        if run:
+            self.run_queue()
+        if getattr(self, "showing_queue", False):
+            self.show_queue(ids[0] if ids else None)
+
+    def run_queue(self) -> None:
+        if self.runner.running:
+            self._say("Wait for the scan (or run) in progress to finish.", error=True)
+            return
+        self.runner.run_requisitions()
+        self.queue_panel.set_running(True)
+
+    def _on_queue_finished(self, data: dict, error: str) -> None:
+        ran = data.get("ran", [])
+        if error:
+            self._say(error, error="stopped" not in error.lower())
+        else:
+            states = [r["state"] for r in ran]
+            parts = [f"{states.count(s)} {s.replace('_', ' ')}" for s in dict.fromkeys(states)]
+            self._say("Queue finished · " + (", ".join(parts) if parts else "nothing was queued"))
+        self.queue_panel.set_running(False)
+        self.refresh()
+        self.sidebar_model.reload_queue()
+        if getattr(self, "showing_queue", False):
+            self.show_queue()
+
+    def _on_queue_action(self, action: str, requisition_id: int, extra) -> None:
+        if action == "run":
+            self.run_queue()
+            return
+        if action == "remove":
+            if not self.confirm("Remove its output?", "Everything this requisition wrote moves to Exchange's recycle "
+                                                     "folder, and files it overwrote are put back."):
+                return
+            self._job(["requisition", "remove", str(requisition_id)], "Removing the output …", "Output removed")
+            return
+        try:
+            if action == "move":
+                self.service.requisition_action("move", requisition_id, extra)
+            elif action == "resume":
+                self.service.requisition_action("resume", requisition_id, extra)
+                self._say("Queued again · Run queue to continue")
+            elif action == "check_stale":
+                found = self.service.requisition_action("check_stale", 0)
+                self._say(f"{len(found)} requisition{'s' * (len(found) != 1)} stale" if found else "Nothing is stale")
+            elif action == "rebuild":
+                new_id = self.service.requisition_action("rebuild", requisition_id)
+                self._say(f"Rebuild queued as requisition {new_id} · Run queue to run it")
+            else:
+                self.service.requisition_action(action, requisition_id)
+        except EditError as exc:
+            self._say(str(exc), error=True)
+        self.sidebar_model.reload_queue()
+        self.show_queue(requisition_id)
+
+    def _job(self, args: list[str], doing: str, done: str) -> None:
+        """A slower requisition action (it rescans) in a background process."""
+        if self.runner.running or getattr(self, "queue_job", None) is not None:
+            self._say("Wait for the scan or run in progress to finish.", error=True)
+            return
+        self.queue_job = CliJob(args, self.service.db_path, self)
+
+        def finished(_data, error: str) -> None:
+            self.queue_job = None
+            self._say(f"{done}" if not error else error, error=bool(error))
+            self.refresh()
+            self.sidebar_model.reload_queue()
+            if getattr(self, "showing_queue", False):
+                self.show_queue()
+
+        self.queue_job.finished.connect(finished)
+        self._say(doing)
+        self.queue_job.start()
 
     def open_settings(self, lexicon: str | None = None):
         from exchange_ui.settings import SettingsDialog

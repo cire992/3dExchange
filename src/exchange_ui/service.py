@@ -190,6 +190,103 @@ class LibraryService:
         """Undo one entry of a dossier's history (any session); itself undoable."""
         self.edit(f"undo {label}", lambda c: c.undo(log_id))
 
+    # Requisitions ---------------------------------------------------------------------------------
+
+    def registry(self, reload: bool = False):
+        """Pipeline packages (cached; ``reload`` after installing or trusting one)."""
+        from exchange.pipelines.registry import load_registry
+
+        if reload or getattr(self, "_registry", None) is None:
+            self._registry = load_registry()
+        return self._registry
+
+    def environments(self) -> list[dict]:
+        return [{**dict(e), "user_config": json.loads(e["user_config"] or "{}")} for e in repo.list_environments(self._conn)]
+
+    def plan(self, uid: str, environment_id: int, **kwargs):
+        """Plan one asset (or product) into an environment (see requisitions.plan)."""
+        from exchange.requisitions.plan import plan_requisition
+
+        return plan_requisition(self._conn, self.definitions, self.registry(), uid, environment_id, **kwargs)
+
+    def routes(self, uid: str, environment_id: int) -> list[dict]:
+        from exchange.requisitions.plan import routes
+
+        return routes(self._conn, self.definitions, self.registry(), uid, environment_id)
+
+    def _write(self, fn: Callable[[sqlite3.Connection], Any]) -> Any:
+        """Run ``fn`` on the write connection; a busy library or a refused action is an EditError."""
+        try:
+            return fn(self._curation().conn)
+        except sqlite3.OperationalError as exc:
+            if "locked" in str(exc) or "busy" in str(exc):
+                raise EditError(BUSY) from exc
+            raise
+        except ExchangeError as exc:
+            raise EditError(str(exc)) from exc
+
+    def queue(self, plans: list) -> list[int]:
+        """Queue plans (remembering their options as each pipeline's last used); their ids."""
+        from exchange.requisitions.plan import queue_plan
+        from exchange.requisitions.presets import remember
+
+        ids = self._write(lambda conn: [queue_plan(conn, p, self.registry()) for p in plans
+                                        if any(i.include for i in p.items)])
+        options: dict = {}
+        for plan in plans:
+            for item in plan.items:
+                if item.include:
+                    options.update(item.params)
+        remember(options)
+        return ids
+
+    def requisitions(self) -> list[dict]:
+        from exchange.requisitions.lifecycle import list_requisitions
+
+        return list_requisitions(self._conn)
+
+    def requisition(self, ref) -> dict:
+        from exchange.requisitions.lifecycle import detail
+
+        return detail(self._conn, ref)
+
+    def requisition_action(self, action: str, ref, *args) -> Any:
+        """hold, release, move (position), resume (on_collision), check_stale."""
+        from exchange.requisitions import lifecycle
+
+        if action == "hold":
+            return self._write(lambda conn: lifecycle.hold(conn, ref, True))
+        if action == "release":
+            return self._write(lambda conn: lifecycle.hold(conn, ref, False))
+        if action == "move":
+            return self._write(lambda conn: lifecycle.move(conn, ref, *args))
+        if action == "resume":
+            return self._write(lambda conn: lifecycle.resume(conn, ref, *args))
+        if action == "rebuild":
+            return self._write(lambda conn: lifecycle.rebuild(conn, self.registry(), ref))
+        if action == "check_stale":
+            return self._write(lambda conn: lifecycle.check_stale(conn, self.registry()))
+        raise ValueError(action)
+
+    def default_endpoint(self, environment_id: int, name: str = "<name>"):
+        from exchange.requisitions.endpoints import default_endpoint
+
+        return default_endpoint(self._conn, self.definitions, environment_id, name)
+
+    def set_endpoint(self, environment_id: int, folder: str | None, visibility: str | None) -> None:
+        """An environment's endpoint folder (None: the default) and visibility."""
+        def write(conn):
+            config = repo.user_config(conn, environment_id)
+            if folder:
+                config["endpoint"] = folder
+            else:
+                config.pop("endpoint", None)
+            if visibility:
+                config["visibility"] = visibility
+            with repo.transaction(conn):
+                repo.set_user_config(conn, environment_id, config)
+        self._write(write)
+
     def file_key(self, path: str | Path) -> tuple[int, str] | None:
         """(root id, rel_key) of a file inside a known root, for linking; None if outside all."""
         path = Path(path).resolve()
