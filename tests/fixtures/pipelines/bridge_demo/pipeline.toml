@@ -1,0 +1,30 @@
+# A test pipeline whose step runs in "Blender" (a stand-in in tests).
+
+[pipeline]
+id = "bridge_demo"
+name = "Bridge demo"
+version = "1.0.0"
+author = "Tests"
+format_version = 1
+
+[input]
+dossier_types = ["mesh"]
+
+[output]
+environment = "same"
+folder = "Demo/{name}"
+
+[[parameter]]
+id = "word"
+type = "str"
+default = "hello"
+
+[[prerequisite]]
+id = "blender"
+kind = "tool"
+tool = "blender"
+
+[[step]]
+id = "make"
+operation = "ops.make"
+params = { word = "{word}" }

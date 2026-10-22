@@ -1,0 +1,49 @@
+# Convert a mesh to another format with Blender (headless), in the same kind of environment.
+# Reads FBX, OBJ, glTF/GLB, DAE, STL and PLY; writes GLB, glTF, FBX or OBJ (textures included
+# or copied beside it).
+
+[pipeline]
+id = "convert_mesh"
+name = "Convert mesh (Blender)"
+version = "1.0.0"
+author = "Exchange"
+description = "Imports the mesh into Blender and exports it in another format."
+format_version = 1
+
+[input]
+dossier_types = ["mesh"]
+artifact = "Files"
+
+[output]
+environment = "same"
+dossier_type = "mesh"
+folder = "{name}"
+
+[[parameter]]
+id = "format"
+label = "Format"
+type = "choice"
+choices = ["glb", "gltf", "fbx", "obj"]
+default = "glb"
+
+[[parameter]]
+id = "scale"
+label = "Scale"
+type = "float"
+default = 1.0
+min = 0.0001
+max = 10000
+
+[[prerequisite]]
+id = "blender"
+label = "Blender"
+kind = "tool"
+tool = "blender"
+paths = ["C:/Program Files/Blender Foundation/Blender */blender.exe",
+         "C:/Program Files (x86)/Steam/steamapps/common/Blender/blender.exe"]
+hint = "install Blender 2.83 or newer from blender.org"
+
+[[step]]
+id = "convert"
+operation = "blender_ops.convert"
+params = { format = "{format}", scale = "{scale}" }
