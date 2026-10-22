@@ -6,6 +6,7 @@ from pathlib import Path
 
 from PySide6.QtCore import (
     QAbstractListModel,
+    QMimeData,
     QModelIndex,
     QObject,
     QPersistentModelIndex,
@@ -26,6 +27,11 @@ CONTAINER_ID = Qt.ItemDataRole.UserRole + 3
 TYPE_ID = Qt.ItemDataRole.UserRole + 4
 COUNT = Qt.ItemDataRole.UserRole + 5
 DETAIL = Qt.ItemDataRole.UserRole + 6  # small grey text after the name (e.g. "MO2", "offline")
+COLLECTION_UID = Qt.ItemDataRole.UserRole + 7
+SMART = Qt.ItemDataRole.UserRole + 8  # a collection that is a saved search
+
+# Drag and drop: dossier uids, one per line.
+DOSSIER_MIME = "application/x-exchange-dossiers"
 
 # Browser roles
 BRICK = Qt.ItemDataRole.UserRole + 20
@@ -51,6 +57,9 @@ class SidebarModel(QStandardItemModel):
         root = self.invisibleRootItem()
         root.appendRow(_item("LIBRARY", "section"))
         root.appendRow(_item("All assets", "all", count=data["all"]))
+        root.appendRow(_item("COLLECTIONS", "section"))
+        for row in self._collection_rows():
+            root.appendRow(row)
         root.appendRow(_item("ENVIRONMENTS", "section"))
         for env in data["environments"]:
             detail = _LAYER_LABELS.get(env["type_id"], "")
@@ -73,6 +82,27 @@ class SidebarModel(QStandardItemModel):
                 env_item.appendRow(_item(t["name"], "type", count=t["count"], env_id=env["id"],
                                          type_id=t["type_id"]))
             root.appendRow(env_item)
+
+    def _collection_rows(self) -> list[QStandardItem]:
+        rows = []
+        for c in self.service.collections():
+            item = _item(c["name"], "collection", count=c["count"], detail="smart" if c["smart"] else "")
+            item.setData(c["uid"], COLLECTION_UID)
+            item.setData(c["smart"], SMART)
+            if c["smart"]:
+                item.setToolTip(f"Smart collection: {c['query']}")
+            rows.append(item)
+        rows.append(_item("New collection…", "new_collection"))
+        return rows
+
+    def reload_collections(self) -> None:
+        """Rebuild only the collection rows (cheap; the full sidebar counts every environment)."""
+        kinds = [self.index(r, 0).data(KIND) for r in range(self.rowCount())]
+        start = kinds.index("section", 2) + 1  # after the COLLECTIONS header
+        end = kinds.index("section", start)  # the ENVIRONMENTS header
+        self.removeRows(start, end - start)
+        for offset, row in enumerate(self._collection_rows()):
+            self.insertRow(start + offset, row)
 
 
 def _item(text: str, kind: str, *, count: int | None = None, env_id: int | None = None,
@@ -100,6 +130,8 @@ def filter_for(index: QModelIndex, current: Filter) -> Filter:
         flt.container_id = index.data(CONTAINER_ID)
     if kind == "type":
         flt.type_id = index.data(TYPE_ID)
+    if kind == "collection":
+        flt.collection_uid, flt.collection_name = index.data(COLLECTION_UID), index.data()
     return flt
 
 
@@ -215,6 +247,33 @@ class BrowserModel(QAbstractListModel):
 
     def brick(self, row: int) -> Brick | None:
         return self.bricks[row] if 0 <= row < len(self.bricks) else None
+
+    def flags(self, index: QModelIndex | QPersistentModelIndex) -> Qt.ItemFlag:
+        flags = super().flags(index)
+        if index.isValid():
+            flags |= Qt.ItemFlag.ItemIsDragEnabled | Qt.ItemFlag.ItemIsDropEnabled
+        return flags
+
+    def mimeTypes(self) -> list[str]:
+        return [DOSSIER_MIME, "text/uri-list"]
+
+    def mimeData(self, indexes) -> QMimeData:
+        data = QMimeData()
+        uids = [self.bricks[i.row()].uid for i in indexes if i.isValid() and i.row() < len(self.bricks)]
+        data.setData(DOSSIER_MIME, "\n".join(dict.fromkeys(uids)).encode())
+        return data
+
+    def supportedDragActions(self) -> Qt.DropAction:
+        return Qt.DropAction.CopyAction | Qt.DropAction.LinkAction
+
+    def row_of(self, uid: str) -> int | None:
+        return next((r for r, b in enumerate(self.bricks) if b.uid == uid), None)
+
+
+def dropped_uids(mime: QMimeData) -> list[str]:
+    if not mime.hasFormat(DOSSIER_MIME):
+        return []
+    return [u for u in bytes(mime.data(DOSSIER_MIME)).decode().split("\n") if u]
 
 
 def meta_line(brick: Brick) -> str:

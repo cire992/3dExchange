@@ -310,23 +310,32 @@ class Curator:
                                                 for i in ids], [], {"suggestions": ids})
 
     def _suggest_lexicon_words(self, uids: list[str], tags: list[str]) -> None:
-        """You tagged something by hand: offer its unknown name words for that tag."""
+        """You tagged something by hand: offer its unknown name words for that tag.
+
+        Tagging many at once offers only the words at least two of their names share.
+        """
         if self.definitions is None or "category" not in self.definitions.lexicons:
             return
         index = LexiconIndex(self.definitions)
+        words: dict[str, list[str]] = {}  # word -> uids whose name has it
         for uid in uids:
-            name = self.dossier(uid)["name"]
-            for word in dict.fromkeys(index.clean(tokenize(name))):
-                if len(word) < 3 or index.is_index(word) or index.known(word) or word.isdigit():
+            for word in dict.fromkeys(index.clean(tokenize(self.dossier(uid)["name"]))):
+                if len(word) >= 3 and not (index.is_index(word) or index.known(word) or word.isdigit()):
+                    words.setdefault(word, []).append(uid)
+        wanted = 1 if len(uids) == 1 else 2
+        with self._transaction():
+            for word, found_in in words.items():
+                if len(found_in) < wanted:
                     continue
                 for tag in tags:
                     if has_word(self.definitions, "category", tag, word):
                         continue
-                    payload = {"lexicon": "category", "value": tag, "word": word, "from": uid}
+                    payload = {"lexicon": "category", "value": tag, "word": word, "from": found_in[0]}
                     self.conn.execute(
                         "INSERT OR IGNORE INTO suggestion (kind, key, subject_uid, payload, confidence, created_at)"
                         " VALUES ('lexicon_word', ?, ?, ?, 0.5, ?)",
-                        (f"lexicon_word:category:{tag.casefold()}:{word}", uid, repo.to_json(payload), repo.now()))
+                        (f"lexicon_word:category:{tag.casefold()}:{word}", found_in[0], repo.to_json(payload),
+                         repo.now()))
 
     # Undo ------------------------------------------------------------------------------------------
 

@@ -124,6 +124,19 @@ QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; width: 0; }}
 QScrollBar:horizontal {{ background: transparent; height: 10px; margin: 2px; }}
 QScrollBar::handle:horizontal {{ background: {BORDER}; border-radius: 4px; min-width: 30px; }}
 QFrame#card {{ background: {SURFACE}; border: 1px solid {BORDER}; border-radius: 8px; }}
+QPushButton#chip, QPushButton#chipUser, QPushButton#chipHidden {{
+    border-radius: 9px; padding: 1px 8px; background: {CARD}; border: 1px solid {BORDER}; color: {TEXT_2};
+}}
+QPushButton#chipUser {{ background: {ACCENT_BG}; border-color: {ACCENT_BG}; color: {ACCENT_LIGHT}; }}
+QPushButton#chipHidden {{ background: transparent; border-style: dashed; color: {MUTED}; }}
+QPushButton#chip:hover, QPushButton#chipUser:hover, QPushButton#chipHidden:hover {{ border-color: {ACCENT}; }}
+QPushButton#link {{ background: transparent; border: none; color: {ACCENT}; padding: 2px 4px; }}
+QPushButton#link:hover {{ color: {ACCENT_LIGHT}; }}
+QToolButton#revert {{ background: transparent; border: none; color: {ACCENT}; font-size: 11pt; padding: 0 2px; }}
+QToolButton#revert:hover {{ color: {ACCENT_LIGHT}; }}
+QLineEdit[overridden="true"], QPlainTextEdit[overridden="true"], QComboBox[overridden="true"] {{
+    border-left: 3px solid {ACCENT};
+}}
 QTableWidget {{ background: transparent; border: none; gridline-color: {BORDER}; }}
 QHeaderView::section {{ background: {SURFACE}; color: {MUTED}; border: none; padding: 4px; }}
 QProgressBar {{ background: {CARD}; border: none; border-radius: 3px; height: 6px; text-align: center; }}

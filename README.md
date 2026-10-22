@@ -25,6 +25,9 @@ It indexes Daz Studio libraries, Unreal Engine projects, Mod Organizer 2 instanc
   - Theme words and a list of known authors tell hand-installed Daz products apart from the category and vendor folders you sort them into.
   - Scans fill the author list from manifests and `data/` folders; you can add to it or remove from it.
 - **Lets you curate.** Rename, retype, tag, link textures onto meshes, merge, split, fold variants, build products and collections. Every action can be undone, and your edits always survive rescans.
+  - **In the window:** edit any field in the inspector; your edits are marked and have a revert button. Select several assets to edit them together.
+  - **Drag and drop:** drop assets on a product, on another asset (link its files or merge), or on a collection in the sidebar. Drop scanned files from Explorer onto an asset to link them.
+  - **Undo and redo** with Ctrl+Z and Ctrl+Y.
 - **Suggests links and groupings.** `Barrel01_D.png` + `Barrel01_N.png` → `Barrel01.glb`; `Donut01_Pink` + `Donut01_Blue` → one asset with two variants. You accept or reject them in batches.
 - **Lets you browse and search.** A desktop window with a sidebar, a thumbnail grid and an inspector, plus a search language: `donut env:skyrim_se tag:food -is:product`, `type:mesh has:broken`, `collection:"Lard Lads assets"`.
 

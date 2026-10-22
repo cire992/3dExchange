@@ -140,6 +140,16 @@ def test_tags_and_lexicon_word_suggestion(lib, defs):
     assert "Bell" not in repo.effective_tags(conn, ding)
 
 
+def test_bulk_tagging_suggests_only_shared_words(lib, defs):
+    conn, curator = lib
+    a, b = uid_of(conn, "Barrel01"), uid_of(conn, "Loose Boots", "product")
+    curator.set_field(a, "name", "Zorbex Quill")
+    curator.set_field(b, "name", "Zorbex Plinth")
+    curator.tag([a, b], add=["Prop"])
+    words = {s["payload"]["word"] for s in list_suggestions(conn, kind="lexicon_word")}
+    assert words == {"zorbex"}  # quill and plinth are each in one name only
+
+
 def test_merge_and_undo_survive_rescans(scan, mixed, lib, defs):
     conn, curator = lib
     pink, blue = uid_of(conn, "Donut01_Pink"), uid_of(conn, "Donut01_Blue")
