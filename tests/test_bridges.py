@@ -2,6 +2,7 @@
 Blender runs too when it is installed."""
 
 import json
+import os
 import shutil
 import sys
 import threading
@@ -68,6 +69,48 @@ def test_daz_bridge_closes_daz_studio_after_the_result(tmp_path, logs):
     failing = write(tmp_path / "scripts" / "bad.dsa", b"// FAIL")
     with pytest.raises(BridgeError, match="failed on purpose"):
         bridge.run(failing, {}, timeout=60)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Daz Studio keeps its settings in the Windows registry")
+def test_daz_instance_settings_come_from_the_main_instance(tmp_path, logs):
+    import winreg
+
+    from exchange.bridges import daz
+
+    base = daz.REGISTRY_KEY  # a test key, not the user's (conftest)
+    main = {"AutoUpdate": (3, winreg.REG_DWORD), "NumContentDirs": (2, winreg.REG_DWORD),
+            "ContentDir0": ("D:/Daz/My Library", winreg.REG_SZ), "ContentDir1": ("D:/Daz/Personal", winreg.REG_SZ),
+            "Startups": (1263, winreg.REG_DWORD)}
+    try:
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{base}\Studio4") as key:
+            for name, (value, kind) in main.items():
+                winreg.SetValueEx(key, name, 0, kind, value)
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{base}\Studio4[Exchange]") as key:
+            winreg.SetValueEx(key, "ContentDir2", 0, winreg.REG_SZ, "C:/Users/Public/Documents/My DAZ 3D Library")
+            winreg.SetValueEx(key, "Startups", 0, winreg.REG_DWORD, 2)
+
+        assert daz.sync_instance_settings() == ["AutoUpdate", "ContentDir0", "ContentDir1", "NumContentDirs"]
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, rf"{base}\Studio4[Exchange]") as key:
+            got = {winreg.EnumValue(key, i)[0]: winreg.EnumValue(key, i)[1] for i in range(winreg.QueryInfoKey(key)[1])}
+        assert got == {"AutoUpdate": 3, "NumContentDirs": 2, "ContentDir0": "D:/Daz/My Library",
+                       "ContentDir1": "D:/Daz/Personal", "Startups": 2}  # stale ContentDir2 gone; own values kept
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, rf"{base}\Studio4") as key:
+            assert winreg.QueryInfoKey(key)[1] == len(main)  # the main instance is only read
+    finally:
+        for key in (rf"{base}\Studio4[Exchange]", rf"{base}\Studio4", base, base.rsplit("\\", 1)[0]):
+            try:
+                winreg.DeleteKey(winreg.HKEY_CURRENT_USER, key)
+            except OSError:
+                pass
+
+    # A failed job quotes Daz Studio's own log of the run, copied into the work folder.
+    log = daz.instance_folder() / "log.txt"
+    write(log, b"[INFO] :: Application update detected\n")
+    os.utime(log, (time.time() + 60, time.time() + 60))
+    bridge = make_bridge("daz_studio", fake_app(tmp_path, "fake_daz"), tmp_path / "work", logs.append)
+    with pytest.raises(BridgeError, match="Application update detected"):
+        bridge.run(write(tmp_path / "scripts" / "bad.dsa", b"// FAIL"), {}, timeout=60)
+    assert (tmp_path / "work" / "daz_studio_log.txt").is_file()
 
 
 def test_command_bridge_timeouts_and_one_job_per_app(tmp_path, logs):

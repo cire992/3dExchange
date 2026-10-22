@@ -31,6 +31,8 @@ class BridgeError(ExchangeError):
 
 
 class Bridge:
+    exit_grace = 2.0  # seconds an app that wrote its result gets to exit by itself before it is closed
+
     def __init__(self, app: str, executable: Path, workdir: Path, log: Callable[[str], None]) -> None:
         self.app, self.executable, self.workdir, self._log = app, Path(executable), Path(workdir), log
         if not self.executable.is_file():
@@ -72,7 +74,10 @@ class Bridge:
                     except subprocess.TimeoutExpired:
                         elapsed = time.monotonic() - started
                         if done is not None and done():
-                            time.sleep(2)  # let it finish exiting by itself
+                            try:  # let it finish exiting by itself
+                                process.wait(timeout=self.exit_grace)
+                            except subprocess.TimeoutExpired:
+                                pass
                             if process.poll() is None:
                                 self._log(f"{self.app} wrote its result; closing it")
                                 _stop(process)
