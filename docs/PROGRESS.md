@@ -110,7 +110,7 @@ answers (see Decisions).
 | #18 | 6b: `exchange serve` and the read API | merged (via #19) |
 | #19 | #16-#18 onto `main` | merged |
 | docs | The game data model: identity v2, overview, game data model; the spec's *Projects* brought in line; the phase 7 plan | in review |
-| 7a | Project homes: formats, parser, schemas, validator, `exchange project init/validate/checkpoint` | next |
+| 7a | Project homes: formats, parser, schemas, validator, `exchange project init/validate/checkpoint/config` | in review |
 | 4d | First process: Daz cross-figure (G9/G2 → G8) | needs the user's answer to open question 1 |
 
 ## Phase 6: Service and Workspace
@@ -298,6 +298,33 @@ Smaller choices:
 - an unresolved process link is a warning only (the Daz → Unreal process does not exist yet)
 - records of signatures without a schema (`PACK`, `CELL`, `DIST` …) are allowed: their `id` and maturity are checked, and links to them resolve when the file exists
 
+### 7a: formats, schemas and validation
+
+The formats are in `docs/PROJECT_HOME.md`.
+
+- **`exchange.projects`:**
+  - **`frontmatter`:** YAML front matter with PyYAML's safe loader (the C one); a repeated key is an error.
+  - **`schema`:** the schema format and the core's schemas in `projects/schemas/` (`NPC_`, `RACE`, `FACT`, `LOT_`).
+  - **`home`:** finding a home (`exchange.project.toml`), `init_home`, `projects.toml`, `resolve_project`.
+  - **`git`:** the repository and checkpoints.
+  - **`validate`:** `validate_home()` returns findings (errors, warnings) and gaps.
+- **Commands:** `exchange project init PATH`, `project validate`, `project checkpoint [--for PATH]` and `project config`.
+- **Not in the plan, needed by checkpoints:** this machine has no global git identity (each
+  repository sets its own), so a new project home could not commit. `projects.toml` also holds
+  `git_name` and `git_email`: `project init` writes them into the new repository, and commits use
+  them when git has none of its own. Without either, the error says how to set them.
+- **Checkpoints:**
+  - They exclude `.exchange/` even when `.gitignore` does not.
+  - They refuse a home that is not its own repository's top level.
+  - They never make an empty commit.
+- **Tests:** `tests/test_projects.py` (32), all on scratch homes. The suite is at 254.
+- **Speed:** 2,001 records validate in about 0.75 s. The first read of freshly written files is
+  far slower on the dev machine, about 7 ms per file, which looks like the virus scanner.
+- **Dossier links against the real library:** a scratch home linked to 300 random products from
+  the scratch scan of the real Daz library (235,087 dossiers), plus 5 uids that do not exist.
+  - The 300 real links resolved and the 5 bad ones became dossier gaps.
+  - Validation took 0.14 s.
+
 ## How we work
 
 - **Plan, then build.** For each roadmap phase, propose a plan with open questions and a recommended answer for each, then wait for approval. So far the user has approved the recommended answers each time.
@@ -433,7 +460,7 @@ src/exchange/            core, never imports Qt (a test enforces this)
                          work folders, cached steps, checkpoints, writing, sidecars, rescans),
                          sidecars (written and read back by identification), lifecycle (resume,
                          hold, move, remove, stale, rebuild)
-  cli_requisitions.py    pipelines, tools, requisition, test-pipeline
+  cli_requisitions.py    processes, tools, requisition, test-process
   bridges/               base (run with timeout and log, one job per app, close the whole process
                          tree), blender (headless wrapper), daz (DazScript wrapper, separate
                          instance), command-line tools; operations reach them via ctx.bridge(app)
@@ -441,7 +468,10 @@ src/exchange/            core, never imports Qt (a test enforces this)
                          desk (unattached files by folder, one level at a time over the (root, rel_key) index)
   autodiscover.py        Steam, Epic, Unreal recent projects, Daz registry, MO2 instances
   environments.py        register_root (user's type wins), excluded folders
-  cli.py cli_curation.py command line
+  service/               exchange serve: the local API (FastAPI), its models and OpenAPI schema (6b)
+  projects/              project homes: front matter, record schemas (schemas/*.yaml), finding and
+                         creating homes, git checkpoints, validation (7a)
+  cli.py cli_curation.py command line (also cli_service.py, cli_projects.py)
 src/exchange_ui/         PySide6 app: main_window, models (paged browser, sidebar with collections), delegates,
                          views (grid and sidebar with drag and drop), inspector (editing, bulk edit),
                          service (reads + edits via Curator, session undo/redo), wizard,

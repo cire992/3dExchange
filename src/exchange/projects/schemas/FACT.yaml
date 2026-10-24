@@ -1,0 +1,48 @@
+signature: FACT
+title: Faction
+description: >-
+  One faction type with a template that sets its fields. Edges are stored on the member's record:
+  a member's faction list, a faction's parent (the contains edge) and its relations.
+template_field: template
+fields:
+  template:
+    type: enum
+    values: [family, house, clan, tribe, company, guild, team, nation, gang, clique, club, culture]
+    required_at: spec
+  parent:
+    type: link
+    to: [FACT]
+    description: The faction this one belongs to (a Clan within its House).
+  lineage: { type: text, templates: [family, house, clan, tribe] }
+  head: { type: link, to: [NPC_], templates: [family, house, clan, tribe] }
+  heir: { type: link, to: [NPC_], templates: [family, house, clan, tribe] }
+  ranks:
+    type: list
+    of: { type: text }
+    templates: [company, guild, team]
+  joining: { type: text, templates: [company, guild, team], description: What it takes to join. }
+  holdings:
+    type: list
+    of: { type: link, to: [LOT_] }
+    templates: [company, guild, team]
+  territory:
+    type: list
+    of: { type: link, to: [REGI, SYST, PLNT, CITY, DIST, ZONE, LOT_] }
+    templates: [nation]
+  government: { type: text, templates: [nation] }
+  turf:
+    type: list
+    of: { type: link, to: [DIST, NBHD, LOT_] }
+    templates: [gang, clique, club]
+  leader: { type: link, to: [NPC_], templates: [company, guild, team, nation, gang, clique, club] }
+  customs: { type: text, templates: [culture] }
+  language: { type: text, templates: [culture] }
+  relations:
+    type: list
+    description: How this faction regards others, as in Bethesda faction relations.
+    of:
+      type: object
+      fields:
+        faction: { type: link, to: [FACT], required_at: sketch }
+        relation: { type: enum, values: [ally, friend, neutral, enemy], required_at: sketch }
+        reaction: { type: int }

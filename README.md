@@ -129,10 +129,37 @@ local HTTP API (FastAPI and uvicorn, the optional `service` extra):
   regenerate it with `exchange serve --openapi > docs/api/openapi.json` after changing the API
   (a test checks it).
 
+## Project homes
+
+A project home is a git-tracked folder of plain files for one project: its identity, goals,
+records (the game's data, one Markdown file each, such as `records/NPC_/NPC_DockMaster.md`) and
+claims (dated work and ideas). The formats are in [`docs/PROJECT_HOME.md`](docs/PROJECT_HOME.md).
+
+```bash
+exchange project config --root "E:/Projects/Exchange" --git-name "Your Name" --git-email you@example.com
+```
+
+```bash
+exchange project init "E:/Projects/Exchange/NJO"
+```
+
+```bash
+exchange project validate --project NJO
+```
+
+- **`project validate`** checks every file against its format and the record schemas (`NPC_`,
+  `RACE`, `FACT` and `LOT_` so far), resolves every link, dossiers included (read-only, against the
+  library), and lists the gaps: records that others need at a higher maturity.
+- **`project checkpoint`** commits every change in the home, as the shell does before a bypassed
+  agent session.
+- **Which project:** without `--project`, commands use the project home holding the current
+  folder, else the default (`project config --default NJO`).
+
 ## Where things live
 
 - **Library database** (SQLite): `%LOCALAPPDATA%\Exchange\library.db`. Set `EXCHANGE_DATA_DIR` to put it elsewhere. Exchange backs it up before every schema migration.
 - **Thumbnails:** `thumbnails\` beside the database.
+- **Projects settings:** `projects.toml` beside the database: the projects root, the default project, and the git identity project homes commit with.
 - **Your definitions:** `%LOCALAPPDATA%\Exchange\definitions\`, with folders `environments\`, `dossier_types\` and `lexicons\`. A file there replaces the built-in one with the same id, which is how lexicon edits are stored.
 
 ## Extending

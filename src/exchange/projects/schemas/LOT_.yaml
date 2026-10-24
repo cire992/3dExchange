@@ -1,0 +1,14 @@
+signature: LOT_
+title: Lot
+description: >-
+  Where the planetside branches converge: a place in a District, Neighborhood or Zone POI. In Unreal
+  a Lot is a Level Instance.
+fields:
+  within:
+    type: link
+    to: [DIST, NBHD, ZPOI, CITY, ZONE]
+    required_at: spec
+  owner: { type: link, to: [FACT, NPC_] }
+  unreal_level:
+    type: text
+    description: The Level Instance asset in the Unreal project, once the Lot is stubbed.
