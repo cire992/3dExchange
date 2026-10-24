@@ -1,6 +1,6 @@
 """Core operations shipped with Exchange: copy, select, resize and convert images, rename, pack.
 
-Pipelines name them ``core.<name>``. None of them touch the source files: they read from the
+Processes name them ``core.<name>``. None of them touch the source files: they read from the
 input artifact and write new files into their own work folder (copy passes files through and
 lets the requisition writer copy them to the endpoint).
 """
@@ -12,7 +12,7 @@ import zipfile
 from pathlib import Path
 
 from exchange.globs import any_match
-from exchange.pipelines.operations import ANY, Artifact, Context, OperationError, operation
+from exchange.processes.operations import ANY, Artifact, Context, OperationError, operation
 
 IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".tga", ".bmp", ".tif", ".tiff", ".dds", ".webp")
 _FORMATS = {"png": ("PNG", ".png"), "jpg": ("JPEG", ".jpg"), "jpeg": ("JPEG", ".jpg"), "tga": ("TGA", ".tga"),

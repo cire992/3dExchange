@@ -113,13 +113,13 @@ class SettingsDialog(QDialog):
         footer.addWidget(self.apply_button)
         page.addLayout(footer)
 
-        from exchange_ui.settings_pipelines import EndpointsPage, PipelinesPage
+        from exchange_ui.settings_processes import EndpointsPage, ProcessesPage
 
         self.tabs = tabs = QTabWidget()
         tabs.addTab(lexicons, "Lexicons")
-        self.pipelines = PipelinesPage(window)
+        self.processes = ProcessesPage(window)
         self.endpoints = EndpointsPage(window)
-        tabs.addTab(self.pipelines, "Pipelines")
+        tabs.addTab(self.processes, "Processes")
         tabs.addTab(self.endpoints, "Endpoints")
         layout = QVBoxLayout(self)
         layout.addWidget(tabs)

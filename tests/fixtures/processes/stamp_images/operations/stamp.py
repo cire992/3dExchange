@@ -1,8 +1,8 @@
-"""Operations of the test pipeline."""
+"""Operations of the test process."""
 
 import shutil
 
-from exchange.pipelines.operations import operation
+from exchange.processes.operations import operation
 
 
 @operation("review", inputs=("Files",), output="Files")

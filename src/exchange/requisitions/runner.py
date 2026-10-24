@@ -1,4 +1,4 @@
-"""Running the queue: requisitions in order, their items one by one, each item's pipelines step by
+"""Running the queue: requisitions in order, their items one by one, each item's processes step by
 step.
 
 * **Work folders:** each requisition gets ``work/<uid>/`` in the data folder for intermediates,
@@ -11,7 +11,7 @@ step.
 * **Writing:** only into the endpoint folder. A file already there is a collision: by default
   the item stops and asks; otherwise it is overwritten (the old file goes to the recycle
   folder), renamed or skipped. Every write is recorded, so the output can be removed cleanly.
-* **Chains:** each pipeline's result is written. An intermediate one goes to its own
+* **Chains:** each process's result is written. An intermediate one goes to its own
   environment (G8 in Daz, usable there too), the last one to the requisition's endpoint.
 * **Afterwards:** the sidecar manifest is written next to the output, the endpoint folder
   becomes a root of its environment if it is not one yet, and it is rescanned, so the new
@@ -36,9 +36,9 @@ from exchange.definitions.schema import DefinitionSet
 from exchange.errors import ExchangeError
 from exchange.locks import Lock
 from exchange.paths import data_dir, fold, is_within, rel_under
-from exchange.pipelines.manifest import step_params
-from exchange.pipelines.operations import Artifact, Checkpoint, Context, OperationError, accepts
-from exchange.pipelines.registry import PipelinePackage, Registry, check_prerequisites, ready, resolve_tool
+from exchange.processes.manifest import step_params
+from exchange.processes.operations import Artifact, Checkpoint, Context, OperationError, accepts
+from exchange.processes.registry import ProcessPackage, Registry, check_prerequisites, ready, resolve_tool
 from exchange.requisitions.endpoints import Endpoint, default_endpoint
 from exchange.requisitions.sidecars import write_sidecar
 
@@ -133,7 +133,7 @@ def _run_requisition(conn, db_path, definitions, registry, req, progress, cancel
         except (ExchangeError, OSError) as exc:
             outcome, detail = "failed", str(exc)
             log("error", detail)
-        except Exception as exc:  # a pipeline's own bug: the item fails, the queue goes on
+        except Exception as exc:  # a process's own bug: the item fails, the queue goes on
             outcome, detail = "failed", f"{type(exc).__name__}: {exc}"
             log("error", traceback.format_exc())
         state = {"done": "done", "attention": "needs_attention", "failed": "failed"}[outcome]
@@ -178,7 +178,7 @@ def _load_state(path: Path) -> dict:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return {"pipeline": 0, "step": 0, "resume": False, "artifacts": {}, "outputs": []}
+        return {"process": 0, "step": 0, "resume": False, "artifacts": {}, "outputs": []}
 
 
 def _save_state(path: Path, state: dict) -> None:
@@ -226,23 +226,23 @@ def source_fingerprint(conn: sqlite3.Connection, entry_id: int) -> str | None:
         return None
 
 
-def _chain(registry: Registry, pipelines: list[dict], tools) -> list[PipelinePackage]:
+def _chain(registry: Registry, processes: list[dict], tools) -> list[ProcessPackage]:
     chain = []
-    for p in pipelines:
+    for p in processes:
         package = registry.get(p["id"])
         if package.manifest.version != p["version"]:
-            raise RequisitionError(f"pipeline {package.id} changed from {p['version']} to {package.manifest.version} "
+            raise RequisitionError(f"process {package.id} changed from {p['version']} to {package.manifest.version} "
                                    "since this was planned; plan it again")
         if not ready(package, tools):
             red = [s for s in check_prerequisites(package, tools) if not s.ok]
-            raise RequisitionError(f"pipeline {package.id} is not ready"
+            raise RequisitionError(f"process {package.id} is not ready"
                                    + (f": {red[0].label}: {red[0].detail}" if red else " (not trusted, or its steps are invalid)"))
         chain.append(package)
     return chain
 
 
 def _run_item(conn, definitions, registry, req, item, log: _Log, tools) -> tuple[str, object]:
-    chain = _chain(registry, json.loads(item["pipelines"]), tools)
+    chain = _chain(registry, json.loads(item["processes"]), tools)
     params = json.loads(item["params"])
     dossier = dossier_info(conn, item["dossier_uid"])
     source, digest = source_artifact(conn, item["source_entry_id"], chain[0].manifest.input_artifact)
@@ -253,24 +253,24 @@ def _run_item(conn, definitions, registry, req, item, log: _Log, tools) -> tuple
     current = Artifact.from_json(state["chain"]) if state.get("chain") else source
     log("start", f"{dossier['name']}: {' → '.join(p.id for p in chain)} from entry {item['source_entry_id']}")
 
-    for pi in range(state["pipeline"], len(chain)):
+    for pi in range(state["process"], len(chain)):
         package = chain[pi]
         manifest = package.manifest
         values = manifest.resolve(params.get(package.id, {}))
         produced = {"source": current}
-        start = state["step"] if pi == state["pipeline"] else 0
+        start = state["step"] if pi == state["process"] else 0
         for si, step in enumerate(manifest.steps):
             if si < start:
                 produced[step.id] = Artifact.from_json(state["artifacts"][f"{pi}.{step.id}"])
                 continue
             spec = package.operation(step.operation)
             inputs = [produced[name] for name in step.inputs]
-            resuming = bool(state.get("resume")) and pi == state["pipeline"] and si == start
+            resuming = bool(state.get("resume")) and pi == state["process"] and si == start
             try:
                 result = _run_step(req["uid"], package, step, spec, inputs, step_params(step, values, dossier),
                                    dossier, log, resuming, tools)
             except Checkpoint as cp:
-                state.update(pipeline=pi, step=si, resume=False)
+                state.update(process=pi, step=si, resume=False)
                 _save_state(state_path, state)
                 log(step.id, f"waiting for you: {cp.message}")
                 return "attention", cp.message
@@ -287,16 +287,16 @@ def _run_item(conn, definitions, registry, req, item, log: _Log, tools) -> tuple
             folder = _fill(manifest.output_folder, values, dossier)
             written, collisions = _write(conn, req, item["id"], target, current, folder, log)
             if collisions:
-                state.update(pipeline=pi, step=len(manifest.steps), resume=False, chain=None)
+                state.update(process=pi, step=len(manifest.steps), resume=False, chain=None)
                 _save_state(state_path, state)
                 shown = ", ".join(str(c) for c in collisions[:3]) + (" …" if len(collisions) > 3 else "")
                 return "attention", (f"{len(collisions)} file(s) already exist at the endpoint ({shown}); "
                                      "resume with overwrite, rename or skip")
             state["outputs"].append({
                 "endpoint": target.folder, "root": target.root, "environment_id": target.environment_id,
-                "pipeline": package.id, "version": manifest.version, "status": manifest.entry_status,
+                "process": package.id, "version": manifest.version, "status": manifest.entry_status,
                 "type_id": manifest.output_dossier_type or dossier["type_id"], "files": written})
-        state.update(pipeline=pi + 1, step=0, resume=False, chain=current.to_json())
+        state.update(process=pi + 1, step=0, resume=False, chain=current.to_json())
         _save_state(state_path, state)
     conn.execute("UPDATE requisition_item SET outputs = ? WHERE id = ?", (json.dumps(state["outputs"]), item["id"]))
     log("done", f"wrote {sum(len(o['files']) for o in state['outputs'])} files")
@@ -311,7 +311,7 @@ def _fill(template: str, values: dict, dossier: dict) -> str:
         raise RequisitionError(f"bad output folder {template!r}: {exc}") from exc
 
 
-def bridges_for(package: PipelinePackage, tools, workdir: Path, log: Callable[[str], None]):
+def bridges_for(package: ProcessPackage, tools, workdir: Path, log: Callable[[str], None]):
     """What ``ctx.bridge(app)`` returns for a package's step: the bridge to that app, at the path
     its prerequisite resolves to."""
     def get(app: str):
@@ -347,18 +347,18 @@ def _run_step(req_uid, package, step, spec, inputs, params, dossier, log: _Log, 
     return result
 
 
-def test_pipeline(conn: sqlite3.Connection, folder: Path, uid: str, out_dir: Path,
+def test_process(conn: sqlite3.Connection, folder: Path, uid: str, out_dir: Path,
                   values: dict | None = None, source_entry_id: int | None = None,
                   log: Callable[[str, str], None] | None = None) -> list[Path]:
-    """Run a pipeline package (from its folder, not installed) on one asset into ``out_dir``: the
+    """Run a process package (from its folder, not installed) on one asset into ``out_dir``: the
     test harness. Nothing is written to the library or the asset's environments.
 
     Testing your own package means running its code, so it is trusted for this run."""
-    from exchange.pipelines.manifest import load_manifest
-    from exchange.pipelines.registry import fingerprint, validate
+    from exchange.processes.manifest import load_manifest
+    from exchange.processes.registry import fingerprint, validate
 
     folder = Path(folder).resolve()
-    package = PipelinePackage(load_manifest(folder / "pipeline.toml"), folder, False, True, fingerprint(folder))
+    package = ProcessPackage(load_manifest(folder / "process.toml"), folder, False, True, fingerprint(folder))
     problems = validate(package)
     if problems:
         raise RequisitionError("; ".join(problems))
@@ -400,7 +400,7 @@ def test_pipeline(conn: sqlite3.Connection, folder: Path, uid: str, out_dir: Pat
 
 def _intermediate_endpoint(conn, definitions, manifest, source: Artifact, req) -> Endpoint | None:
     """Where an intermediate result of a chain goes: the default endpoint of an environment of
-    the pipeline's output type (None if the library has none)."""
+    the process's output type (None if the library has none)."""
     env_type = manifest.output_environment
     if env_type == "same":
         row = conn.execute("SELECT l.environment_id FROM entry e JOIN ledger l ON l.id = e.ledger_id WHERE e.id = ?",
@@ -434,7 +434,7 @@ def _write(conn, req, item_id: int, endpoint: Endpoint, artifact: Artifact, fold
         if not is_within(dest, base):
             raise RequisitionError(f"{rel} would be written outside the endpoint {base}")
         if not src.is_file():
-            raise RequisitionError(f"{src} is missing (the pipeline did not make it)")
+            raise RequisitionError(f"{src} is missing (the process did not make it)")
         pairs.append((src, dest))
     policy = req["on_collision"]
     # Files this requisition already wrote (a product and its child share files) are not collisions.
@@ -483,8 +483,8 @@ def _write_sidecars(conn, req) -> list[tuple[int, str]]:
                 "dossier": item["dossier_uid"], "name": d["name"] if d else "", "type_id": out["type_id"],
                 "status": out["status"],
                 "source": {"entry": item["source_entry_id"], **(dict(source) if source else {})},
-                "pipelines": [{"id": out["pipeline"], "version": out["version"]}],
-                "params": json.loads(item["params"]).get(out["pipeline"], {}), "files": out["files"]})
+                "processes": [{"id": out["process"], "version": out["version"]}],
+                "params": json.loads(item["params"]).get(out["process"], {}), "files": out["files"]})
             roots[out["endpoint"]] = (out["environment_id"], out["root"])
     for folder, outputs in by_folder.items():
         path = write_sidecar(Path(folder), {"requisition": req["uid"], "name": req["name"],

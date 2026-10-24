@@ -76,17 +76,6 @@ Every later section uses these terms exactly as defined here.
 | Exchange MCP | The MCP server Exchange gives every session, exposing projects, the library and requisitions as tools | `search_library`, `update_claim` |
 | Devlog | The project's dated log of what happened, mostly written automatically | `devlog/2026-10.md` |
 
-### Names in code
-
-The code predates some of these names. Until a single mechanical rename PR lands, use this table when reading the code:
-
-| Spec term | Current code name |
-| --- | --- |
-| Process | pipeline (`exchange.pipelines`, `pipeline.toml`, `cli` commands with `pipeline`) |
-| Process guide | `PIPELINE_GUIDE.md` |
-
-All other terms already match.
-
 ## Environments
 
 An environment is recognized by what it contains, and Exchange always works through the environment's own organizational layer.
@@ -570,7 +559,7 @@ glb_to_starfield_ingestible/
 └─ README.md
 ```
 
-The manifest declares name, version, author, input predicate (dossier type + required tags, e.g. static mesh tagged Food), source and target environment variants, operation chain with each step's executor, parameters with defaults, prerequisites, and which roles it grants. (The manifest is still `pipeline.toml` in code until the rename.)
+The manifest declares name, version, author, input predicate (dossier type + required tags, e.g. static mesh tagged Food), source and target environment variants, operation chain with each step's executor, parameters with defaults, prerequisites, and which roles it grants.
 
 Packages live in three places: built into Exchange, installed globally, or in a project home's `processes/` for project-specific work.
 

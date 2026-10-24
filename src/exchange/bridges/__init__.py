@@ -6,11 +6,11 @@ context for the bridge::
     result = ctx.bridge("blender").run(script, {"source": str(path), "format": "glb"},
                                        template=None)
 
-Every bridge works the same way, so pipeline authors never manage processes themselves:
+Every bridge works the same way, so process authors never manage the apps' OS processes themselves:
 
 1. The arguments go to a JSON file in the step's work folder.
 2. A small wrapper is generated: Python inside Blender, or DazScript inside Daz Studio. It
-   reads the arguments, runs the pipeline's script, and writes the script's result (or its
+   reads the arguments, runs the process's script, and writes the script's result (or its
    error) to a result file.
 3. The app runs with that wrapper and a timeout. Its output goes to a log in the work folder.
 4. The result comes back as a dict. A missing result, a reported error or a timeout raises

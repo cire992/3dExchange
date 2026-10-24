@@ -1,9 +1,9 @@
-"""Pipeline manifests (``pipeline.toml``), read as strictly as definitions.
+"""Process manifests (``process.toml``), read as strictly as definitions.
 
-A manifest names the pipeline and says what it takes, what it makes, its parameters, its
+A manifest names the process and says what it takes, what it makes, its parameters, its
 prerequisites and its steps::
 
-    [pipeline]
+    [process]
     id = "textures_to_dds"            # lower_snake_case
     name = "Textures to DDS"
     version = "1.0.0"
@@ -20,7 +20,7 @@ prerequisites and its steps::
     environment = "same"              # target environment type, or "same" as the source's
     dossier_type = "texture"          # what the result is (for chains)
     folder = "{name}"                 # where in the endpoint the files go
-    entry_status = "requisitioned"    # or "copied" for copy pipelines
+    entry_status = "requisitioned"    # or "copied" for copy processes
     roles = []
 
     [[parameter]]
@@ -111,7 +111,7 @@ class Step:
 
 
 @dataclass(frozen=True)
-class PipelineManifest:
+class ProcessManifest:
     id: str
     name: str
     version: str
@@ -167,7 +167,7 @@ def step_params(step: Step, values: dict[str, Any], dossier: dict[str, Any]) -> 
     return out
 
 
-def load_manifest(path: Path) -> PipelineManifest:
+def load_manifest(path: Path) -> ProcessManifest:
     source = str(path)
     try:
         data = tomllib.loads(Path(path).read_text(encoding="utf-8"))
@@ -178,9 +178,9 @@ def load_manifest(path: Path) -> PipelineManifest:
     return parse_manifest(data, source)
 
 
-def parse_manifest(data: dict, source: str) -> PipelineManifest:
-    top = _Table(data, source, "", ["pipeline", "input", "output", "parameter", "prerequisite", "step"])
-    p = top.table("pipeline", ["id", "name", "version", "author", "description", "format_version"])
+def parse_manifest(data: dict, source: str) -> ProcessManifest:
+    top = _Table(data, source, "", ["process", "input", "output", "parameter", "prerequisite", "step"])
+    p = top.table("process", ["id", "name", "version", "author", "description", "format_version"])
     version = p.get("format_version", int)
     if version != FORMAT_VERSION:
         raise DefinitionError(source, f"unsupported format_version {version} (expected {FORMAT_VERSION})")
@@ -230,7 +230,7 @@ def parse_manifest(data: dict, source: str) -> PipelineManifest:
             raise DefinitionError(source, f"{t.where}.operation must be core.<name> or <module>.<name>")
         steps.append(Step(step_id, operation, tuple(inputs), dict(t.get("params", dict, {}))))
     if not steps:
-        raise DefinitionError(source, "a pipeline needs at least one [[step]]")
+        raise DefinitionError(source, "a process needs at least one [[step]]")
     for step in steps:
         for key, value in step.params.items():
             match = _REFERENCE.match(value) if isinstance(value, str) else None
@@ -238,7 +238,7 @@ def parse_manifest(data: dict, source: str) -> PipelineManifest:
                 raise DefinitionError(source, f"step {step.id}: params.{key} refers to unknown parameter "
                                               f"{match.group(1)!r}")
 
-    return PipelineManifest(
+    return ProcessManifest(
         id=_identifier(p), name=p.get("name", str), version=p.get("version", str), author=p.get("author", str, ""),
         description=p.get("description", str, ""), source=source,
         input_types=i.strings("dossier_types"), input_tags=i.strings("tags"),

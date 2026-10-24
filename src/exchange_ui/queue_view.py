@@ -47,7 +47,7 @@ class QueuePanel(QWidget):
         for action, label, tip in (
                 ("hold", "Hold", "Keep it from running"), ("release", "Release", "Let it run again"),
                 ("up", "Move up", ""), ("down", "Move down", ""),
-                ("rebuild", "Rebuild", "Queue it again with the current pipelines, overwriting its output"),
+                ("rebuild", "Rebuild", "Queue it again with the current processes, overwriting its output"),
                 ("remove", "Remove output", "Move what it wrote to the recycle folder; put back what it overwrote")):
             button = QPushButton(label)
             button.setToolTip(tip)
@@ -63,7 +63,7 @@ class QueuePanel(QWidget):
             resume_menu.addAction(label, lambda p=policy: self._act("resume", p))
         self.resume_button.setMenu(resume_menu)
         stale = QPushButton("Check for stale")
-        stale.setToolTip("Find fulfilled requisitions whose source or pipeline has changed since")
+        stale.setToolTip("Find fulfilled requisitions whose source or process has changed since")
         stale.clicked.connect(lambda: self.requested.emit("check_stale", 0, None))
         bar.addWidget(self.run_button)
         for button in (self.resume_button, *self.buttons.values()):
@@ -169,8 +169,8 @@ class QueuePanel(QWidget):
                             f" · if files exist: {d['on_collision']} · {written} files written")
         self.items.setRowCount(len(d["items"]))
         for r, item in enumerate(d["items"]):
-            pipelines = " → ".join(p["id"] for p in item["pipelines"])
-            for c, text in enumerate([f"{item['name']} ({pipelines or 'no pipeline'})", item["state"], item["message"] or ""]):
+            processes = " → ".join(p["id"] for p in item["processes"])
+            for c, text in enumerate([f"{item['name']} ({processes or 'no process'})", item["state"], item["message"] or ""]):
                 cell = QTableWidgetItem(text)
                 cell.setData(Qt.ItemDataRole.UserRole, item["id"])
                 self.items.setItem(r, c, cell)

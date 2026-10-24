@@ -1,6 +1,6 @@
 # Exchange: progress and handoff
 
-Last updated 2026-10-24, after the design pivot. `main` has phases 1-3, 4a-4c (#10-#13) and the Daz Studio bridge fixes checked against the real app (#14). 205 tests passed as of #14.
+Last updated 2026-10-24, during Roadmap phase 6. `main` has phases 1-3, 4a-4c (#10-#13) and the Daz Studio bridge fixes checked against the real app (#14). In review: the pivot docs (#15), a Daz bridge include fix (#16), 6a (the rename of pipelines to processes, #17) and 6b (the service and its read API), stacked in that order.
 
 Read this first, then `docs/IDENTITY.md` (what Exchange is for), `docs/DESIGN_SPEC.md` (how it
 works; the source of truth, use its terms exactly) and `docs/USEFUL_PATHS.md` (real asset
@@ -25,9 +25,8 @@ phases 1-4 stays and becomes the core of the new design. Read `IDENTITY.md` and 
   Exchange MCP server for agent sessions.
 - **The PySide6 window stays** as the working UI until the Workspace window reaches library
   parity (roadmap phase 6), then it is removed. Keep it working until then.
-- **Vocabulary.** Pipelines are now **processes**. The spec's *Names in code* table maps spec
-  terms to current code names until the rename PR lands. Endpoints stay; project targets are a
-  kind of endpoint.
+- **Vocabulary.** Pipelines are now **processes**, in the code too since 6a (see *Phase 6*).
+  Endpoints stay; project targets are a kind of endpoint.
 - **Scope.** Plugin records and game data are now in scope for project homes. Exchange is a
   personal tool for the user, Windows only; generality is welcome only when it costs nothing.
 
@@ -51,22 +50,14 @@ recommended answers, wait for approval, one PR per chunk, check against real dat
 | 10-11 | Game environments; breadth | this one | |
 
 **Next, in order:**
-1. **The rename PR** (pipelines → processes), before 4d adds more pipeline code. It covers the
-   package and module names, `pipeline.toml` → `process.toml`, CLI commands and help, the user's
-   data folder (`<data>/pipelines/`, the trust list, tool paths), the `requisitions` table's
-   `pipelines` and `params` columns (a migration), the window's labels, and the README. Existing
-   data is migrated on first run; with a single user, no long-term aliases are needed. Test the
-   migration on a copy of the real database and data folder, never the originals.
+1. **The rename** is 6a, the first chunk of Roadmap phase 6 (see *Phase 6*).
 2. **4d**, once the user answers phase 4 question 1 (what cross-figure converts first, and with
-   which tool). The user has a Blender template scene for these conversions.
-3. **Phase 5** runs in parallel in the shell repository, in its own session; it does not touch
-   this repository.
-4. **Phase 6 plan** after the rename and 4d. Recommended answers to carry into it, not yet
-   approved:
-   - **API layer:** FastAPI with uvicorn as an optional `service` extra, like the `ui` extra, so
-     the core keeps its minimal dependencies.
-   - **Project-home commits** (phase 7): automatic commits at bypass-session checkpoints, when a
-     claim reaches review or done, and on request.
+   which tool). It may run alongside 6b-6d, which touch other modules. The user has a Blender
+   template scene for these conversions.
+3. **Phase 5** is done in the shell repository (its PRs #1, #4, #5, #6).
+4. **Phase 6** goes on with 6b (see *Phase 6*). Carried to phase 7, not yet approved:
+   **project-home commits**, automatically at bypass-session checkpoints, when a claim reaches
+   review or done, and on request.
 
 **Between the repositories:** this repository owns the service API and the Exchange MCP; the
 shell consumes them. Until phase 6 the shell's Workspace window is a placeholder, so phase 5 needs
@@ -82,7 +73,7 @@ pipeline (Daz cross-figure, G9/G2 → G8).** The phase 4 plan was approved with 
 answers (see Decisions).
 
 **Next:**
-- **The rename PR, then 4d:** see *Design pivot* above.
+- **Phase 6, then 4d:** see *Phase 6* below and *Design pivot* above.
 - **Stacked PRs next time:** after merging one, change the next PR's base to `main` before merging it (or delete the merged branch, and GitHub moves it). #11 and #12 merged into their base branches and needed #13 to reach `main`.
 - **4d** waits for the user's answer to open question 1: what cross-figure converts first, and with which tool.
 
@@ -102,7 +93,107 @@ answers (see Decisions).
 | #12 | 4c: requisitions in the window: Requisition to… (plan tree, option forms, presets, last-used options, batch), the queue view, Settings › Pipelines and Endpoints | merged (via #13) |
 | #13 | 4b and 4c onto `main`, with this doc | merged |
 | #14 | Daz Studio bridge, checked against the real app: instance settings from the main instance, Daz's log in errors | merged |
-| 4d | First pipeline: Daz cross-figure (G9/G2 → G8) | needs the user's answer to open question 1 |
+| #15 | The design pivot docs: identity, spec, progress | in review |
+| #16 | Daz Studio bridge: the job script is included at the top level, so its functions see its names | in review (stacked on #15) |
+| #17 | 6a: pipelines renamed processes, with the migration of existing data | in review (stacked on #16) |
+| 6b | `exchange serve` and the read API | in review (stacked on #17) |
+| 4d | First process: Daz cross-figure (G9/G2 → G8) | needs the user's answer to open question 1 |
+
+## Phase 6: Service and Workspace
+
+Approved 2026-10-24 with every recommended answer. Each chunk is one PR in one repository; the
+shell's handoff doc is `docs/EXCHANGE_PROGRESS.md` in the shell repository.
+
+| # | Repo | What |
+| --- | --- | --- |
+| 6a | core | Rename pipelines to processes, with the migration of existing data |
+| 6b | core | `exchange serve` (FastAPI, loopback, per-launch token) and the read API: sidebar, paged query and search, dossier detail, collections, thumbnails, environments; the OpenAPI schema committed as the contract |
+| 6c | shell | The shell starts the service and proxies it on its own origin; connection status in the Workspace |
+| 6d | shell | Library browsing (sidebar, virtualized item cards, search, read-only inspector); meets G4 |
+| 6e | core | Write API: curation edits, undo/redo/history, suggestions, desk, lexicons |
+| 6f | shell | Curation in the Workspace |
+| 6g | core | Jobs API: environments (detect, configure), scans with progress events, watcher notices, requisitions, process prerequisites, endpoints |
+| 6h | shell | Environments and scanning |
+| 6i | shell | Requisitions, the queue, Settings › Processes and Endpoints |
+| 6j | both | Parity checklist signed off by the user on a real library, then the PySide6 window removed |
+
+Decisions:
+- **API:** FastAPI with uvicorn as an optional `service` extra; the core keeps its minimal
+  dependencies. The schema is committed as `docs/api/openapi.json`; the shell generates
+  TypeScript types from it.
+- **Transport:** the shell's Node service starts `<core>/.venv/Scripts/python -m exchange serve`
+  from a configured core folder and proxies it, so the Workspace keeps one origin and token.
+- **Long jobs:** scans and requisition runs stay in worker processes, streaming progress events.
+- **Both UIs during the transition:** they may run on the same database; avoid editing in both at
+  once (separate undo stacks). The PySide6 window goes in 6j.
+- **Work in a separate worktree** of this repository, never in the user's checkout.
+
+### 6a: the rename and the data migration
+
+- **Code:** `exchange.processes` (was `exchange.pipelines`), `ProcessError`, `ProcessManifest`,
+  `process.toml` with a `[process]` table, `exchange processes …` and `exchange test-process`,
+  `--process`, the window's *Processes* settings, the README and the spec.
+- **Database:** migration `0007_processes.sql` renames `requisition_item.pipelines` to
+  `processes` and each output's `"pipeline"` key to `"process"`. Option values stay keyed by
+  process id. The database is backed up first, as for every migration.
+- **Data folder** (`exchange.processes.legacy`, run once by `user_processes_dir()` under a lock):
+  each package in `<data>/pipelines/` is converted in place. `pipeline.toml` becomes
+  `process.toml` with `[process]`, and imports of `exchange.pipelines` become
+  `exchange.processes`. Then the folder is renamed to `<data>/processes/` in one step. A package
+  stays trusted only if its old fingerprint matched; its trust is then recorded for the
+  converted files. An interrupted move finishes on the next run. `tools.json`, presets and
+  `last_options.json` are keyed by tool or process id and do not change.
+- **Sidecars** inside environments are never rewritten. New ones say `"processes"`; scans read
+  only dossiers, names and files, so both kinds are recognized.
+- **Old packages** found later (an extra folder, or `install` of an old folder) are reported with
+  what to rename instead of being skipped, and an import of `exchange.pipelines` fails with the
+  same hint.
+- **No live Exchange data folder exists on the dev machine** (`%LOCALAPPDATA%\Exchange` is
+  absent; earlier real-data checks used scratch copies). The migration was checked on a scratch
+  data folder built with the pre-rename `main`: two Sketchfab models copied to scratch and
+  scanned, a trusted user package, a Blender tool path, a fulfilled Convert mesh requisition
+  (Blender 4.1) with a saved preset, and a queued one. On a copy of it the new code moved the
+  folder, kept the package trusted with its imports updated, kept tool paths and presets, ran
+  the queued requisition to fulfilment, found nothing stale, backed up the database
+  (`library.v6.….bak.db`), and recognized both old- and new-format sidecars when rescanning the
+  endpoint.
+
+### 6b: the service and its read API
+
+- **`exchange serve`** (`exchange.service`, the optional `service` extra: FastAPI and uvicorn):
+  - binds `127.0.0.1` itself (`--port 0` picks a free port) and starts listening, then prints one
+    JSON ready line (`event`, `url`, `api`, `version`, and `token` only when it made one)
+  - the shell passes its own token in `EXCHANGE_SERVICE_TOKEN`
+  - `--exit-with-stdin` stops it when its parent goes away
+- **Security:** every `/api` request needs `Authorization: Bearer <token>`. Requests for any host
+  name other than `127.0.0.1` or `localhost` get 403 (no DNS rebinding). No CORS, no docs pages,
+  no schema route. `/health` needs no token and says nothing about the library.
+- **Reading:** one read-only connection per worker thread, like the PySide6 window; the database is
+  created or migrated once at start.
+- **Routes (`/api/v1`):**
+  - `sidebar`, `environments`, `collections`
+  - `dossiers`: a page of item cards, with `query` (the search language), `group`, `environment`,
+    `container`, `type`, `parent`, `collection`, `unidentified`, `offset`, `limit` ≤ 1000. It applies
+    the window's rule: searches, type, collection and Unidentified views list all assets.
+  - `dossiers/{uid}`: the inspector's detail with the parent's fields
+  - `dossiers/{uid}/thumbnail`: the image from the cache
+  - Thumbnails are URLs served by the service, never filesystem paths.
+  - A search that does not parse is a 400 with its message.
+- **Contract:** `docs/api/openapi.json`, regenerated by `exchange serve --openapi`; a test fails
+  when it is out of date. The shell generates its TypeScript types from it (6c).
+- **Tests:** `tests/test_service.py` covers the token, the host check, each route against the core's
+  own query functions, the committed schema, and `exchange serve` started as the shell will start
+  it. The suite is at 222.
+- **On the real library** (a read-only scan of `D:\Daz 3D\Studio\My Library` into scratch,
+  without enrichment: 3.56M files, 14,497 products, 235,087 dossiers, the same as before):
+  - ready in 1.2 s
+  - the sidebar 1.8 s
+  - a page of 200 0.40 s (the last page 0.44 s)
+  - searches 0.36-0.76 s (`tag:food` cold)
+  - one asset's detail 0.13 s, environments and collections 0.02 s
+
+  The sidebar is the slow call: the shell should load it once and refresh it when the library
+  changes, not on every navigation.
 
 ## How we work
 
