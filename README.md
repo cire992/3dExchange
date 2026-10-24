@@ -149,7 +149,12 @@ exchange project validate --project NJO
 
 - **`project validate`** checks every file against its format and the record schemas (`NPC_`,
   `RACE`, `FACT` and `LOT_` so far), resolves every link, dossiers included (read-only, against the
-  library), and lists the gaps: records that others need at a higher maturity.
+  library), and lists the gaps: records that others need at a higher maturity, and dossier links
+  that broke. Each gap opens a gap claim once, updated or moved to review by later runs
+  (`--check-only` writes nothing).
+- **`capture`** turns one line into a Sketch record (`exchange capture "NPC_DockMaster: gruff
+  harbormaster"`) or an idea claim (`exchange capture "What if the House funds the gang?"`).
+- **`claims list`** and **`claims ack`** show the claims and clear the triage flag on new ones.
 - **`project checkpoint`** commits every change in the home, as the shell does before a bypassed
   agent session.
 - **Which project:** without `--project`, commands use the project home holding the current
