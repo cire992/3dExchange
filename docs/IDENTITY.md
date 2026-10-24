@@ -1,6 +1,6 @@
 # Exchange: Identity
 
-Version 1, 2026-10-24. This document changes only through amendments, recorded in the log at the bottom.
+Version 2, 2026-10-24. This document changes only through amendments, recorded in the log at the bottom.
 
 ## Thesis
 
@@ -50,7 +50,7 @@ Mission control, built to be stared at all day: readable first, never drab.
 ## Domains
 
 - Shell and Chats
-- Project homes (identity, domains, claims)
+- Project homes (identity, domains, records, claims)
 - Asset database (dossiers, ledgers, curation)
 - Processes (requisitions, bridges)
 - Exchange MCP
@@ -63,10 +63,10 @@ Finite milestones, each either done or not.
 | # | Goal | Done when | Status |
 |---|---|---|---|
 | G1 | Library online | Daz library, UE projects, MO2 and loose files scan into dossiers; curation works | Done (repository phases 1–3) |
-| G2 | First Process | Daz cross-figure (G9/G2 → G8) runs as a requisition | In progress (PR 4d) |
-| G3 | Chats online | The fork runs with tabs for Claude Code, Codex, Kimi and PowerShell, history restore, and the per-session bypass checkbox with a badge on the tab | Not started |
-| G4 | Service and Workspace | The core is served over a local API; the web Workspace browses the library | Not started |
-| G5 | Project home | Identity, domain and claim files are created and rendered in the Workspace, with fast claim capture | Not started |
+| G2 | First Process | Daz cross-figure (G9/G2 → G8) runs as a requisition | In progress (4d) |
+| G3 | Chats online | The fork runs with tabs for Claude Code, Codex, Kimi and PowerShell, history restore, and the per-session bypass checkbox with a badge on the tab | Done (shell phase 5) |
+| G4 | Service and Workspace | The core is served over a local API; the web Workspace browses the library | In progress (phase 6) |
+| G5 | Project home | Identity, domain, record and claim files are created and rendered in the Workspace, with fast claim capture | Not started |
 | G6 | Agents connected | Through the Exchange MCP, a claim is dispatched to a chat session and returns for review | Not started |
 | G7 | Benchmark | A fresh Unreal project themed on Sirenne and the wider Star Wars setting is run from Exchange: its project home and identity exist, claims are dispatched to agents, and at least one Daz character arrives in the project through a Process | Not started |
 
@@ -79,8 +79,9 @@ A fresh Unreal Engine project themed on Sirenne and Luke's wider Star Wars setti
 - **Project:** a git-tracked project home, kept separate from the Unreal project and mod folders it builds.
 - **Identity:** a project's premise, pillars, feel and boundaries. Changes only through amendments.
 - **Domain:** a node in a project's growing structure: a district, faction, character, system or questline.
+- **Record:** a typed unit of compiled game data (a character, faction, quest, lot, magic effect), named by a signature-prefixed editor ID. Records persist and carry a maturity level (sketch → spec → stub → built → polished), not a status. In a game project, the structure's domains are records.
 - **Goal:** a finite milestone.
-- **Claim:** a dated unit of work or idea, attached to a domain and optionally a goal. Status runs idea → open → claimed → review → done. Only Luke marks a claim done.
+- **Claim:** a dated unit of work or idea, attached to a domain or record and optionally a goal. Status runs idea → open → claimed → review → done. Only Luke marks a claim done. An idea claim can be promoted into a new record and stays linked as its origin.
 - **Dossier:** what an asset is. **Ledger:** where it lives.
 - **Environment:** an ecosystem where assets exist (Daz library, Unreal project, MO2 instance, loose files).
 - **Endpoint:** where Process output goes. A project target is a kind of endpoint.
@@ -89,3 +90,4 @@ A fresh Unreal Engine project themed on Sirenne and Luke's wider Star Wars setti
 ## Amendment log
 
 - **2026-10-24 (v1):** Exchange broadens from a 3D asset manager into a personal, AI-assisted project workspace. Pipelines are renamed Processes. Endpoints are recontextualized as project targets. Plugin records and game data come into scope for project homes.
+- **2026-10-24 (v2):** Records enter the vocabulary as compiled game data, distinct from claims: records carry maturity, claims carry status. Project homes and G5 now include record files. Detail lives in the game data model document.
