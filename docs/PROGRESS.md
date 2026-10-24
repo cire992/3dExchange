@@ -1,11 +1,20 @@
 # Exchange: progress and handoff
 
-Last updated 2026-10-24, during Roadmap phase 6. `main` has phases 1-3, 4a-4c (#10-#13) and the Daz Studio bridge fixes checked against the real app (#14). In review: the pivot docs (#15), a Daz bridge include fix (#16), 6a (the rename of pipelines to processes, #17) and 6b (the service and its read API), stacked in that order.
+Last updated 2026-10-24, at the start of Roadmap phase 7. `main` has phases 1-3, 4a-4c (#10-#13), the Daz Studio bridge fixes checked against the real app (#14), the pivot docs (#15), and phase 6's core chunks: the Daz bridge include fix, 6a (the rename) and 6b (the service), landed by #19. The shell's 6c is merged in the shell repository. The phase 7 plan (project homes, part 1) is approved; see *Phase 7*.
 
-Read this first, then `docs/IDENTITY.md` (what Exchange is for), `docs/DESIGN_SPEC.md` (how it
-works; the source of truth, use its terms exactly) and `docs/USEFUL_PATHS.md` (real asset
-folders and tools on the dev machine, for testing). The [README](../README.md) covers install
-and usage.
+Read this first, then `docs/OVERVIEW.md` (how the parts connect), `docs/IDENTITY.md` (what
+Exchange is for), `docs/GAME_DATA_MODEL.md` (records and claims), `docs/DESIGN_SPEC.md` (how it
+works; use its terms exactly) and `docs/USEFUL_PATHS.md` (real asset folders and tools on the dev
+machine, for testing). Where the game data model and the spec disagree, the game data model wins;
+the spec's *Projects* section was brought in line with it for phase 7. The
+[README](../README.md) covers install and usage.
+
+## Game data model (2026-10-24)
+
+Records (compiled game data, with maturity) are now separate from claims (work, with status).
+See docs/OVERVIEW.md for how the parts connect, docs/IDENTITY.md (v2) for the amendment, and
+docs/GAME_DATA_MODEL.md for the record and claim design. Phase 7 builds the first slice:
+project home files, schemas for NPC_, RACE, FACT and LOT_, validation, gap claims and fast capture.
 
 ## Design pivot (2026-10-24)
 
@@ -42,9 +51,10 @@ recommended answers, wait for approval, one PR per chunk, check against real dat
 | --- | --- | --- | --- |
 | 1-3 | Foundations, Library, Curation | this one | G1, done |
 | 4 | Requisitions v1; first process Daz cross-figure (4d) | this one | G2, in progress |
-| 5 | Chats online: the shell fork, sessions, history, per-session bypass | shell | G3 |
-| 6 | Service and Workspace: local API, the rename, library view at parity | both | G4 |
-| 7 | Project homes: files and index, identity interview, claims, devlog, mission control | both | G5 |
+| 5 | Chats online: the shell fork, sessions, history, per-session bypass | shell | G3, done |
+| 6 | Service and Workspace: local API, the rename, library view at parity | both | G4, in progress |
+| 7 | Project homes, part 1: file formats, record schemas, validation, gap claims, fast capture, the bypass checkpoint | both | G5 |
+| 7, part 2 | After 6d-6j: the identity interview, devlog, mission control, the claims board, Card and Table views, the project index | both | G5 |
 | 8 | Agents connected: Exchange MCP, generated agent files, claim dispatch, skills, drift review | both | G6 |
 | 9 | Benchmark: a fresh Sirenne-themed Unreal project run from Exchange, with a Daz → Unreal process | both | G7 |
 | 10-11 | Game environments; breadth | this one | |
@@ -55,9 +65,10 @@ recommended answers, wait for approval, one PR per chunk, check against real dat
    which tool). It may run alongside 6b-6d, which touch other modules. The user has a Blender
    template scene for these conversions.
 3. **Phase 5** is done in the shell repository (its PRs #1, #4, #5, #6).
-4. **Phase 6** goes on with 6b (see *Phase 6*). Carried to phase 7, not yet approved:
-   **project-home commits**, automatically at bypass-session checkpoints, when a claim reaches
-   review or done, and on request.
+4. **Phase 6** goes on with 6d (the shell's library browsing) when the user says so.
+5. **Phase 7, part 1** (see *Phase 7*) is approved and starts now. Of the project-home commits
+   carried from phase 6, only the checkpoint before a bypassed session is decided (7c); commits
+   when a claim reaches review or done, and on request, are still open.
 
 **Between the repositories:** this repository owns the service API and the Exchange MCP; the
 shell consumes them. Until phase 6 the shell's Workspace window is a placeholder, so phase 5 needs
@@ -93,10 +104,13 @@ answers (see Decisions).
 | #12 | 4c: requisitions in the window: Requisition to… (plan tree, option forms, presets, last-used options, batch), the queue view, Settings › Pipelines and Endpoints | merged (via #13) |
 | #13 | 4b and 4c onto `main`, with this doc | merged |
 | #14 | Daz Studio bridge, checked against the real app: instance settings from the main instance, Daz's log in errors | merged |
-| #15 | The design pivot docs: identity, spec, progress | in review |
-| #16 | Daz Studio bridge: the job script is included at the top level, so its functions see its names | in review (stacked on #15) |
-| #17 | 6a: pipelines renamed processes, with the migration of existing data | in review (stacked on #16) |
-| 6b | `exchange serve` and the read API | in review (stacked on #17) |
+| #15 | The design pivot docs: identity, spec, progress | merged |
+| #16 | Daz Studio bridge: the job script is included at the top level, so its functions see its names | merged (via #19) |
+| #17 | 6a: pipelines renamed processes, with the migration of existing data | merged (via #19) |
+| #18 | 6b: `exchange serve` and the read API | merged (via #19) |
+| #19 | #16-#18 onto `main` | merged |
+| docs | The game data model: identity v2, overview, game data model; the spec's *Projects* brought in line; the phase 7 plan | in review |
+| 7a | Project homes: formats, parser, schemas, validator, `exchange project init/validate/checkpoint` | next |
 | 4d | First process: Daz cross-figure (G9/G2 → G8) | needs the user's answer to open question 1 |
 
 ## Phase 6: Service and Workspace
@@ -194,6 +208,95 @@ Decisions:
 
   The sidebar is the slow call: the shell should load it once and refresh it when the library
   changes, not on every navigation.
+
+## Phase 7: Project homes, part 1
+
+Approved 2026-10-24 with every recommended answer. Goal G5. Phase 6 had not merged past 6c when
+this was planned, so the Workspace views (Card and Table for the first four signatures) move to
+part 2, and G5 is not met by part 1: its "done when" needs the Workspace.
+
+| # | Repo | What |
+| --- | --- | --- |
+| docs | core | Identity v2, the overview and the game data model; the spec's *Projects* section brought in line with the game data model; this plan |
+| 7a | core | `exchange.projects`: the project home formats, a parser, record schemas for `NPC_`, `RACE`, `FACT` and `LOT_`, the validator; `exchange project init`, `project validate` and `project checkpoint`; `docs/PROJECT_HOME.md` |
+| 7b | core | Gap claims opened by validation, fast capture (`exchange capture`), `exchange claims list` and `claims ack`, dossier hints |
+| 7c | shell | A git checkpoint of the project home before each bypassed session, through the core's CLI |
+
+**In scope:** the formats (identity, goals, records, claims, the coverage rules file), record
+schemas, validation, gap claims, fast capture and the bypass checkpoint. **Out of scope:**
+ladder, coverage and mining claims; other signatures; the compile Process; the Casting Board;
+any change to the asset database or scanning. Test only against scratch project homes, never
+the user's (the project-homes root is in `USEFUL_PATHS.md`).
+
+Decisions:
+1. **Dossier IDs** (checked 2026-10-24 on copies of the test fixtures):
+   - **They survive:**
+     - a plain rescan
+     - files that go missing and come back (the entry is retired, then revived)
+     - a Daz product reinstalled in another content directory (matched by SKU)
+   - **They don't survive:**
+     - a moved or renamed file or folder product (new dossiers; the old ones keep only retired entries)
+     - a Daz folder product regrouped after a lexicon change
+     - the automatic exact-duplicate merge, which deletes the losing dossier without an alias
+     - a rebuilt database
+     - `env forget`
+   - **The user's own merges** keep an alias, but lookups of the old uid return the emptied dossier.
+   - **In phase 7 (7b):**
+     - the resolver follows `dossier_alias`
+     - validation keeps a hint per linked dossier in `.exchange/dossier-hints.json`: name, type, environment, SKU, path and hash
+     - a uid that no longer resolves, or has only retired entries, opens a gap claim to relink it, listing candidates found by the hint
+   - **Later, in a separate core PR before Character Look is used for real:** duplicate merges record an alias, dossiers that records link to count as user work, and API lookups follow aliases.
+   - **With the Casting Board:** move detection during scans.
+2. **YAML frontmatter** (the game data model wins over the spec's TOML), parsed with PyYAML
+   `safe_load`, a new core dependency. Exchange never rewrites YAML a person wrote. It creates
+   new files, and edits only the `needed_by`, `status` and `triage` lines of gap claims it made.
+3. **Identity and goals:** `IDENTITY.md` (capitals, as in the spec) and a single `goals.md`
+   whose frontmatter lists goals `G1…` with statuses planned, active, done, dropped.
+4. **No `domains/` or `data/` in phase 7.** In a game project the records are the domains; `data/`
+   stays reserved for data that are not records (Bethesda plugin text, phase 10).
+5. **Schemas:** a small YAML format (field types text, int, number, bool, date, enum, link,
+   dossier, process, claim, list, object; `required_at` a maturity level), the same in the core
+   and in a project home's `schemas/`. A project's schemas add new signatures only; they never
+   change the core's.
+6. **Gap claims** come only from links:
+   - a record link that does not resolve, or whose target is not mature enough
+   - a broken dossier link
+
+   Mistakes inside a file are reported, not turned into claims. A record at Spec or above needs
+   each record it links to at no less than the lower of its own maturity and the field's cap
+   (Spec unless the schema says otherwise). Links from Sketch records are not checked.
+7. **No duplicates:**
+   - one gap claim per target record while one is not done or dropped; its `needed_by` list grows
+   - a dropped gap claim is never reopened
+   - a gap that returns after its claim was done opens a new claim linked to the old one
+8. **Gaps that get fixed:** validation moves the claim to `review` with a dated note, never to done.
+9. **Triage:** gap claims carry `triage: new` until `exchange claims ack` clears it (until the
+   triage inbox view exists).
+10. **Fast capture:** `exchange capture "<line>"`. A line starting with an editor ID
+    (`NPC_DockMaster: gruff harbormaster…`) creates a Sketch record; any other line creates an
+    idea claim, attached with `--on <ID>`. Unattached ideas are allowed and reported as unfiled.
+11. **Which project and the checkpoint:**
+    - **Which project:** `--project`, else the project home containing the current folder, else the
+      default named in `<data>/projects.toml`, which also holds the projects root.
+    - **When the checkpoint runs:** before every launch of a bypassed session in a project home,
+      resumes included.
+    - **What it commits:** all changes, never an empty commit.
+    - **If it fails:** the session does not start; the dialog offers **Start without checkpoint**.
+      A home that is not a git repository fails with a message saying to set up git
+      (`exchange project init` runs `git init`).
+12. **Docs:** identity v2, the overview and the game data model live in this repository; the
+    shell's handoff doc points here.
+13. **Part 2** (after 6d-6j): the identity interview, the devlog, mission control, the claims
+    board, the Card and Table views, and the project index.
+
+Smaller choices:
+- no project index in the library database yet: validation reads the files each run
+- unknown fields are warnings, not errors
+- maturity is stored as 0-4; the CLI also accepts the level names
+- editor IDs match `^([A-Z]{3}_|[A-Z]{4}_)[A-Za-z0-9][A-Za-z0-9_]*$`: a signature ending in `_` uses that underscore as the separator
+- a claim whose date and slug are taken gets `-2`
+- an unresolved process link is a warning only (the Daz → Unreal process does not exist yet)
+- records of signatures without a schema (`PACK`, `CELL`, `DIST` …) are allowed: their `id` and maturity are checked, and links to them resolve when the file exists
 
 ## How we work
 
