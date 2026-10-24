@@ -10,12 +10,15 @@ Validation reads the files directly (there is no project index yet) and reports:
   claims are opened from these (Roadmap phase 7b).
 
 Dossier links are resolved read-only against the library database, following merges
-(``dossier_alias``).
+(``dossier_alias``). Each linked dossier's description (name, type, environment, product key, path,
+hash) is kept as a hint in ``.exchange/dossier-hints.json``; when a link breaks, its hint finds the
+candidates to relink to.
 """
 
 from __future__ import annotations
 
 import datetime as dt
+import json
 import re
 import sqlite3
 from dataclasses import asdict, dataclass, field
@@ -64,6 +67,12 @@ class Gap:
     current: int | None = None  # the target's maturity, when it exists
     dossier: str | None = None
     dossier_state: str | None = None  # "missing" or "retired"
+    candidates: list[dict] = field(default_factory=list)  # dossiers that may be the same asset
+
+    @property
+    def work(self) -> str:
+        """What the gap's claim asks for: "relink" a dossier, or "mature" a record."""
+        return "relink" if self.kind == "dossier" else "mature"
 
 
 @dataclass
@@ -93,6 +102,8 @@ class Report:
     schemas: dict[str, RecordType] = field(default_factory=dict)
     findings: list[Finding] = field(default_factory=list)
     gaps: list[Gap] = field(default_factory=list)
+    dossiers_checked: bool = False  # False when there was no library to resolve dossier links in
+    dossier_hints: dict[str, dict] = field(default_factory=dict)  # every linked uid's description
 
     @property
     def errors(self) -> list[Finding]:
@@ -158,9 +169,87 @@ class DossierIndex:
             return "retired", current
         return ("merged" if merged else "ok"), current
 
+    def describe(self, uid: str) -> dict | None:
+        """What a dossier is and where it lives, to find it again if its uid stops resolving."""
+        if self.conn is None:
+            return None
+        row = self.conn.execute("SELECT id, name, type_id FROM dossier_effective WHERE uid = ?", (uid,)).fetchone()
+        if row is None:
+            return None
+        hint: dict[str, Any] = {"name": row[1], "type": row[2]}
+        key = self.conn.execute("SELECT value FROM dossier_field WHERE dossier_id = ? AND field = 'product_key'",
+                                (row[0],)).fetchone()
+        if key is not None:
+            hint["product_key"] = json.loads(key[0])
+        place = self.conn.execute(
+            "SELECT env.name, r.path, f.rel_path, f.hash, f.size FROM entry e"
+            " JOIN ledger l ON l.id = e.ledger_id JOIN environment env ON env.id = l.environment_id"
+            " JOIN entry_file ef ON ef.entry_id = e.id JOIN file f ON f.id = ef.file_id"
+            " JOIN environment_root r ON r.id = f.root_id"
+            " WHERE l.dossier_id = ? ORDER BY e.status = 'retired', ef.role != 'primary', e.id LIMIT 1",
+            (row[0],)).fetchone()
+        if place is not None:
+            hint.update(environment=place[0], path=str(Path(place[1]) / place[2]), size=place[4])
+            if place[3]:
+                hint["hash"] = place[3]
+        return hint
+
+    def candidates(self, hint: dict, exclude: str, limit: int = 5) -> list[dict]:
+        """Live dossiers matching a hint: the same file (hash), product key, or name and type."""
+        if self.conn is None or not hint:
+            return []
+        queries = []
+        if hint.get("hash"):
+            queries.append(("the same file", "SELECT DISTINCT l.dossier_id FROM file f"
+                            " JOIN entry_file ef ON ef.file_id = f.id JOIN entry e ON e.id = ef.entry_id"
+                            " JOIN ledger l ON l.id = e.ledger_id WHERE f.hash = ? AND f.state = 'present'",
+                            (hint["hash"],)))
+        if hint.get("product_key"):
+            queries.append(("the same product key", "SELECT dossier_id FROM dossier_field"
+                            " WHERE field = 'product_key' AND value = ?", (json.dumps(hint["product_key"]),)))
+        if hint.get("name") and hint.get("type"):
+            queries.append(("the same name and type", "SELECT id FROM dossier WHERE name = ? COLLATE NOCASE"
+                            " AND type_id = ?", (hint["name"], hint["type"])))
+        found: dict[str, str] = {}
+        for why, sql, args in queries:
+            for (dossier_id,) in self.conn.execute(sql, args).fetchall():
+                row = self.conn.execute(
+                    "SELECT d.uid FROM dossier d WHERE d.id = ? AND NOT EXISTS"
+                    " (SELECT 1 FROM dossier_alias a WHERE a.alias_uid = d.uid) AND EXISTS"
+                    " (SELECT 1 FROM entry e JOIN ledger l ON l.id = e.ledger_id"
+                    "  WHERE l.dossier_id = d.id AND e.status != 'retired')", (dossier_id,)).fetchone()
+                if row is not None and row[0] != exclude and row[0] not in found:
+                    found[row[0]] = why
+        result = []
+        for uid, why in list(found.items())[:limit]:
+            described = self.describe(uid) or {}
+            result.append({"uid": uid, "why": why,
+                           **{k: described[k] for k in ("name", "type", "environment", "path") if k in described}})
+        return result
+
     def close(self) -> None:
         if self.conn is not None:
             self.conn.close()
+
+
+HINTS_FILE = "dossier-hints.json"
+
+
+def read_hints(home: ProjectHome) -> dict[str, dict]:
+    try:
+        hints = json.loads((home.cache_dir / HINTS_FILE).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return hints if isinstance(hints, dict) else {}
+
+
+def write_hints(home: ProjectHome, hints: dict[str, dict]) -> None:
+    """Keep the hints of the dossiers linked now (``.exchange/`` is never committed)."""
+    home.cache_dir.mkdir(exist_ok=True)
+    path = home.cache_dir / HINTS_FILE
+    temp = path.with_suffix(".tmp")
+    temp.write_text(json.dumps(hints, indent=1, ensure_ascii=False, sort_keys=True), encoding="utf-8")
+    temp.replace(path)
 
 
 class _Validator:
@@ -170,6 +259,8 @@ class _Validator:
         self.dossiers = DossierIndex(db_path)
         self._processes = processes
         self._dossier_warning = False
+        self.report.dossiers_checked = self.dossiers.conn is not None
+        self.old_hints = read_hints(home)
 
     # helpers ----------------------------------------------------------------------------------
 
@@ -500,19 +591,29 @@ class _Validator:
 
     def check_dossier(self, record: Record, uid: str, where: str) -> None:
         state, final = self.dossiers.resolve(uid)
+        hints = self.report.dossier_hints
         if state == "unchecked":
+            if uid in self.old_hints:
+                hints[uid] = self.old_hints[uid]
             if not self._dossier_warning:
                 self._dossier_warning = True
                 self.add("warning", MARKER, f"dossier links are not checked: {self.dossiers.problem}")
-        elif state == "merged":
-            self.add("warning", record.path, f"{where}: dossier {uid} was merged into {final}; link that instead",
-                     record.id, where)
-        elif state in ("missing", "retired"):
-            why = "is not in the library" if state == "missing" else \
-                "has only retired entries in the library (its files are gone or were moved)"
-            self.report.gaps.append(Gap(
-                "dossier", record.id, record.id, where, f"{record.id}'s {where}: dossier {uid} {why}",
-                dossier=uid, dossier_state=state))
+            return
+        if state in ("ok", "merged"):
+            if uid not in hints:
+                hints[uid] = self.dossiers.describe(final) or {}
+            if state == "merged":
+                self.add("warning", record.path, f"{where}: dossier {uid} was merged into {final}; link that instead",
+                         record.id, where)
+            return
+        # Broken: the old hint (or, for a retired dossier, what the library still says) finds candidates.
+        if uid not in hints:
+            hints[uid] = self.old_hints.get(uid) or self.dossiers.describe(uid) or {}
+        why = "is not in the library" if state == "missing" else \
+            "has only retired entries in the library (its files are gone or were moved)"
+        self.report.gaps.append(Gap(
+            "dossier", record.id, record.id, where, f"{record.id}'s {where}: dossier {uid} {why}",
+            dossier=uid, dossier_state=state, candidates=self.dossiers.candidates(hints[uid], uid)))
 
     # claims ----------------------------------------------------------------------------------
 

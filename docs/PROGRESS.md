@@ -111,6 +111,7 @@ answers (see Decisions).
 | #19 | #16-#18 onto `main` | merged |
 | docs | The game data model: identity v2, overview, game data model; the spec's *Projects* brought in line; the phase 7 plan | in review |
 | 7a | Project homes: formats, parser, schemas, validator, `exchange project init/validate/checkpoint/config` | in review |
+| 7b | Gap claims, dossier hints and relink candidates, fast capture, `exchange claims list/ack` | in review (on 7a) |
 | 4d | First process: Daz cross-figure (G9/G2 → G8) | needs the user's answer to open question 1 |
 
 ## Phase 6: Service and Workspace
@@ -324,6 +325,38 @@ The formats are in `docs/PROJECT_HOME.md`.
   the scratch scan of the real Daz library (235,087 dossiers), plus 5 uids that do not exist.
   - The 300 real links resolved and the 5 bad ones became dossier gaps.
   - Validation took 0.14 s.
+
+### 7b: gap claims and fast capture
+
+The formats and rules are in `docs/PROJECT_HOME.md` (*Gap claims*, *Triage*, *Fast capture*).
+
+- **`exchange project validate`** now writes, unless `--check-only`:
+  - the gap claims (`projects/claims.py`, `sync_gap_claims`)
+  - `.exchange/dossier-hints.json`
+- **One claim per piece of work.** The key is the target record and the work: maturing a record, or
+  relinking its dossier.
+  - This refines decision 7, which spoke of one claim per target. A record can need both a relink
+    and more maturity, and they are different jobs.
+- **Exchange's edits to its own claims** go through `frontmatter.set_keys`, which:
+  - rewrites single top-level keys in place
+  - appends notes to the body
+  - refuses the edit if parsing the result shows any other change
+- **Not resolved when unsure:**
+  - a claim whose target or needers have errors
+  - relink claims, when there is no library to check against
+- **Relink candidates** come from the hint, by the same file hash, product key, or name and type,
+  among live dossiers that are not merge aliases.
+- **`exchange capture`** (`projects/capture.py`) and **`exchange claims list` / `ack`**.
+- **Fixed on the way:** `frontmatter.dump` wrote a mapping holding only plain values as one flow
+  line (`{id: NPC_A, maturity: 0}`). It now writes a line per key.
+- **Tests:** `tests/test_gap_claims.py` (11). The suite is at 265.
+- **Against the scratch scan of the real Daz library** (235,087 dossiers, not enriched, so there
+  are no hashes): 20 records linked to uids that do not exist, each with a hint copied from a real
+  product.
+  - All 20 became relink claims, each listing the right product by its product key.
+  - Validation took 3.6 s, about 0.18 s per broken link: finding a product key reads all of
+    `dossier_field`, which has no index on values. That is fine for the odd broken link. If many
+    links break at once, an index there would be the fix (a database change, so not in phase 7).
 
 ## How we work
 

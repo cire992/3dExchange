@@ -6,6 +6,7 @@ the same mapping is an error instead of silently keeping the last value.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -72,11 +73,52 @@ def read(path: Path) -> Document:
     return parse(path.read_text(encoding="utf-8"))
 
 
+def _dump(meta: dict[str, Any]) -> str:
+    # One key at a time: PyYAML writes a mapping of plain values as one flow line ({id: x, …}), but
+    # front matter reads best as a line per key, with small lists and mappings inline.
+    return "".join(yaml.safe_dump({k: v}, sort_keys=False, allow_unicode=True, width=100,
+                                  default_flow_style=None if isinstance(v, (list, dict)) and v else False)
+                   for k, v in meta.items())
+
+
 def dump(meta: dict[str, Any], body: str = "") -> str:
-    """A new file's text. Exchange writes new files only; it never rewrites one a person wrote."""
-    head = yaml.safe_dump(meta, sort_keys=False, allow_unicode=True, default_flow_style=None, width=100)
+    """A new file's text. Exchange writes new files; of files it did not write, it changes nothing."""
     body = body if not body or body.endswith("\n") else body + "\n"
-    return f"---\n{head}---\n{body}"
+    return f"---\n{_dump(meta)}---\n{body}"
+
+
+_TOP_KEY = re.compile(r"^([A-Za-z_][\w-]*)\s*:")
+
+
+def set_keys(text: str, updates: dict[str, Any], *, append: str = "") -> str:
+    """``text`` with the top-level keys in ``updates`` rewritten in place (or added at the end of
+    the front matter) and ``append`` added to the body. Every other line stays as it was. Used only
+    on claims Exchange created; the result is parsed back to make sure nothing else changed."""
+    before = parse(text)
+    newline = "\r\n" if "\r\n" in text else "\n"
+    lines = text.lstrip("﻿").splitlines(keepends=True)
+    end = next(i for i in range(1, len(lines)) if lines[i].rstrip() == "---")
+    head = lines[1:end]
+    for key, value in updates.items():
+        new = [line + newline for line in _dump({key: value}).splitlines()]
+        start = next((i for i, line in enumerate(head) if (m := _TOP_KEY.match(line)) and m.group(1) == key), None)
+        if start is None:
+            head += new
+            continue
+        stop = start + 1
+        while stop < len(head) and (head[stop][:1] in (" ", "\t", "-") or not head[stop].strip()):
+            stop += 1
+        head[start:stop] = new
+    body = "".join(lines[end + 1:])
+    if append:
+        if body and not body.endswith(("\n", "\r\n")):
+            body += newline
+        body += newline.join(append.rstrip("\n").split("\n")) + newline
+    result = "".join([lines[0], *head, lines[end], body])
+    after = parse(result)
+    if after.meta != {**before.meta, **updates}:
+        raise FrontMatterError("rewriting the front matter would change other keys; the file was left alone")
+    return result
 
 
 def _yaml_message(exc: yaml.YAMLError, first_line: int) -> str:

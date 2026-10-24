@@ -168,8 +168,8 @@ signature), `says` (the rule in words) and `expect` (a mapping).
 
 ## Validation
 
-`exchange project validate [--project P] [--db LIBRARY] [--json]` exits with 1 when there are
-errors.
+`exchange project validate [--project P] [--db LIBRARY] [--check-only] [--json]` exits with 1 when
+there are errors. Unless `--check-only`, it then writes the gap claims and the dossier hints.
 
 - **Errors:** the file breaks its format, or a record claims a maturity its fields do not meet.
 - **Warnings:** unknown fields, links that cannot be checked (a signature without a schema, an
@@ -182,7 +182,71 @@ errors.
   - **dossier:** a dossier link whose uid is not in the library, or has only retired entries. Links
     are resolved read-only and follow merges. Checked at every maturity.
 
-Gaps become gap claims (Roadmap phase 7b).
+## Gap claims
+
+Validation turns gaps into claims, one per piece of work:
+
+- **Maturing a record:** "Spec LOT_SaltRowCantina", for every record that links to it. The claim's
+  `gap` says `{work: mature, required: 1}`, plus `missing: true` when the record does not exist yet.
+- **Relinking a record's dossier:** "Relink NPC_DockMaster's dossier". `gap` says
+  `{work: relink, dossiers: [<uid>]}`, and the body lists candidates to relink to.
+
+```markdown
+---
+id: 2026-10-24-spec-lot-salt-row-cantina
+title: Spec LOT_SaltRowCantina
+status: open
+created: '2026-10-24'
+target: LOT_SaltRowCantina
+source: gap
+needed_by: [NPC_DockMaster]
+gap: {work: mature, required: 1}
+triage: new
+---
+LOT_SaltRowCantina is a Sketch. These records need it at Spec or above:
+- NPC_DockMaster (Spec) links to LOT_SaltRowCantina in schedule[0].location, which is a Sketch (0); it needs Spec (1)
+```
+
+Each validation:
+
+- **opens** a claim for new work, with `triage: new`
+- **adds** new needers to the open claim's `needed_by`, with a dated line in the body, and raises
+  `gap.required` when a record needs more
+- **never reopens** work whose claim is `dropped`. If work comes back after its claim was `done`,
+  a new claim opens, linking the old one (`links: [claim:…]`).
+- **moves** an idea, open or claimed gap claim whose gap is gone to `review`, with a dated note. It
+  leaves one alone while one of its records has errors (its links were not checked), and leaves
+  relink claims alone when there is no library to check against.
+
+Exchange edits only the claims it created (`source: gap`). It changes only their `status`,
+`needed_by`, `gap` and `triage` lines and adds notes at the end of the body, then reads the file
+back to make sure nothing else changed. Claims you write are never touched. A lock in
+`.exchange/locks/` keeps two validations from writing at once.
+
+**Dossier hints:** `.exchange/dossier-hints.json` keeps, for every linked dossier, its name, type,
+environment, product key, path and file hash, refreshed whenever the link resolves. When a uid
+stops resolving, its hint finds candidates among the live dossiers, by:
+
+1. a file with the same hash
+2. the same product key (a Daz SKU)
+3. the same name and type
+
+## Triage
+
+`exchange claims list [--status S] [--source S] [--target ID] [--new] [--json]` lists claims;
+`*` marks those waiting in triage (`triage: new`). `exchange claims ack ID…` (or `--all`) sets
+`triage: seen`.
+
+## Fast capture
+
+`exchange capture "<line>" [--on ID] [--goal G1] [--maturity LEVEL]`:
+
+- **A line starting with an editor ID** creates that record: `exchange capture "NPC_DockMaster:
+  gruff harbormaster"` writes `records/NPC_/NPC_DockMaster.md` at Sketch (or `--maturity`), with
+  the rest of the line as its prose. An existing record (in any case) is refused.
+- **Any other line** creates an idea claim, `claims/<date>-<slug>.md`: status idea, source manual,
+  the line as its body. `--on` sets its target and `--goal` its goal. Without `--on` it is
+  allowed, but reported as unfiled.
 
 ## Choosing a project
 
