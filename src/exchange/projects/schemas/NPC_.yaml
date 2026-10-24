@@ -1,0 +1,40 @@
+signature: NPC_
+title: Non-player character
+description: A named character. The record's prose body is the character profile.
+fields:
+  race:
+    type: link
+    to: [RACE]
+    required_at: spec
+  look:
+    type: object
+    required_at: stub
+    description: The Daz dossier the character is built from, and the process that brings it in.
+    fields:
+      dossier: { type: dossier, required_at: sketch }
+      process: { type: process }
+  factions:
+    type: list
+    description: Faction membership (the member-of edge), with a rank or role.
+    of:
+      type: object
+      fields:
+        faction: { type: link, to: [FACT], required_at: sketch }
+        rank: { type: text }
+  kin:
+    type: list
+    description: Kinship edges; a family tree is a Family faction with these.
+    of:
+      type: object
+      fields:
+        npc: { type: link, to: [NPC_], required_at: sketch }
+        relation: { type: enum, values: [parent, child, spouse, sibling], required_at: sketch }
+  schedule:
+    type: list
+    description: Where the character is, hour by hour, and what they do there.
+    of:
+      type: object
+      fields:
+        hours: { type: text, pattern: '^([01][0-9]|2[0-4])-([01][0-9]|2[0-4])$', required_at: sketch }
+        location: { type: link, to: [LOT_, CELL], required_at: sketch }
+        package: { type: link, to: [PACK] }

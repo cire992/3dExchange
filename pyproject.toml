@@ -9,10 +9,12 @@ description = "Manage 3D assets across game, engine and content-library environm
 readme = "README.md"
 requires-python = ">=3.11"
 # Pillow decodes and resizes images (including DDS) for thumbnails; numpy drives the small
-# mesh renderer that previews glTF/OBJ files. Everything else is the standard library.
+# mesh renderer that previews glTF/OBJ files. PyYAML reads project homes' front matter (YAML, as
+# the game data model chose). Everything else is the standard library.
 dependencies = [
     "pillow>=10",
     "numpy>=1.26",
+    "pyyaml>=6",
 ]
 
 [project.optional-dependencies]
@@ -33,6 +35,7 @@ where = ["src"]
 [tool.setuptools.package-data]
 "exchange.db" = ["migrations/*.sql"]
 "exchange.definitions" = ["builtin/environments/*.toml", "builtin/dossier_types/*.toml", "builtin/lexicons/*.toml"]
+"exchange.projects" = ["schemas/*.yaml"]
 "exchange.processes" = ["builtin/*/process.toml", "builtin/*/operations/*.py", "builtin/*/scripts/*", "builtin/*/templates/*", "builtin/*/presets/*"]
 
 [tool.pytest.ini_options]

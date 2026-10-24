@@ -1,0 +1,9 @@
+signature: RACE
+title: Race
+description: Humanoid races, droids, creatures and audio-only characters.
+fields:
+  kind:
+    type: enum
+    values: [humanoid, droid, creature, audio_only]
+    required_at: spec
+  playable: { type: bool }
