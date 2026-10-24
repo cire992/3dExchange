@@ -1,18 +1,18 @@
 """Presets and last-used options for requisitions.
 
-A **preset** holds options for every pipeline a plan uses, so "G9 Male → Skyrim (HIMBO)" sets up
+A **preset** holds options for every process a plan uses, so "G9 Male → Skyrim (HIMBO)" sets up
 a whole product's plan in one go, and can be applied to many assets at once (batch). Presets are
 files, so they can be shared and shipped:
 
 * the user's, in ``<data>/presets/<name>.json``
-* a pipeline package's, in its ``presets/*.json``
+* a process package's, in its ``presets/*.json``
 
 ::
 
     {"name": "Small JPEG textures", "description": "...", "environment": "loose_files",
      "options": {"convert_mesh": {"format": "glb"}, "stamp_images": {"size": 256}}}
 
-**Last-used options** are remembered per pipeline (``<data>/last_options.json``) whenever a
+**Last-used options** are remembered per process (``<data>/last_options.json``) whenever a
 requisition is queued from the window, and pre-fill the next plan when no preset is chosen.
 """
 
@@ -26,7 +26,7 @@ from typing import Any
 
 from exchange.errors import ExchangeError
 from exchange.paths import data_dir
-from exchange.pipelines.registry import Registry
+from exchange.processes.registry import Registry
 
 
 class PresetError(ExchangeError):
@@ -36,16 +36,16 @@ class PresetError(ExchangeError):
 @dataclass
 class Preset:
     name: str
-    options: dict[str, dict[str, Any]]  # pipeline id -> option values
+    options: dict[str, dict[str, Any]]  # process id -> option values
     description: str = ""
     environment: str | None = None  # target environment type it was made for, if any
     source: str = ""  # the file
-    shipped: bool = False  # from a pipeline package (read-only)
-    pipelines: list[str] = field(default_factory=list)
+    shipped: bool = False  # from a process package (read-only)
+    processes: list[str] = field(default_factory=list)
 
     def params(self) -> dict[str, Any]:
-        """As plan_requisition's ``params``: ``{"pipeline.option": value}``."""
-        return {f"{pipeline}.{key}": value for pipeline, values in self.options.items() for key, value in values.items()}
+        """As plan_requisition's ``params``: ``{"process.option": value}``."""
+        return {f"{process}.{key}": value for process, values in self.options.items() for key, value in values.items()}
 
 
 def presets_dir() -> Path:
@@ -67,7 +67,7 @@ def _read(path: Path, shipped: bool) -> Preset | None:
 
 
 def load_presets(registry: Registry | None = None) -> dict[str, Preset]:
-    """Every preset by name: those shipped in pipeline packages, then the user's (which win)."""
+    """Every preset by name: those shipped in process packages, then the user's (which win)."""
     found: dict[str, Preset] = {}
     for package in (registry.packages.values() if registry else []):
         for path in sorted((package.path / "presets").glob("*.json")) if (package.path / "presets").is_dir() else []:
@@ -100,7 +100,7 @@ def delete_preset(name: str, registry: Registry | None = None) -> None:
     if preset is None:
         raise PresetError(f"no preset {name!r}")
     if preset.shipped:
-        raise PresetError(f"{name!r} ships with a pipeline package; it cannot be deleted")
+        raise PresetError(f"{name!r} ships with a process package; it cannot be deleted")
     Path(preset.source).unlink()
 
 
@@ -116,14 +116,14 @@ def last_used() -> dict[str, dict[str, Any]]:
 
 
 def remember(options: dict[str, dict[str, Any]]) -> None:
-    """Remember these options as each pipeline's last used."""
+    """Remember these options as each process's last used."""
     known = last_used()
     known.update({k: v for k, v in options.items() if v})
     _last_file().parent.mkdir(parents=True, exist_ok=True)
     _last_file().write_text(json.dumps(known, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
-def last_used_params(pipelines: list[str]) -> dict[str, Any]:
-    """The remembered options of some pipelines, as plan_requisition's ``params``."""
+def last_used_params(processes: list[str]) -> dict[str, Any]:
+    """The remembered options of some processes, as plan_requisition's ``params``."""
     known = last_used()
-    return {f"{p}.{k}": v for p in pipelines for k, v in known.get(p, {}).items()}
+    return {f"{p}.{k}": v for p in processes for k, v in known.get(p, {}).items()}

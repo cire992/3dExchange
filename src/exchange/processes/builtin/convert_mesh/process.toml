@@ -2,7 +2,7 @@
 # Reads FBX, OBJ, glTF/GLB, DAE, STL and PLY; writes GLB, glTF, FBX or OBJ (textures included
 # or copied beside it).
 
-[pipeline]
+[process]
 id = "convert_mesh"
 name = "Convert mesh (Blender)"
 version = "1.0.0"

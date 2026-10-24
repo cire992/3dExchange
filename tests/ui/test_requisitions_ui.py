@@ -1,19 +1,19 @@
 """Requisitions in the window (Roadmap phase 4c): the Requisition to… dialog, presets and last-used
-options, the queue view (with a real background run) and Settings › Pipelines and Endpoints."""
+options, the queue view (with a real background run) and Settings › Processes and Endpoints."""
 
 from pathlib import Path
 
 import pytest
 from PySide6.QtCore import Qt
 
-from exchange.pipelines.registry import install, tool_paths, trust
+from exchange.processes.registry import install, tool_paths, trust
 from exchange.requisitions.presets import last_used, load_presets
 from exchange_ui import main_window
 
 from test_editing import action
 from test_ui import select_brick
 
-FIXTURES = Path(__file__).parent.parent / "fixtures" / "pipelines"
+FIXTURES = Path(__file__).parent.parent / "fixtures" / "processes"
 
 
 @pytest.fixture
@@ -44,7 +44,7 @@ def test_dialog_plans_options_presets_and_queues(win, monkeypatch, qtbot):
     assert set(k for p, k in dialog.editors if p == "stamp_images") == {"size", "review", "note"}
     assert "Exchange Conversions" in dialog.endpoint_label.text()
 
-    # Options flow into the plan; a preset remembers them for every pipeline.
+    # Options flow into the plan; a preset remembers them for every process.
     dialog.set_option("stamp_images", "size", 7)
     dialog.set_option("stamp_images", "note", "from a preset")
     assert dialog.plans[0].items[0].params["stamp_images"]["size"] == 7
@@ -90,9 +90,9 @@ def test_batch_and_the_inspector_button(win, qtbot):
 def test_context_menu_and_queue_view(win, qtbot, monkeypatch):
     index = select_brick(win, "Barrel01")
     assert action(win.build_context_menu(index), "Requisition to…").isEnabled()
-    plan = win.service.plan(uid_of(win, "Barrel01"), env_id(win, "loose_files"), pipelines=["copy_entry"])
+    plan = win.service.plan(uid_of(win, "Barrel01"), env_id(win, "loose_files"), processes=["copy_entry"])
     [first] = win.service.queue([plan])
-    plan = win.service.plan(uid_of(win, "Barrel01"), env_id(win, "loose_files"), pipelines=["stamp_images"],
+    plan = win.service.plan(uid_of(win, "Barrel01"), env_id(win, "loose_files"), processes=["stamp_images"],
                             params={"review": True})
     [second] = win.service.queue([plan])
     win.tree.setCurrentIndex(win._find_sidebar(("queue", "Requisitions")))
@@ -129,10 +129,10 @@ def test_context_menu_and_queue_view(win, qtbot, monkeypatch):
     assert next(r for r in win.service.requisitions() if r["id"] == first)["state"] == "removed"
 
 
-def test_settings_pipelines_and_endpoints(window, monkeypatch, qtbot, tmp_path):
+def test_settings_processes_and_endpoints(window, monkeypatch, qtbot, tmp_path):
     dialog = window.open_settings()
     qtbot.addWidget(dialog)
-    page = dialog.pipelines
+    page = dialog.processes
     monkeypatch.setattr(window, "ask_folder", lambda *a: str(FIXTURES / "bridge_demo"))
     page._install()
     assert page.current_id() == "bridge_demo" and "not trusted" in page.list.currentItem().text()

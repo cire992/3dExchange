@@ -1,4 +1,4 @@
-"""Requisitions v1 (Roadmap phase 4a): pipeline packages, planning, the queue, writing output,
+"""Requisitions v1 (Roadmap phase 4a): process packages, planning, the queue, writing output,
 sidecars, staleness, removal and the command line."""
 
 import json
@@ -14,9 +14,9 @@ from exchange.curation import Curator
 from exchange.db import repository as repo
 from exchange.errors import DefinitionError
 from exchange.locks import Lock, LockBusy
-from exchange.pipelines.manifest import parse_manifest
-from exchange.pipelines.registry import (
-    PipelineError,
+from exchange.processes.manifest import parse_manifest
+from exchange.processes.registry import (
+    ProcessError,
     check_prerequisites,
     install,
     load_registry,
@@ -28,15 +28,15 @@ from exchange.pipelines.registry import (
 from exchange.requisitions import lifecycle
 from exchange.requisitions.plan import plan_requisition, queue_plan, routes
 from exchange.requisitions.runner import run_queue
-from exchange.requisitions.runner import test_pipeline as harness
+from exchange.requisitions.runner import test_process as harness
 
-STAMP = Path(__file__).parent / "fixtures" / "pipelines" / "stamp_images"
+STAMP = Path(__file__).parent / "fixtures" / "processes" / "stamp_images"
 
 
 @pytest.fixture
 def setup(scan, tmp_path, library, definitions, db_path):
     """A loose-files library whose Barrel01 mesh has a (real) texture linked onto it, and the
-    test pipeline installed and trusted."""
+    test process installed and trusted."""
     folder = copy_fixture("loose_files", tmp_path / "scan" / "Loose")
     write(folder / "Downloads" / "barrel" / "Barrel01_N.png", png_bytes((64, 32)))
     scan(folder)
@@ -50,7 +50,7 @@ def setup(scan, tmp_path, library, definitions, db_path):
 
 
 def plan(s, **kwargs):
-    kwargs.setdefault("pipelines", ["stamp_images"])
+    kwargs.setdefault("processes", ["stamp_images"])
     return plan_requisition(s["conn"], s["definitions"], s["registry"], s["barrel"], s["env"], **kwargs)
 
 
@@ -67,7 +67,7 @@ def entries_of(conn, uid):
 
 
 def test_manifests_are_strict():
-    base = {"pipeline": {"id": "x", "name": "X", "version": "1", "format_version": 1},
+    base = {"process": {"id": "x", "name": "X", "version": "1", "format_version": 1},
             "output": {"environment": "same"}, "step": [{"id": "a", "operation": "core.copy"}]}
     assert parse_manifest(base, "x").steps[0].inputs == ("source",)
     for broken, message in (
@@ -88,7 +88,7 @@ def test_packages_trust_and_prerequisites(tmp_path):
     registry = load_registry()
     untrusted = registry.get("stamp_images")
     assert not untrusted.trusted and not ready(untrusted)
-    with pytest.raises(PipelineError, match="not trusted"):
+    with pytest.raises(ProcessError, match="not trusted"):
         untrusted.operations()  # its code is never imported before it is trusted
     trust(untrusted)
     assert ready(load_registry().get("stamp_images"))
@@ -99,9 +99,9 @@ def test_packages_trust_and_prerequisites(tmp_path):
     # A tool prerequisite is red until the tool is found.
     copy = tmp_path / "needs_tool"
     shutil.copytree(STAMP, copy)
-    manifest = (copy / "pipeline.toml").read_text(encoding="utf-8").replace('id = "stamp_images"', 'id = "needs_tool"')
+    manifest = (copy / "process.toml").read_text(encoding="utf-8").replace('id = "stamp_images"', 'id = "needs_tool"')
     manifest += '\n[[prerequisite]]\nid = "fake"\nkind = "tool"\ntool = "faketool"\nhint = "install it"\n'
-    (copy / "pipeline.toml").write_text(manifest, encoding="utf-8")
+    (copy / "process.toml").write_text(manifest, encoding="utf-8")
     trust(install(copy))
     needy = load_registry().get("needs_tool")
     [status] = check_prerequisites(needy)
@@ -114,8 +114,8 @@ def test_packages_trust_and_prerequisites(tmp_path):
 def test_chain_types_are_checked(tmp_path):
     copy = tmp_path / "bad"
     shutil.copytree(STAMP, copy)
-    text = (copy / "pipeline.toml").read_text(encoding="utf-8").replace('id = "stamp_images"', 'id = "bad"')
-    (copy / "pipeline.toml").write_text(text.replace('operation = "stamp.mark"', 'operation = "stamp.nothing"'),
+    text = (copy / "process.toml").read_text(encoding="utf-8").replace('id = "stamp_images"', 'id = "bad"')
+    (copy / "process.toml").write_text(text.replace('operation = "stamp.mark"', 'operation = "stamp.nothing"'),
                                         encoding="utf-8")
     trust(install(copy))
     assert any("no operation 'stamp.nothing'" in p for p in validate(load_registry().get("bad")))
@@ -224,7 +224,7 @@ def test_stale_and_rebuild(setup, scan):
 
 def test_copy_route_and_failures(setup):
     s, conn = setup, setup["conn"]
-    p = plan_requisition(conn, s["definitions"], s["registry"], s["barrel"], s["env"], pipelines=["copy_entry"])
+    p = plan_requisition(conn, s["definitions"], s["registry"], s["barrel"], s["env"], processes=["copy_entry"])
     req_id = queue_plan(conn, p, s["registry"])
     run(s)
     assert lifecycle.detail(conn, req_id)["state"] == "fulfilled"
@@ -264,18 +264,18 @@ def test_lost_library_is_rebuilt_from_sidecars(setup, scan, tmp_path, definition
 
 def test_presets_and_lenient_defaults(setup, capsys):
     s = setup
-    # A preset or last-used value the pipeline no longer takes is dropped, not an error.
+    # A preset or last-used value the process no longer takes is dropped, not an error.
     p = plan(s, defaults={"stamp_images.size": "big", "stamp_images.gone": 1, "stamp_images.note": "kept"},
              params={"stamp_images.review": True})
     assert p.items[0].include and p.items[0].params["stamp_images"] == {"size": 16, "review": True, "note": "kept"}
 
     db = str(s["db"])
-    assert main(["requisition", "plan", s["barrel"][:10], "--env", str(s["env"]), "--pipeline", "stamp_images",
+    assert main(["requisition", "plan", s["barrel"][:10], "--env", str(s["env"]), "--process", "stamp_images",
                  "--param", "size=5", "--save-preset", "Five", "--db", db]) == 0
     capsys.readouterr()
     assert main(["presets", "list", "--db", db]) == 0
     assert "Five  (stamp_images)" in capsys.readouterr().out
-    assert main(["requisition", "plan", s["barrel"][:10], "--env", str(s["env"]), "--pipeline", "stamp_images",
+    assert main(["requisition", "plan", s["barrel"][:10], "--env", str(s["env"]), "--process", "stamp_images",
                  "--preset", "Five", "--param", "note=hi", "--db", db, "--json"]) == 0
     item = json.loads(capsys.readouterr().out)["items"][0]
     assert item["params"]["stamp_images"] == {"size": 5, "review": False, "note": "hi"}
@@ -286,9 +286,9 @@ def test_presets_and_lenient_defaults(setup, capsys):
 def test_cli(setup, capsys):
     s = setup
     db = str(s["db"])
-    assert main(["pipelines", "list", "--db", db]) == 0
+    assert main(["processes", "list", "--db", db]) == 0
     assert "stamp_images" in capsys.readouterr().out
-    assert main(["requisition", "plan", s["barrel"][:10], "--env", str(s["env"]), "--pipeline", "stamp_images",
+    assert main(["requisition", "plan", s["barrel"][:10], "--env", str(s["env"]), "--process", "stamp_images",
                  "--param", "size=8", "--queue", "--db", db]) == 0
     out = capsys.readouterr().out
     assert "[x] Barrel01" in out and "Queued as requisition" in out
@@ -296,5 +296,5 @@ def test_cli(setup, capsys):
     assert json.loads(capsys.readouterr().out)["ran"][0]["state"] == "fulfilled"
     assert main(["requisition", "list", "--db", db]) == 0
     assert "fulfilled" in capsys.readouterr().out
-    assert main(["requisition", "plan", s["barrel"][:10], "--env", str(s["env"]), "--pipeline", "nope", "--db", db]) == 0
+    assert main(["requisition", "plan", s["barrel"][:10], "--env", str(s["env"]), "--process", "nope", "--db", db]) == 0
     assert "does not take it there" in capsys.readouterr().out

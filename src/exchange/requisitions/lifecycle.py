@@ -4,8 +4,8 @@
   about files already at the endpoint); failed items are retried too.
 * **Remove** its output: every file it wrote goes to the recycle folder, files it overwrote
   come back, and the endpoint is rescanned so its entries retire.
-* **Stale:** a fulfilled requisition whose source files or pipeline versions changed since.
-  Its entries are marked stale; **rebuild** queues it again with the current pipelines,
+* **Stale:** a fulfilled requisition whose source files or process versions changed since.
+  Its entries are marked stale; **rebuild** queues it again with the current processes,
   overwriting its earlier output (kept in the recycle folder).
 """
 
@@ -19,7 +19,7 @@ from pathlib import Path
 from exchange.db import repository as repo
 from exchange.definitions.schema import DefinitionSet
 from exchange.errors import ExchangeError
-from exchange.pipelines.registry import Registry
+from exchange.processes.registry import Registry
 from exchange.requisitions.runner import _load_state, _save_state, _state_file, recycle, source_fingerprint
 
 STATES = ("queued", "held", "running", "needs_attention", "fulfilled", "partially_fulfilled", "failed",
@@ -59,7 +59,7 @@ def detail(conn: sqlite3.Connection, ref: int | str) -> dict:
     for i in conn.execute("SELECT * FROM requisition_item WHERE requisition_id = ? ORDER BY id", (req["id"],)):
         name = conn.execute("SELECT name FROM dossier_effective WHERE uid = ?", (i["dossier_uid"],)).fetchone()
         items.append({**dict(i), "name": name[0] if name else i["dossier_uid"],
-                      "pipelines": json.loads(i["pipelines"]), "params": json.loads(i["params"]),
+                      "processes": json.loads(i["processes"]), "params": json.loads(i["params"]),
                       "outputs": json.loads(i["outputs"] or "[]")})
     writes = [dict(w) for w in conn.execute("SELECT * FROM requisition_write WHERE requisition_id = ? ORDER BY id",
                                             (req["id"],))]
@@ -141,19 +141,19 @@ def remove(conn: sqlite3.Connection, db_path: Path, definitions: DefinitionSet, 
 
 
 def check_stale(conn: sqlite3.Connection, registry: Registry) -> list[tuple[int, str]]:
-    """Mark fulfilled requisitions whose sources or pipelines changed since as stale (and their
+    """Mark fulfilled requisitions whose sources or processes changed since as stale (and their
     entries). Returns (requisition id, why) for each newly stale one."""
     found = []
     for req in conn.execute("SELECT * FROM requisition WHERE state IN ('fulfilled', 'partially_fulfilled')").fetchall():
         why = None
         for item in conn.execute("SELECT * FROM requisition_item WHERE requisition_id = ? AND state = 'done'",
                                  (req["id"],)):
-            for p in json.loads(item["pipelines"]):
+            for p in json.loads(item["processes"]):
                 package = registry.packages.get(p["id"])
                 if package is None:
-                    why = f"pipeline {p['id']} is no longer installed"
+                    why = f"process {p['id']} is no longer installed"
                 elif package.manifest.version != p["version"]:
-                    why = f"pipeline {p['id']} is now {package.manifest.version} (was {p['version']})"
+                    why = f"process {p['id']} is now {package.manifest.version} (was {p['version']})"
             if why is None and source_fingerprint(conn, item["source_entry_id"]) != item["source_fingerprint"]:
                 name = conn.execute("SELECT name FROM dossier_effective WHERE uid = ?", (item["dossier_uid"],)).fetchone()
                 why = f"the source of {name[0] if name else item['dossier_uid']} changed"
@@ -169,7 +169,7 @@ def check_stale(conn: sqlite3.Connection, registry: Registry) -> list[tuple[int,
 
 
 def rebuild(conn: sqlite3.Connection, registry: Registry, ref: int | str) -> int:
-    """Queue a stale (or any fulfilled) requisition again with the current pipelines, overwriting
+    """Queue a stale (or any fulfilled) requisition again with the current processes, overwriting
     its earlier output. Returns the new requisition's id."""
     req = get(conn, ref)
     if req["state"] not in ("stale", "fulfilled", "partially_fulfilled"):
@@ -182,11 +182,11 @@ def rebuild(conn: sqlite3.Connection, registry: Registry, ref: int | str) -> int
             (repo.new_uid(), req["name"], position, req["environment_id"], req["endpoint"], req["id"], repo.now()))
         new_id = cur.lastrowid
         for item in conn.execute("SELECT * FROM requisition_item WHERE requisition_id = ?", (req["id"],)).fetchall():
-            pipelines = [{"id": p["id"], "version": registry.get(p["id"]).manifest.version}
-                         for p in json.loads(item["pipelines"])]
-            conn.execute("INSERT INTO requisition_item (requisition_id, dossier_uid, source_entry_id, pipelines, params,"
+            processes = [{"id": p["id"], "version": registry.get(p["id"]).manifest.version}
+                         for p in json.loads(item["processes"])]
+            conn.execute("INSERT INTO requisition_item (requisition_id, dossier_uid, source_entry_id, processes, params,"
                          " include, state) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                         (new_id, item["dossier_uid"], item["source_entry_id"], json.dumps(pipelines), item["params"],
+                         (new_id, item["dossier_uid"], item["source_entry_id"], json.dumps(processes), item["params"],
                           item["include"], "queued" if item["include"] else "skipped"))
         # The old sidecar goes (so the files are read as the new requisition's); its files stay
         # until the new run overwrites them, which keeps the previous versions in the recycle folder.

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from exchange.pipelines.operations import operation
+from exchange.processes.operations import operation
 
 SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "make.py"
 

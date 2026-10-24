@@ -1,14 +1,14 @@
-"""Planning a requisition: which pipelines can turn a dossier into something for an environment,
+"""Planning a requisition: which processes can turn a dossier into something for an environment,
 from which of its entries, and the plan of a whole product.
 
-* A pipeline **matches** a dossier when the dossier's type is (a subtype of) one of its input
+* A process **matches** a dossier when the dossier's type is (a subtype of) one of its input
   types, it has all the input tags, and the source entry's environment is one it takes. Only
-  **ready** pipelines are offered: trusted, a valid chain, every prerequisite green.
+  **ready** processes are offered: trusted, a valid chain, every prerequisite green.
 * **Routes:** if the target environment already holds the asset, it can be *copied* from that
-  entry (the ``copy_entry`` pipeline) instead of *converted* from another one.
-* **Chains:** with no direct pipeline, pipelines are chained (up to three) when one's output
+  entry (the ``copy_entry`` process) instead of *converted* from another one.
+* **Chains:** with no direct process, processes are chained (up to three) when one's output
   (dossier type, environment) is the next one's input, e.g. G2 → G8 → Skyrim.
-* A **product** plans each of its children; children with no pipeline are listed, unchecked.
+* A **product** plans each of its children; children with no process are listed, unchecked.
 """
 
 from __future__ import annotations
@@ -21,11 +21,11 @@ from typing import Any
 from exchange.db import repository as repo
 from exchange.definitions.schema import DefinitionSet
 from exchange.errors import ExchangeError
-from exchange.pipelines.registry import PipelinePackage, Registry, ready, tool_paths
+from exchange.processes.registry import ProcessPackage, Registry, ready, tool_paths
 from exchange.requisitions.endpoints import Endpoint, default_endpoint
 
 MAX_CHAIN = 3
-COPY_PIPELINE = "copy_entry"
+COPY_PROCESS = "copy_entry"
 
 
 class PlanError(ExchangeError):
@@ -40,8 +40,8 @@ class PlanItem:
     source_entry_id: int | None
     source: str  # where the source entry is, in words
     route: str  # convert | copy | none
-    pipelines: list[str]  # the chain, in order
-    params: dict[str, dict[str, Any]] = field(default_factory=dict)  # pipeline id -> values
+    processes: list[str]  # the chain, in order
+    params: dict[str, dict[str, Any]] = field(default_factory=dict)  # process id -> values
     include: bool = True
     problems: list[str] = field(default_factory=list)
 
@@ -65,7 +65,7 @@ def _entries(conn: sqlite3.Connection, uid: str) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-def matches(package: PipelinePackage, definitions: DefinitionSet, type_id: str, tags: set[str],
+def matches(package: ProcessPackage, definitions: DefinitionSet, type_id: str, tags: set[str],
             source_env_type: str, target_env_type: str | None, *, check_tags: bool = True) -> bool:
     m = package.manifest
     if m.input_types and not any(type_id in definitions.dossier_types and definitions.is_a(type_id, t)
@@ -82,8 +82,8 @@ def matches(package: PipelinePackage, definitions: DefinitionSet, type_id: str, 
 def find_chains(registry: Registry, definitions: DefinitionSet, type_id: str, tags: set[str],
                 source_env_type: str, target_env_type: str, tools: dict[str, str] | None = None,
                 ) -> list[list[str]]:
-    """Ready pipeline chains from (type, environment) to the target environment, shortest first."""
-    usable = [p for p in registry.packages.values() if p.id != COPY_PIPELINE and ready(p, tools)]
+    """Ready process chains from (type, environment) to the target environment, shortest first."""
+    usable = [p for p in registry.packages.values() if p.id != COPY_PROCESS and ready(p, tools)]
     found: list[list[str]] = []
     frontier: list[tuple[list[str], str, str]] = [([], type_id, source_env_type)]
     for depth in range(MAX_CHAIN):
@@ -109,7 +109,7 @@ def find_chains(registry: Registry, definitions: DefinitionSet, type_id: str, ta
 
 def routes(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Registry, uid: str,
            environment_id: int, tools: dict[str, str] | None = None) -> list[dict]:
-    """The ways to get a dossier into an environment: [{route, pipelines, source_entry_id, source}]."""
+    """The ways to get a dossier into an environment: [{route, processes, source_entry_id, source}]."""
     dossier = conn.execute("SELECT * FROM dossier_effective WHERE uid = ?", (uid,)).fetchone()
     if dossier is None:
         raise PlanError(f"no dossier {uid}")
@@ -122,28 +122,28 @@ def routes(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Regis
     for entry in _entries(conn, uid):
         label = f"{entry['env_name']} · {entry['container'] or '(root)'} ({entry['status']})"
         if entry["environment_id"] == environment_id:
-            copy = registry.packages.get(COPY_PIPELINE)
+            copy = registry.packages.get(COPY_PROCESS)
             if copy is not None and ready(copy, tools):
-                out.append({"route": "copy", "pipelines": [COPY_PIPELINE], "source_entry_id": entry["id"],
+                out.append({"route": "copy", "processes": [COPY_PROCESS], "source_entry_id": entry["id"],
                             "source": label})
         for chain in find_chains(registry, definitions, dossier["type_id"], tags, entry["env_type"],
                                  target["type_id"], tools):
-            out.append({"route": "convert", "pipelines": chain, "source_entry_id": entry["id"], "source": label})
+            out.append({"route": "convert", "processes": chain, "source_entry_id": entry["id"], "source": label})
     return out
 
 
 def plan_requisition(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Registry, uid: str,
-                     environment_id: int, *, pipelines: list[str] | None = None, source_entry_id: int | None = None,
+                     environment_id: int, *, processes: list[str] | None = None, source_entry_id: int | None = None,
                      params: dict[str, Any] | None = None, defaults: dict[str, Any] | None = None,
                      endpoint_folder: str | None = None,
                      on_collision: str = "ask", name: str | None = None,
                      tools: dict[str, str] | None = None) -> Plan:
     """Plan getting a dossier (or a whole product) into an environment.
 
-    ``pipelines`` picks a chain (otherwise the first route found, preferring conversion from the
-    origin); ``params`` sets options, as ``{"size": 512}`` (any pipeline with that option) or
+    ``processes`` picks a chain (otherwise the first route found, preferring conversion from the
+    origin); ``params`` sets options, as ``{"size": 512}`` (any process with that option) or
     ``{"convert_mesh.format": "obj"}``. ``defaults`` (a preset, last-used options) are the same
-    shape but lenient: options a pipeline does not have, or values it would reject, are dropped.
+    shape but lenient: options a process does not have, or values it would reject, are dropped.
     """
     dossier = conn.execute("SELECT * FROM dossier_effective WHERE uid = ?", (uid,)).fetchone()
     if dossier is None:
@@ -158,20 +158,20 @@ def plan_requisition(conn: sqlite3.Connection, definitions: DefinitionSet, regis
     subjects = [uid] + [c[0] for c in children]
     items = []
     for subject in subjects:
-        item = _plan_item(conn, definitions, registry, subject, environment_id, pipelines,
+        item = _plan_item(conn, definitions, registry, subject, environment_id, processes,
                           source_entry_id if subject == uid else None, params or {}, tools, defaults or {})
         if subject == uid and children and item.route == "none":
-            continue  # a product with no pipeline of its own: its children carry the plan
+            continue  # a product with no process of its own: its children carry the plan
         items.append(item)
     plan = Plan(name, environment_id, endpoint, items, on_collision)
     if not any(i.include for i in items):
-        plan.warnings.append("nothing here can be requisitioned to this environment with the pipelines that are ready")
+        plan.warnings.append("nothing here can be requisitioned to this environment with the processes that are ready")
     _warnings(conn, plan, subjects)
     return plan
 
 
-def _options(manifest, pipeline_id: str, given: dict[str, Any]) -> dict[str, Any]:
-    own = {k.split(".", 1)[1]: v for k, v in given.items() if k.startswith(f"{pipeline_id}.")}
+def _options(manifest, process_id: str, given: dict[str, Any]) -> dict[str, Any]:
+    own = {k.split(".", 1)[1]: v for k, v in given.items() if k.startswith(f"{process_id}.")}
     shared = {k: v for k, v in given.items() if "." not in k and manifest.parameter(k) is not None}
     return {**shared, **own}
 
@@ -196,23 +196,23 @@ def _plan_item(conn, definitions, registry, uid, environment_id, wanted, source_
     if source_entry_id is not None:
         options = [o for o in options if o["source_entry_id"] == source_entry_id]
     if wanted:
-        options = [o for o in options if o["pipelines"] == list(wanted)]
+        options = [o for o in options if o["processes"] == list(wanted)]
     options.sort(key=lambda o: o["route"] != "convert")  # convert from the source unless asked to copy
     if not options:
-        why = "no ready pipeline takes it there" if not wanted else f"{' → '.join(wanted)} does not take it there"
+        why = "no ready process takes it there" if not wanted else f"{' → '.join(wanted)} does not take it there"
         return PlanItem(uid, d["name"], d["type_id"], None, "", "none", [], include=False, problems=[why])
     chosen = options[0]
     values: dict[str, dict[str, Any]] = {}
     problems = []
-    for pipeline_id in chosen["pipelines"]:
-        manifest = registry.get(pipeline_id).manifest
-        soft = _lenient(manifest, _options(manifest, pipeline_id, defaults or {}))
+    for process_id in chosen["processes"]:
+        manifest = registry.get(process_id).manifest
+        soft = _lenient(manifest, _options(manifest, process_id, defaults or {}))
         try:
-            values[pipeline_id] = manifest.resolve({**soft, **_options(manifest, pipeline_id, params)})
+            values[process_id] = manifest.resolve({**soft, **_options(manifest, process_id, params)})
         except ValueError as exc:
             problems.append(str(exc))
     return PlanItem(uid, d["name"], d["type_id"], chosen["source_entry_id"], chosen["source"], chosen["route"],
-                    chosen["pipelines"], values, include=not problems, problems=problems)
+                    chosen["processes"], values, include=not problems, problems=problems)
 
 
 def _warnings(conn: sqlite3.Connection, plan: Plan, uids: list[str]) -> None:
@@ -241,9 +241,9 @@ def queue_plan(conn: sqlite3.Connection, plan: Plan, registry: Registry) -> int:
              repo.now()))
         requisition_id = cur.lastrowid
         conn.executemany(
-            "INSERT INTO requisition_item (requisition_id, dossier_uid, source_entry_id, pipelines, params, include, state)"
+            "INSERT INTO requisition_item (requisition_id, dossier_uid, source_entry_id, processes, params, include, state)"
             " VALUES (?, ?, ?, ?, ?, ?, ?)",
             [(requisition_id, i.dossier_uid, i.source_entry_id,
-              json.dumps([{"id": p, "version": registry.get(p).manifest.version} for p in i.pipelines]),
+              json.dumps([{"id": p, "version": registry.get(p).manifest.version} for p in i.processes]),
               json.dumps(i.params), int(i.include), "queued" if i.include else "skipped") for i in plan.items])
     return requisition_id

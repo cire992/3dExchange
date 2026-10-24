@@ -2,7 +2,7 @@
 # the Exchange Conversions content directory): the "copy from an existing entry" route. The
 # files keep their layout inside the container, so a Daz product stays a valid content layout.
 
-[pipeline]
+[process]
 id = "copy_entry"
 name = "Copy to another container"
 version = "1.0.0"

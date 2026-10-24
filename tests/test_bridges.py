@@ -14,14 +14,14 @@ import pytest
 from builders import copy_fixture, glb_bytes, write
 from exchange.bridges import BridgeError, make_bridge
 from exchange.locks import Lock
-from exchange.pipelines.registry import install, load_registry, resolve_tool, set_tool, trust, validate
+from exchange.processes.registry import install, load_registry, resolve_tool, set_tool, trust, validate
 from exchange.requisitions import lifecycle
 from exchange.requisitions.plan import plan_requisition, queue_plan
 from exchange.requisitions.runner import run_queue
 
 HERE = Path(__file__).parent
 FAKES = HERE / "fixtures" / "fake_apps"
-DEMO = HERE / "fixtures" / "pipelines" / "bridge_demo"
+DEMO = HERE / "fixtures" / "processes" / "bridge_demo"
 
 
 def fake_app(tmp_path: Path, name: str) -> Path:
@@ -142,8 +142,8 @@ def test_tools_resolve_newest_and_apps_must_be_declared(tmp_path):
         write(tmp_path / "Apps" / version / "tool.exe", b"MZ")
     copy = tmp_path / "pkg"
     shutil.copytree(DEMO, copy)
-    text = (copy / "pipeline.toml").read_text(encoding="utf-8")
-    (copy / "pipeline.toml").write_text(text.replace('tool = "blender"', f'tool = "blender"\npaths = ["{(tmp_path / "Apps").as_posix()}/Tool */tool.exe"]'),
+    text = (copy / "process.toml").read_text(encoding="utf-8")
+    (copy / "process.toml").write_text(text.replace('tool = "blender"', f'tool = "blender"\npaths = ["{(tmp_path / "Apps").as_posix()}/Tool */tool.exe"]'),
                                         encoding="utf-8")
     trust(install(copy))
     package = load_registry().get("bridge_demo")
@@ -151,7 +151,7 @@ def test_tools_resolve_newest_and_apps_must_be_declared(tmp_path):
     set_tool("blender", str(tmp_path / "Apps" / "Tool 1.2" / "tool.exe"))
     assert Path(resolve_tool(package, "blender")).parent.name == "Tool 1.2"  # the user's choice wins
 
-    (copy / "pipeline.toml").write_text(text.split("[[prerequisite]]")[0] + "[[step]]" + text.split("[[step]]")[1],
+    (copy / "process.toml").write_text(text.split("[[prerequisite]]")[0] + "[[step]]" + text.split("[[step]]")[1],
                                         encoding="utf-8")
     trust(install(copy))
     assert any("declare it as a [[prerequisite]]" in p for p in validate(load_registry().get("bridge_demo")))
@@ -173,7 +173,7 @@ def test_a_requisition_through_a_bridge(meshes, tmp_path):
     trust(install(DEMO))
     registry = load_registry()
     teapot = conn.execute("SELECT uid FROM dossier WHERE name = 'Teapot'").fetchone()[0]
-    plan = plan_requisition(conn, definitions, registry, teapot, env, pipelines=["bridge_demo"], params={"word": "made"})
+    plan = plan_requisition(conn, definitions, registry, teapot, env, processes=["bridge_demo"], params={"word": "made"})
     req = queue_plan(conn, plan, registry)
     run_queue(db_path, definitions, registry)
     d = lifecycle.detail(conn, req)
@@ -190,7 +190,7 @@ def test_real_blender_converts_a_mesh(meshes):
     conn, env, definitions, db_path = meshes
     registry = load_registry()
     teapot = conn.execute("SELECT uid FROM dossier WHERE name = 'Teapot'").fetchone()[0]
-    plan = plan_requisition(conn, definitions, registry, teapot, env, pipelines=["convert_mesh"], params={"format": "obj"})
+    plan = plan_requisition(conn, definitions, registry, teapot, env, processes=["convert_mesh"], params={"format": "obj"})
     req = queue_plan(conn, plan, registry)
     run_queue(db_path, definitions, registry)
     d = lifecycle.detail(conn, req)

@@ -193,8 +193,8 @@ class LibraryService:
     # Requisitions ---------------------------------------------------------------------------------
 
     def registry(self, reload: bool = False):
-        """Pipeline packages (cached; ``reload`` after installing or trusting one)."""
-        from exchange.pipelines.registry import load_registry
+        """Process packages (cached; ``reload`` after installing or trusting one)."""
+        from exchange.processes.registry import load_registry
 
         if reload or getattr(self, "_registry", None) is None:
             self._registry = load_registry()
@@ -226,7 +226,7 @@ class LibraryService:
             raise EditError(str(exc)) from exc
 
     def queue(self, plans: list) -> list[int]:
-        """Queue plans (remembering their options as each pipeline's last used); their ids."""
+        """Queue plans (remembering their options as each process's last used); their ids."""
         from exchange.requisitions.plan import queue_plan
         from exchange.requisitions.presets import remember
 

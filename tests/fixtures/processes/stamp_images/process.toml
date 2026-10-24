@@ -1,7 +1,7 @@
-# A test pipeline: scale images down, then "stamp" them with a note, optionally pausing for a
+# A test process: scale images down, then "stamp" them with a note, optionally pausing for a
 # review (a manual checkpoint) first.
 
-[pipeline]
+[process]
 id = "stamp_images"
 name = "Stamp images"
 version = "1.0.0"

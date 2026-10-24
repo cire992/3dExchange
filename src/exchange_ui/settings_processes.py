@@ -1,6 +1,6 @@
-"""Settings › Pipelines and Settings › Endpoints.
+"""Settings › Processes and Settings › Endpoints.
 
-* **Pipelines:** every package, with its prerequisites green or red. Here you set a tool's
+* **Processes:** every package, with its prerequisites green or red. Here you set a tool's
   path, install a package folder, and trust a package after reading what it runs and where it
   writes. Only trusted packages with every prerequisite green are offered for requisitions.
 * **Endpoints:** where each environment's requisitions write (its default, or a folder you
@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (
 )
 
 from exchange.errors import ExchangeError
-from exchange.pipelines.registry import (
+from exchange.processes.registry import (
     check_prerequisites,
     describe_trust,
     install,
@@ -48,7 +48,7 @@ def _clear(layout) -> None:
             _clear(item.layout())
 
 
-class PipelinesPage(QWidget):
+class ProcessesPage(QWidget):
     def __init__(self, window, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.window, self.service = window, window.service
@@ -102,9 +102,9 @@ class PipelinesPage(QWidget):
         item = self.list.currentItem() if hasattr(self, "list") else None
         return item.data(Qt.ItemDataRole.UserRole) if item else None
 
-    def select(self, pipeline_id: str) -> None:
+    def select(self, process_id: str) -> None:
         for r in range(self.list.count()):
-            if self.list.item(r).data(Qt.ItemDataRole.UserRole) == pipeline_id:
+            if self.list.item(r).data(Qt.ItemDataRole.UserRole) == process_id:
                 self.list.setCurrentRow(r)
 
     def _show(self) -> None:
@@ -177,16 +177,16 @@ class PipelinesPage(QWidget):
             self.status.setText(f"{tool}: {path}")
             self.reload()
 
-    def _trust(self, pipeline_id: str) -> None:
-        package = self.service.registry().get(pipeline_id)
-        text = "\n".join(describe_trust(package)) + "\n\nA pipeline runs its own code. Trust it?"
-        if self.window.confirm("Trust this pipeline?", text):
+    def _trust(self, process_id: str) -> None:
+        package = self.service.registry().get(process_id)
+        text = "\n".join(describe_trust(package)) + "\n\nA process runs its own code. Trust it?"
+        if self.window.confirm("Trust this process?", text):
             trust(package)
             self.status.setText(f"Trusted {package.manifest.name}")
-            self.reload(select=pipeline_id)
+            self.reload(select=process_id)
 
     def _install(self) -> None:
-        folder = self.window.ask_folder("Choose a pipeline package folder (it holds pipeline.toml)")
+        folder = self.window.ask_folder("Choose a process package folder (it holds process.toml)")
         if not folder:
             return
         try:
