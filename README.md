@@ -63,7 +63,7 @@ py -3.12 -m venv .venv
 .venv/Scripts/python -m pip install -e ".[ui]"
 ```
 
-Use `.[dev]` instead of `.[ui]` if you also want the test tools.
+Use `.[dev]` instead of `.[ui]` if you also want the test tools. Add `service` (`.[ui,service]`) for the local API the desktop shell uses.
 
 ## Use
 
@@ -107,8 +107,27 @@ Or use the command line. A few examples:
 | `requisition routes / plan / list / show / run / resume / hold / move / remove / check-stale / rebuild` | Plan (`--queue`, `--preset`, `--save-preset`), run and manage requisitions. |
 | `presets list / show / delete` | Requisition presets: options for every process of a plan. |
 | `test-process FOLDER UID` | Run a process you are writing on one asset, into a temporary folder. |
+| `serve` | Serve the library over a local API for the desktop shell (needs the `service` extra; see below). |
 
 Every command takes `--json` for machine-readable output, and `--db PATH` to use another library.
+
+## The local service
+
+The desktop shell (the Exchange Shell repository) reads the library through `exchange serve`, a
+local HTTP API (FastAPI and uvicorn, the optional `service` extra):
+
+- **Loopback only:** it listens on `127.0.0.1` (`--port 0`, the default, picks a free port) and
+  refuses requests addressed to any other host name.
+- **Token:** every `/api` request needs `Authorization: Bearer <token>`. The starting process
+  passes it in `EXCHANGE_SERVICE_TOKEN`, or the service makes one.
+- **Ready line:** on start it prints one JSON line,
+  `{"event": "ready", "url": …, "api": 1, …}`, plus the token when it made it.
+- **Lifetime:** with `--exit-with-stdin` it stops when its stdin closes.
+- **Read-only (6b):** the sidebar, environments, pages of assets with the search language,
+  one asset's detail, its thumbnail, and collections, under `/api/v1/`. `/health` needs no token.
+- **Contract:** the schema is committed as [`docs/api/openapi.json`](docs/api/openapi.json);
+  regenerate it with `exchange serve --openapi > docs/api/openapi.json` after changing the API
+  (a test checks it).
 
 ## Where things live
 

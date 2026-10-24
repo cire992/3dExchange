@@ -1,0 +1,1697 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Exchange",
+    "description": "The local API of the Exchange service, for the desktop shell's Workspace window.",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "service"
+        ],
+        "summary": "Health",
+        "description": "Whether the service is up. Needs no token and reveals nothing about the library.",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sidebar": {
+      "get": {
+        "tags": [
+          "library"
+        ],
+        "summary": "Get Sidebar",
+        "description": "Counts for the sidebar: the whole library, Unidentified, and each environment's containers and types.",
+        "operationId": "get_sidebar_api_v1_sidebar_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sidebar"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/environments": {
+      "get": {
+        "tags": [
+          "library"
+        ],
+        "summary": "Get Environments",
+        "description": "Every environment with its roots (no counts; see the sidebar for those).",
+        "operationId": "get_environments_api_v1_environments_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Environment"
+                  },
+                  "type": "array",
+                  "title": "Response Get Environments Api V1 Environments Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/dossiers": {
+      "get": {
+        "tags": [
+          "library"
+        ],
+        "summary": "Get Dossiers",
+        "description": "A page of item cards, sorted by name (by type, then name, when grouped by type).",
+        "operationId": "get_dossiers_api_v1_dossiers_get",
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "The search language, e.g. `donut env:starfield tag:food`",
+              "default": "",
+              "title": "Query"
+            },
+            "description": "The search language, e.g. `donut env:starfield tag:food`"
+          },
+          {
+            "name": "group",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "product, type or all; searches, type, collection and Unidentified views always list all, as the window does",
+              "default": "product",
+              "title": "Group"
+            },
+            "description": "product, type or all; searches, type, collection and Unidentified views always list all, as the window does"
+          },
+          {
+            "name": "environment",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only assets with a live entry in this environment",
+              "title": "Environment"
+            },
+            "description": "Only assets with a live entry in this environment"
+          },
+          {
+            "name": "container",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only assets with a live entry in this container",
+              "title": "Container"
+            },
+            "description": "Only assets with a live entry in this container"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this dossier type and its subtypes",
+              "title": "Type"
+            },
+            "description": "Only this dossier type and its subtypes"
+          },
+          {
+            "name": "parent",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "One product's contents, by its uid",
+              "title": "Parent"
+            },
+            "description": "One product's contents, by its uid"
+          },
+          {
+            "name": "collection",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "One collection's members, by its uid",
+              "title": "Collection"
+            },
+            "description": "One collection's members, by its uid"
+          },
+          {
+            "name": "unidentified",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Only Unidentified assets",
+              "default": false,
+              "title": "Unidentified"
+            },
+            "description": "Only Unidentified assets"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "default": 200,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/dossiers/{uid}": {
+      "get": {
+        "tags": [
+          "library"
+        ],
+        "summary": "Get Dossier",
+        "description": "Everything the inspector shows for one asset, with its parent product's fields.",
+        "operationId": "get_dossier_api_v1_dossiers__uid__get",
+        "parameters": [
+          {
+            "name": "uid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Uid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DossierDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/dossiers/{uid}/thumbnail": {
+      "get": {
+        "tags": [
+          "library"
+        ],
+        "summary": "Get Thumbnail",
+        "description": "An asset's thumbnail, from the thumbnail cache next to the database.",
+        "operationId": "get_thumbnail_api_v1_dossiers__uid__thumbnail_get",
+        "parameters": [
+          {
+            "name": "uid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Uid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The thumbnail image",
+            "content": {
+              "image/png": {},
+              "image/jpeg": {},
+              "image/webp": {}
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/collections": {
+      "get": {
+        "tags": [
+          "library"
+        ],
+        "summary": "Get Collections",
+        "description": "Manual and smart collections with their member counts.",
+        "operationId": "get_collections_api_v1_collections_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Collection"
+                  },
+                  "type": "array",
+                  "title": "Response Get Collections Api V1 Collections Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Brick": {
+        "properties": {
+          "uid": {
+            "type": "string",
+            "title": "Uid"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "type_id": {
+            "type": "string",
+            "title": "Type Id"
+          },
+          "type_name": {
+            "type": "string",
+            "title": "Type Name"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "unidentified": {
+            "type": "boolean",
+            "title": "Unidentified"
+          },
+          "thumbnail_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail Url",
+            "description": "Served by this service; null without a thumbnail"
+          },
+          "format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Format",
+            "description": "The primary file's extension, e.g. .glb"
+          },
+          "environments": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Environments"
+          },
+          "entries": {
+            "type": "integer",
+            "title": "Entries"
+          },
+          "children": {
+            "type": "integer",
+            "title": "Children"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uid",
+          "name",
+          "type_id",
+          "type_name",
+          "confidence",
+          "unidentified",
+          "thumbnail_url",
+          "format",
+          "environments",
+          "entries",
+          "children"
+        ],
+        "title": "Brick",
+        "description": "One item card in the browser."
+      },
+      "Collection": {
+        "properties": {
+          "uid": {
+            "type": "string",
+            "title": "Uid"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "query": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query",
+            "description": "A smart collection's search"
+          },
+          "smart": {
+            "type": "boolean",
+            "title": "Smart"
+          },
+          "count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Count",
+            "description": "Null when a smart collection's search no longer compiles"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uid",
+          "name",
+          "smart"
+        ],
+        "title": "Collection"
+      },
+      "CollectionRef": {
+        "properties": {
+          "uid": {
+            "type": "string",
+            "title": "Uid"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uid",
+          "name"
+        ],
+        "title": "CollectionRef"
+      },
+      "ContainerCount": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "count"
+        ],
+        "title": "ContainerCount"
+      },
+      "Dependency": {
+        "properties": {
+          "reference": {
+            "type": "string",
+            "title": "Reference"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DossierRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "reference",
+          "status"
+        ],
+        "title": "Dependency"
+      },
+      "DossierDetail": {
+        "properties": {
+          "uid": {
+            "type": "string",
+            "title": "Uid"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "name_overridden": {
+            "type": "boolean",
+            "title": "Name Overridden"
+          },
+          "type_id": {
+            "type": "string",
+            "title": "Type Id"
+          },
+          "type_name": {
+            "type": "string",
+            "title": "Type Name"
+          },
+          "type_overridden": {
+            "type": "boolean",
+            "title": "Type Overridden"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "unidentified": {
+            "type": "boolean",
+            "title": "Unidentified"
+          },
+          "signals": {
+            "title": "Signals",
+            "description": "What produced the identification and its confidence"
+          },
+          "fields": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FieldValue"
+            },
+            "type": "object",
+            "title": "Fields"
+          },
+          "parent_fields": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FieldValue"
+            },
+            "type": "object",
+            "title": "Parent Fields",
+            "description": "The parent product's fields (origin usually lives there)"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "variant": {
+            "title": "Variant"
+          },
+          "thumbnail_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumbnail Url"
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DossierRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/DossierRef"
+            },
+            "type": "array",
+            "title": "Children"
+          },
+          "ledgers": {
+            "items": {
+              "$ref": "#/components/schemas/Ledger"
+            },
+            "type": "array",
+            "title": "Ledgers"
+          },
+          "dependencies": {
+            "items": {
+              "$ref": "#/components/schemas/Dependency"
+            },
+            "type": "array",
+            "title": "Dependencies"
+          },
+          "required_by": {
+            "items": {
+              "$ref": "#/components/schemas/DossierRef"
+            },
+            "type": "array",
+            "title": "Required By"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryItem"
+            },
+            "type": "array",
+            "title": "History"
+          },
+          "variants": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Variants"
+          },
+          "tag_sources": {
+            "items": {
+              "$ref": "#/components/schemas/TagSource"
+            },
+            "type": "array",
+            "title": "Tag Sources"
+          },
+          "aliases": {
+            "items": {
+              "$ref": "#/components/schemas/DossierRef"
+            },
+            "type": "array",
+            "title": "Aliases"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/Suggestion"
+            },
+            "type": "array",
+            "title": "Suggestions"
+          },
+          "collections": {
+            "items": {
+              "$ref": "#/components/schemas/CollectionRef"
+            },
+            "type": "array",
+            "title": "Collections"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uid",
+          "name",
+          "name_overridden",
+          "type_id",
+          "type_name",
+          "type_overridden",
+          "confidence",
+          "unidentified",
+          "fields",
+          "tags",
+          "children",
+          "ledgers",
+          "dependencies",
+          "required_by",
+          "history",
+          "variants",
+          "tag_sources",
+          "aliases",
+          "suggestions",
+          "collections"
+        ],
+        "title": "DossierDetail",
+        "description": "Everything the inspector shows for one asset."
+      },
+      "DossierRef": {
+        "properties": {
+          "uid": {
+            "type": "string",
+            "title": "Uid"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "type_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uid"
+        ],
+        "title": "DossierRef"
+      },
+      "Entry": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "container": {
+            "type": "string",
+            "title": "Container"
+          },
+          "container_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Container Kind"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "source_container": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Container"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "retired_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retired At"
+          },
+          "variant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variant"
+          },
+          "moved_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Moved From"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/EntryFile"
+            },
+            "type": "array",
+            "title": "Files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "container",
+          "status",
+          "files"
+        ],
+        "title": "Entry"
+      },
+      "EntryFile": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "rel_path": {
+            "type": "string",
+            "title": "Rel Path"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Absolute path on this PC"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
+          },
+          "hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hash"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "rel_path",
+          "path",
+          "role"
+        ],
+        "title": "EntryFile"
+      },
+      "Environment": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "uid": {
+            "type": "string",
+            "title": "Uid"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "type_id": {
+            "type": "string",
+            "title": "Type Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "online",
+              "offline",
+              "partial"
+            ],
+            "title": "Status",
+            "description": "From its roots, as in the sidebar"
+          },
+          "added_at": {
+            "type": "string",
+            "title": "Added At"
+          },
+          "last_scanned_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Scanned At"
+          },
+          "roots": {
+            "items": {
+              "$ref": "#/components/schemas/Root"
+            },
+            "type": "array",
+            "title": "Roots"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "uid",
+          "name",
+          "type_id",
+          "status",
+          "added_at",
+          "roots"
+        ],
+        "title": "Environment"
+      },
+      "EnvironmentRef": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "type_id": {
+            "type": "string",
+            "title": "Type Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "type_id"
+        ],
+        "title": "EnvironmentRef"
+      },
+      "FieldValue": {
+        "properties": {
+          "value": {
+            "title": "Value"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source",
+            "description": "scan, user, or a lookup source"
+          }
+        },
+        "type": "object",
+        "title": "FieldValue"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "Health": {
+        "properties": {
+          "service": {
+            "type": "string",
+            "const": "exchange",
+            "title": "Service",
+            "default": "exchange"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "api": {
+            "type": "integer",
+            "title": "Api",
+            "description": "The API version; paths start with /api/v{api}"
+          },
+          "schema_version": {
+            "type": "integer",
+            "title": "Schema Version",
+            "description": "The library database schema this service uses"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "api",
+          "schema_version"
+        ],
+        "title": "Health"
+      },
+      "HistoryItem": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id",
+            "description": "The curation log id; null for entry events"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          },
+          "undoable": {
+            "type": "boolean",
+            "title": "Undoable",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "action",
+          "payload"
+        ],
+        "title": "HistoryItem"
+      },
+      "Ledger": {
+        "properties": {
+          "environment": {
+            "$ref": "#/components/schemas/EnvironmentRef"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/Entry"
+            },
+            "type": "array",
+            "title": "Entries"
+          }
+        },
+        "type": "object",
+        "required": [
+          "environment",
+          "entries"
+        ],
+        "title": "Ledger"
+      },
+      "Page": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Brick"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "offset"
+        ],
+        "title": "Page"
+      },
+      "Problem": {
+        "properties": {
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "detail"
+        ],
+        "title": "Problem"
+      },
+      "Root": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "online",
+              "offline"
+            ],
+            "title": "Status"
+          },
+          "offline_since": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offline Since"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "path",
+          "status"
+        ],
+        "title": "Root"
+      },
+      "Sidebar": {
+        "properties": {
+          "all": {
+            "type": "integer",
+            "title": "All",
+            "description": "Assets with at least one live entry"
+          },
+          "unidentified_dossiers": {
+            "type": "integer",
+            "title": "Unidentified Dossiers"
+          },
+          "unattached_files": {
+            "type": "integer",
+            "title": "Unattached Files",
+            "description": "Counted when each online root was last scanned"
+          },
+          "environments": {
+            "items": {
+              "$ref": "#/components/schemas/SidebarEnvironment"
+            },
+            "type": "array",
+            "title": "Environments"
+          }
+        },
+        "type": "object",
+        "required": [
+          "all",
+          "unidentified_dossiers",
+          "unattached_files",
+          "environments"
+        ],
+        "title": "Sidebar"
+      },
+      "SidebarEnvironment": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "type_id": {
+            "type": "string",
+            "title": "Type Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "online",
+              "offline",
+              "partial"
+            ],
+            "title": "Status"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "roots": {
+            "items": {
+              "$ref": "#/components/schemas/Root"
+            },
+            "type": "array",
+            "title": "Roots"
+          },
+          "containers": {
+            "items": {
+              "$ref": "#/components/schemas/ContainerCount"
+            },
+            "type": "array",
+            "title": "Containers"
+          },
+          "types": {
+            "items": {
+              "$ref": "#/components/schemas/TypeCount"
+            },
+            "type": "array",
+            "title": "Types"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "type_id",
+          "status",
+          "count",
+          "roots",
+          "containers",
+          "types"
+        ],
+        "title": "SidebarEnvironment"
+      },
+      "Suggestion": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "payload"
+        ],
+        "title": "Suggestion"
+      },
+      "TagSource": {
+        "properties": {
+          "tag": {
+            "type": "string",
+            "title": "Tag"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "user": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "add",
+                  "remove"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tag",
+          "sources",
+          "confidence"
+        ],
+        "title": "TagSource"
+      },
+      "TypeCount": {
+        "properties": {
+          "type_id": {
+            "type": "string",
+            "title": "Type Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type_id",
+          "name",
+          "count"
+        ],
+        "title": "TypeCount"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "token": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "The service's per-launch token"
+      }
+    }
+  }
+}
