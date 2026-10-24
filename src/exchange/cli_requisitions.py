@@ -1,4 +1,4 @@
-"""Command line for pipelines, tools and requisitions (Roadmap phase 4)."""
+"""Command line for processes, tools and requisitions (Roadmap phase 4)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from pathlib import Path
 from exchange.cli_curation import _emit, _uid
 from exchange.db import open_library
 from exchange.errors import ExchangeError
-from exchange.pipelines.registry import (
+from exchange.processes.registry import (
     check_prerequisites,
     describe_trust,
     install,
@@ -24,15 +24,15 @@ from exchange.pipelines.registry import (
 
 
 def add_parsers(commands, common: argparse.ArgumentParser) -> None:
-    pipelines = commands.add_parser("pipelines", help="pipeline packages: list, check, install, trust")
-    pip = pipelines.add_subparsers(dest="pipelines_command", required=True)
-    pip.add_parser("list", parents=[common], help="list pipelines and whether they are ready")
-    p = pip.add_parser("show", parents=[common], help="show one pipeline")
+    processes = commands.add_parser("processes", help="process packages: list, check, install, trust")
+    pip = processes.add_subparsers(dest="processes_command", required=True)
+    pip.add_parser("list", parents=[common], help="list processes and whether they are ready")
+    p = pip.add_parser("show", parents=[common], help="show one process")
     p.add_argument("id")
-    pip.add_parser("check", parents=[common], help="check every pipeline's prerequisites")
-    p = pip.add_parser("install", parents=[common], help="install a pipeline package folder (then trust it)")
+    pip.add_parser("check", parents=[common], help="check every process's prerequisites")
+    p = pip.add_parser("install", parents=[common], help="install a process package folder (then trust it)")
     p.add_argument("folder", type=Path)
-    p = pip.add_parser("trust", parents=[common], help="trust an installed pipeline (it runs its own code)")
+    p = pip.add_parser("trust", parents=[common], help="trust an installed process (it runs its own code)")
     p.add_argument("id")
 
     tools = commands.add_parser("tools", help="where external tools are (Blender, texconv, Daz Studio …)")
@@ -50,10 +50,10 @@ def add_parsers(commands, common: argparse.ArgumentParser) -> None:
     p = rq.add_parser("plan", parents=[common], help="plan a requisition (and queue it with --queue)")
     p.add_argument("uid", help="an asset or product")
     p.add_argument("--env", type=int, required=True, metavar="ID", help="the target environment")
-    p.add_argument("--pipeline", action="append", metavar="ID", help="the pipeline (repeat for a chain)")
+    p.add_argument("--process", action="append", metavar="ID", help="the process (repeat for a chain)")
     p.add_argument("--source-entry", type=int, metavar="ID", help="convert or copy from this entry")
     p.add_argument("--param", action="append", default=[], metavar="NAME=VALUE",
-                   help="an option (NAME or PIPELINE.NAME); repeatable")
+                   help="an option (NAME or PROCESS.NAME); repeatable")
     p.add_argument("--endpoint", help="write here instead of the environment's default")
     p.add_argument("--on-collision", choices=("ask", "overwrite", "rename", "skip"), default="ask")
     p.add_argument("--name", help="the requisition's name")
@@ -78,19 +78,19 @@ def add_parsers(commands, common: argparse.ArgumentParser) -> None:
     p.add_argument("position", type=int)
     p = rq.add_parser("remove", parents=[common], help="move its output to the recycle folder")
     p.add_argument("id")
-    rq.add_parser("check-stale", parents=[common], help="find requisitions whose source or pipeline changed")
+    rq.add_parser("check-stale", parents=[common], help="find requisitions whose source or process changed")
     p = rq.add_parser("rebuild", parents=[common], help="queue a stale requisition again")
     p.add_argument("id")
 
-    presets = commands.add_parser("presets", help="requisition presets: options for every pipeline of a plan")
+    presets = commands.add_parser("presets", help="requisition presets: options for every process of a plan")
     pre = presets.add_subparsers(dest="presets_command", required=True)
     pre.add_parser("list", parents=[common], help="list presets")
     for name, text in (("show", "show one preset"), ("delete", "delete one of your presets")):
         p = pre.add_parser(name, parents=[common], help=text)
         p.add_argument("name")
 
-    test = commands.add_parser("test-pipeline", parents=[common],
-                               help="run a pipeline folder on one asset into a temporary folder")
+    test = commands.add_parser("test-process", parents=[common],
+                               help="run a process folder on one asset into a temporary folder")
     test.add_argument("folder", type=Path)
     test.add_argument("uid")
     test.add_argument("--param", action="append", default=[], metavar="NAME=VALUE")
@@ -98,12 +98,12 @@ def add_parsers(commands, common: argparse.ArgumentParser) -> None:
     test.add_argument("--out", type=Path, help="where to write (default: a new temporary folder)")
 
 
-COMMANDS = ("pipelines", "tools", "requisition", "presets", "test-pipeline")
+COMMANDS = ("processes", "tools", "requisition", "presets", "test-process")
 
 
 def run(args, definitions) -> int:
-    handler = {"pipelines": _pipelines, "tools": _tools, "requisition": _requisition, "presets": _presets,
-               "test-pipeline": _test}[args.command]
+    handler = {"processes": _processes, "tools": _tools, "requisition": _requisition, "presets": _presets,
+               "test-process": _test}[args.command]
     return handler(args, definitions)
 
 
@@ -117,12 +117,12 @@ def _params(pairs: list[str]) -> dict:
     return out
 
 
-# Pipelines and tools --------------------------------------------------------------------------
+# Processes and tools --------------------------------------------------------------------------
 
 
-def _pipelines(args, definitions) -> int:
+def _processes(args, definitions) -> int:
     registry = load_registry()
-    c = args.pipelines_command
+    c = args.processes_command
     if c == "list":
         tools = tool_paths()
         rows = [{"id": p.id, "name": p.manifest.name, "version": p.manifest.version, "builtin": p.builtin,
@@ -130,7 +130,7 @@ def _pipelines(args, definitions) -> int:
         lines = [f"  {r['id']:<26} {r['version']:<8} {'ready' if r['ready'] else 'untrusted' if not r['trusted'] else 'not ready'}"
                  f"  {r['name']}" for r in rows]
         lines += [f"  problem: {p}" for p in registry.problems]
-        _emit(args, {"pipelines": rows, "problems": registry.problems}, "\n".join(lines) or "No pipelines.")
+        _emit(args, {"processes": rows, "problems": registry.problems}, "\n".join(lines) or "No processes.")
     elif c == "show":
         package = registry.get(args.id)
         m = package.manifest
@@ -157,13 +157,13 @@ def _pipelines(args, definitions) -> int:
         rows = []
         for package in registry.packages.values():
             for s in check_prerequisites(package, tools):
-                rows.append({"pipeline": package.id, **s.__dict__})
-        _emit(args, rows, "\n".join(f"  {'✓' if r['ok'] else '✗'} {r['pipeline']}: {r['label']} — {r['detail']}"
-                                    for r in rows) or "No pipeline has prerequisites.")
+                rows.append({"process": package.id, **s.__dict__})
+        _emit(args, rows, "\n".join(f"  {'✓' if r['ok'] else '✗'} {r['process']}: {r['label']} — {r['detail']}"
+                                    for r in rows) or "No process has prerequisites.")
     elif c == "install":
         package = install(args.folder)
         lines = ["Installed (not trusted yet):", *[f"  {line}" for line in describe_trust(package)],
-                 f"Trust it to run its code: exchange pipelines trust {package.id}"]
+                 f"Trust it to run its code: exchange processes trust {package.id}"]
         _emit(args, {"id": package.id, "path": str(package.path)}, "\n".join(lines))
     else:
         package = registry.get(args.id)
@@ -198,9 +198,9 @@ def _requisition(args, definitions) -> int:
         c = args.requisition_command
         if c == "routes":
             rows = routes(conn, definitions, registry, _uid(conn, args.uid), args.env)
-            _emit(args, rows, "\n".join(f"  {r['route']:<8} {' → '.join(r['pipelines'])}  from {r['source']}"
+            _emit(args, rows, "\n".join(f"  {r['route']:<8} {' → '.join(r['processes'])}  from {r['source']}"
                                         f" (entry {r['source_entry_id']})" for r in rows)
-                  or "No ready pipeline takes it there.")
+                  or "No ready process takes it there.")
         elif c == "plan":
             defaults = {}
             if args.preset:
@@ -209,14 +209,14 @@ def _requisition(args, definitions) -> int:
                     raise ExchangeError(f"no preset {args.preset!r} (see: exchange presets list)")
                 defaults = found.params()
             plan = plan_requisition(conn, definitions, registry, _uid(conn, args.uid), args.env,
-                                    pipelines=args.pipeline, source_entry_id=args.source_entry,
+                                    processes=args.process, source_entry_id=args.source_entry,
                                     params=_params(args.param), defaults=defaults, endpoint_folder=args.endpoint,
                                     on_collision=args.on_collision, name=args.name)
             if args.save_preset:
                 options: dict = {}
                 for i in plan.items:
-                    for pipeline, values in i.params.items():
-                        options.setdefault(pipeline, values)
+                    for process, values in i.params.items():
+                        options.setdefault(process, values)
                 save_preset(args.save_preset, options,
                             environment=conn.execute("SELECT type_id FROM environment WHERE id = ?",
                                                      (args.env,)).fetchone()[0])
@@ -226,13 +226,13 @@ def _requisition(args, definitions) -> int:
             lines = [f"{plan.name} → {plan.endpoint.label} ({plan.endpoint.folder}, {plan.endpoint.visibility})"]
             for i in plan.items:
                 mark = "[x]" if i.include else "[ ]"
-                how = " → ".join(i.pipelines) if i.pipelines else "no pipeline"
+                how = " → ".join(i.processes) if i.processes else "no process"
                 lines.append(f"  {mark} {i.name} ({i.type_id}): {i.route} via {how}"
                              + (f", from {i.source}" if i.source else "")
                              + (f"  {'; '.join(i.problems)}" if i.problems else ""))
-                for pipeline, values in i.params.items():
+                for process, values in i.params.items():
                     if values:
-                        lines.append(f"        {pipeline}: " + ", ".join(f"{k}={v!r}" for k, v in values.items()))
+                        lines.append(f"        {process}: " + ", ".join(f"{k}={v!r}" for k, v in values.items()))
             lines += [f"  warning: {w}" for w in plan.warnings]
             lines.append(f"Queued as requisition {queued}; run it with: exchange requisition run" if queued
                          else "Add --queue to queue it.")
@@ -248,7 +248,7 @@ def _requisition(args, definitions) -> int:
             if d["message"]:
                 lines.append(f"  {d['message']}")
             for i in d["items"]:
-                lines.append(f"  {i['state']:<16} {i['name']}: {' → '.join(p['id'] for p in i['pipelines'])}"
+                lines.append(f"  {i['state']:<16} {i['name']}: {' → '.join(p['id'] for p in i['processes'])}"
                              + (f"  ({i['message']})" if i["message"] else ""))
                 for out in i["outputs"]:
                     lines += [f"      {Path(out['endpoint']).joinpath(*f.split('/'))}" for f in out["files"][:10]]
@@ -305,17 +305,17 @@ def _presets(args, definitions) -> int:
     registry = load_registry()
     found = load_presets(registry)
     if args.presets_command == "list":
-        rows = [{"name": p.name, "description": p.description, "pipelines": p.pipelines, "shipped": p.shipped,
+        rows = [{"name": p.name, "description": p.description, "processes": p.processes, "shipped": p.shipped,
                  "environment": p.environment} for p in found.values()]
-        _emit(args, rows, "\n".join(f"  {r['name']}  ({', '.join(r['pipelines'])})"
+        _emit(args, rows, "\n".join(f"  {r['name']}  ({', '.join(r['processes'])})"
                                     + ("  [shipped]" if r["shipped"] else "") for r in rows) or "No presets yet.")
     elif args.presets_command == "show":
         preset = found.get(args.name)
         if preset is None:
             raise ExchangeError(f"no preset {args.name!r}")
         _emit(args, preset.__dict__, "\n".join([f"{preset.name}  ({preset.source})", *(
-            f"  {pipeline}: " + ", ".join(f"{k}={v!r}" for k, v in values.items())
-            for pipeline, values in preset.options.items())]))
+            f"  {process}: " + ", ".join(f"{k}={v!r}" for k, v in values.items())
+            for process, values in preset.options.items())]))
     else:
         delete_preset(args.name, registry)
         _emit(args, {"deleted": args.name}, f"Deleted preset {args.name}")
@@ -326,7 +326,7 @@ def _test(args, definitions) -> int:
     import tempfile
 
     from exchange.db import open_library_readonly
-    from exchange.requisitions.runner import test_pipeline
+    from exchange.requisitions.runner import test_process
 
     out = args.out or Path(tempfile.mkdtemp(prefix="exchange-test-"))
     conn = open_library_readonly(args.db)
@@ -334,7 +334,7 @@ def _test(args, definitions) -> int:
         raise ExchangeError(f"no library at {args.db}")
     lines: list[str] = []
     try:
-        written = test_pipeline(conn, args.folder, _uid(conn, args.uid), out, _params(args.param), args.source_entry,
+        written = test_process(conn, args.folder, _uid(conn, args.uid), out, _params(args.param), args.source_entry,
                                 log=lambda step, message: lines.append(f"  [{step}] {message}"))
     finally:
         conn.close()

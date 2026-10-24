@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from exchange.pipelines.operations import OperationError, operation
+from exchange.processes.operations import OperationError, operation
 
 MESH_EXTS = (".fbx", ".obj", ".glb", ".gltf", ".dae", ".stl", ".ply")
 SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "convert_mesh.py"

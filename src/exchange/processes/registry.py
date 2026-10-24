@@ -1,19 +1,19 @@
-"""Finding pipeline packages, trusting them, loading their operations and checking prerequisites.
+"""Finding process packages, trusting them, loading their operations and checking prerequisites.
 
 Packages come from two places: the built-ins shipped with Exchange and the user's
-``pipelines/`` folder in the Exchange data folder (one folder per package)::
+``processes/`` folder in the Exchange data folder (one folder per package)::
 
     glb_to_starfield_ingestible/
-    ├─ pipeline.toml        manifest (see manifest.py)
+    ├─ process.toml        manifest (see manifest.py)
     ├─ operations/          Python operations (<module>.py)
     ├─ templates/ presets/ tests/ README.md
 
-Pipelines run arbitrary code, so a user package must be **trusted** before Exchange imports its
+Processes run arbitrary code, so a user package must be **trusted** before Exchange imports its
 operations or runs it: trusting records a fingerprint of its manifest and code, and any change
 to them needs trusting again. Untrusted packages are listed (from their manifest alone) but
 never imported.
 
-Tool paths (Blender, texconv, Daz Studio …) are shared by every pipeline that needs the tool:
+Tool paths (Blender, texconv, Daz Studio …) are shared by every process that needs the tool:
 ``tools.json`` in the data folder maps a tool id to the executable.
 """
 
@@ -32,26 +32,35 @@ from pathlib import Path
 
 from exchange.errors import DefinitionError, ExchangeError
 from exchange.paths import data_dir
-from exchange.pipelines.core_ops import CORE_OPERATIONS
-from exchange.pipelines.manifest import PipelineManifest, load_manifest
-from exchange.pipelines.operations import OperationSpec, accepts
+from exchange.processes.core_ops import CORE_OPERATIONS
+from exchange.processes.manifest import ProcessManifest, load_manifest
+from exchange.processes.operations import OperationSpec, accepts
 
 
-class PipelineError(ExchangeError):
-    """A pipeline package cannot be used (untrusted, broken, missing prerequisites)."""
+class ProcessError(ExchangeError):
+    """A process package cannot be used (untrusted, broken, missing prerequisites)."""
 
 
-def user_pipelines_dir() -> Path:
-    return data_dir() / "pipelines"
+_migrated: set[Path] = set()
 
 
-def builtin_pipelines_dir() -> Path:
-    return Path(str(resources.files("exchange.pipelines").joinpath("builtin")))
+def user_processes_dir() -> Path:
+    data = data_dir()
+    if data not in _migrated:
+        # A data folder from before the rename keeps its packages, trust and tool paths.
+        from exchange.processes.legacy import migrate_data_folder
+        migrate_data_folder(data)
+        _migrated.add(data)
+    return data / "processes"
+
+
+def builtin_processes_dir() -> Path:
+    return Path(str(resources.files("exchange.processes").joinpath("builtin")))
 
 
 @dataclass
-class PipelinePackage:
-    manifest: PipelineManifest
+class ProcessPackage:
+    manifest: ProcessManifest
     path: Path
     builtin: bool
     trusted: bool
@@ -72,7 +81,7 @@ class PipelinePackage:
     def operations(self) -> dict[str, OperationSpec]:
         """Its own operations by "<module>.<name>" (imports its code: trusted packages only)."""
         if not self.trusted:
-            raise PipelineError(f"pipeline {self.id} is not trusted; trust it first (exchange pipelines trust {self.id})")
+            raise ProcessError(f"process {self.id} is not trusted; trust it first (exchange processes trust {self.id})")
         if self._operations is None:
             self._operations = _load_operations(self)
         return self._operations
@@ -83,27 +92,27 @@ class PipelinePackage:
         else:
             spec = self.operations().get(name)
         if spec is None:
-            raise PipelineError(f"pipeline {self.id}: no operation {name!r}")
+            raise ProcessError(f"process {self.id}: no operation {name!r}")
         return spec
 
 
 @dataclass
 class Registry:
-    packages: dict[str, PipelinePackage]
+    packages: dict[str, ProcessPackage]
     problems: list[str]  # packages that could not be read, with why
 
-    def get(self, pipeline_id: str) -> PipelinePackage:
-        package = self.packages.get(pipeline_id)
+    def get(self, process_id: str) -> ProcessPackage:
+        package = self.packages.get(process_id)
         if package is None:
-            raise PipelineError(f"no pipeline {pipeline_id!r}")
+            raise ProcessError(f"no process {process_id!r}")
         return package
 
 
 def fingerprint(path: Path) -> str:
     """A hash of a package's manifest and code (what trusting it vouches for)."""
     digest = hashlib.sha256()
-    files = [path / "pipeline.toml", *sorted((path / "operations").rglob("*.py"))] \
-        if (path / "operations").is_dir() else [path / "pipeline.toml"]
+    files = [path / "process.toml", *sorted((path / "operations").rglob("*.py"))] \
+        if (path / "operations").is_dir() else [path / "process.toml"]
     for file in files:
         digest.update(file.relative_to(path).as_posix().encode())
         digest.update(file.read_bytes())
@@ -111,7 +120,7 @@ def fingerprint(path: Path) -> str:
 
 
 def _trust_file() -> Path:
-    return user_pipelines_dir() / "trusted.json"
+    return user_processes_dir() / "trusted.json"
 
 
 def _trusted() -> dict[str, str]:
@@ -122,35 +131,38 @@ def _trusted() -> dict[str, str]:
 
 
 def load_registry(extra_dirs: tuple[Path, ...] = (), *, include_user: bool = True) -> Registry:
-    """Every pipeline package Exchange can see. A broken package is reported, not raised.
+    """Every process package Exchange can see. A broken package is reported, not raised.
 
     ``extra_dirs`` hold packages (one folder each) treated like the user's (e.g. tests)."""
-    packages: dict[str, PipelinePackage] = {}
+    packages: dict[str, ProcessPackage] = {}
     problems: list[str] = []
     trusted = _trusted()
-    sources: list[tuple[Path, bool]] = [(builtin_pipelines_dir(), True)]
+    sources: list[tuple[Path, bool]] = [(builtin_processes_dir(), True)]
     if include_user:
-        sources.append((user_pipelines_dir(), False))
+        sources.append((user_processes_dir(), False))
     sources += [(Path(d), False) for d in extra_dirs]
     for base, builtin in sources:
         if not base.is_dir():
             continue
-        for folder in sorted(p for p in base.iterdir() if (p / "pipeline.toml").is_file()):
+        for folder in sorted(p for p in base.iterdir() if (p / "pipeline.toml").is_file() and not (p / "process.toml").is_file()):
+            problems.append(f"{folder}: a package from before pipelines were renamed processes; rename "
+                            "pipeline.toml to process.toml and its [pipeline] table to [process]")
+        for folder in sorted(p for p in base.iterdir() if (p / "process.toml").is_file()):
             try:
-                manifest = load_manifest(folder / "pipeline.toml")
+                manifest = load_manifest(folder / "process.toml")
                 digest = fingerprint(folder)
             except (DefinitionError, OSError) as exc:
                 problems.append(str(exc))
                 continue
             if manifest.id in packages and packages[manifest.id].builtin and not builtin:
-                problems.append(f"{folder}: id {manifest.id!r} is a built-in pipeline's; rename it")
+                problems.append(f"{folder}: id {manifest.id!r} is a built-in process's; rename it")
                 continue
-            packages[manifest.id] = PipelinePackage(manifest, folder, builtin,
+            packages[manifest.id] = ProcessPackage(manifest, folder, builtin,
                                                     builtin or trusted.get(manifest.id) == digest, digest)
     return Registry(packages, problems)
 
 
-def trust(package: PipelinePackage) -> None:
+def trust(package: ProcessPackage) -> None:
     """Trust a package as it is now (its manifest and code)."""
     trusted = _trusted()
     trusted[package.id] = package.fingerprint
@@ -159,20 +171,23 @@ def trust(package: PipelinePackage) -> None:
     package.trusted = True
 
 
-def install(source: Path) -> PipelinePackage:
-    """Copy a package folder into the user's pipelines folder (untrusted until trusted)."""
+def install(source: Path) -> ProcessPackage:
+    """Copy a package folder into the user's processes folder (untrusted until trusted)."""
     source = Path(source).resolve()
-    manifest = load_manifest(source / "pipeline.toml")
-    target = user_pipelines_dir() / manifest.id
+    if not (source / "process.toml").is_file() and (source / "pipeline.toml").is_file():
+        raise ProcessError(f"{source} is a package from before pipelines were renamed processes: rename "
+                           "pipeline.toml to process.toml and its [pipeline] table to [process], then install it")
+    manifest = load_manifest(source / "process.toml")
+    target = user_processes_dir() / manifest.id
     if target.resolve() == source:
-        raise PipelineError(f"{source} is already installed")
+        raise ProcessError(f"{source} is already installed")
     if target.exists():
         shutil.rmtree(target)
     shutil.copytree(source, target, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-    return PipelinePackage(manifest, target, False, False, fingerprint(target))
+    return ProcessPackage(manifest, target, False, False, fingerprint(target))
 
 
-def describe_trust(package: PipelinePackage) -> list[str]:
+def describe_trust(package: ProcessPackage) -> list[str]:
     """What trusting a package lets it do, from its manifest (nothing is imported)."""
     m = package.manifest
     lines = [f"{m.name} {m.version} by {m.author or 'an unnamed author'} ({package.path})"]
@@ -186,13 +201,13 @@ def describe_trust(package: PipelinePackage) -> list[str]:
     return lines
 
 
-def _load_operations(package: PipelinePackage) -> dict[str, OperationSpec]:
+def _load_operations(package: ProcessPackage) -> dict[str, OperationSpec]:
     """Import a trusted package's operations/<module>.py files as one Python package of its own."""
     folder = package.path / "operations"
     found: dict[str, OperationSpec] = {}
     if not folder.is_dir():
         return found
-    name = f"exchange_pipeline_{package.id}"
+    name = f"exchange_process_{package.id}"
     holder = types.ModuleType(name)
     holder.__path__ = [str(folder)]  # so its modules can import each other
     sys.modules[name] = holder
@@ -202,7 +217,9 @@ def _load_operations(package: PipelinePackage) -> dict[str, OperationSpec]:
         try:
             module = importlib.import_module(f"{name}.{file.stem}")
         except Exception as exc:  # their code: report it as theirs
-            raise PipelineError(f"pipeline {package.id}: {file.name} failed to load: {exc}") from exc
+            hint = ("; it imports exchange.pipelines, which is now exchange.processes"
+                    if isinstance(exc, ModuleNotFoundError) and (exc.name or "").startswith("exchange.pipelines") else "")
+            raise ProcessError(f"process {package.id}: {file.name} failed to load: {exc}{hint}") from exc
         for value in vars(module).values():
             spec = getattr(value, "__exchange_operation__", None)
             if isinstance(spec, OperationSpec):
@@ -252,7 +269,7 @@ def _expand(path: str) -> list[str]:
     return sorted(matches, key=natural, reverse=True)
 
 
-def resolve_tool(package: PipelinePackage, tool: str, tools: dict[str, str] | None = None) -> str | None:
+def resolve_tool(package: ProcessPackage, tool: str, tools: dict[str, str] | None = None) -> str | None:
     """Where a package's tool is: the user's setting first, then the paths its manifest suggests."""
     tools = tool_paths() if tools is None else tools
     candidates = [tools[tool]] if tool in tools else []
@@ -262,7 +279,7 @@ def resolve_tool(package: PipelinePackage, tool: str, tools: dict[str, str] | No
     return next((c for c in candidates if Path(c).is_file()), None)
 
 
-def check_prerequisites(package: PipelinePackage, tools: dict[str, str] | None = None) -> list[PrerequisiteStatus]:
+def check_prerequisites(package: ProcessPackage, tools: dict[str, str] | None = None) -> list[PrerequisiteStatus]:
     """Each prerequisite, green or red with a fix hint. Cheap: paths only, nothing is run."""
     tools = tool_paths() if tools is None else tools
     out = []
@@ -279,12 +296,12 @@ def check_prerequisites(package: PipelinePackage, tools: dict[str, str] | None =
     return out
 
 
-def ready(package: PipelinePackage, tools: dict[str, str] | None = None) -> bool:
+def ready(package: ProcessPackage, tools: dict[str, str] | None = None) -> bool:
     """Trusted, with a valid chain and every prerequisite green: offered for requisitions."""
     return package.trusted and not validate(package) and all(s.ok for s in check_prerequisites(package, tools))
 
 
-def validate(package: PipelinePackage) -> list[str]:
+def validate(package: ProcessPackage) -> list[str]:
     """Problems with a trusted package's chain: unknown operations, mismatched artifact types."""
     if not package.trusted:
         return ["not trusted"]
@@ -293,7 +310,7 @@ def validate(package: PipelinePackage) -> list[str]:
     for step in package.manifest.steps:
         try:
             spec = package.operation(step.operation)
-        except PipelineError as exc:
+        except ProcessError as exc:
             problems.append(str(exc))
             produced[step.id] = "Files"
             continue

@@ -4,7 +4,7 @@ Exchange is a desktop application that gives modders and solo developers a god's
 
 It indexes Daz Studio libraries, Unreal Engine projects, Mod Organizer 2 instances and loose folders into one library of **dossiers** (what an asset *is*), each with **ledgers** recording where it lives. **Scanning is strictly read-only:** Exchange never writes to a scanned folder.
 
-> **Status:** Roadmap phases 1 (Foundations), 2 (Library) and 3 (Curation) are done. Phase 4 (Requisitions) is in progress: the engine, the bridges to Blender, Daz Studio and command-line tools, and requisitions in the window are in; the first real pipeline (Daz cross-figure) comes next. See [docs/PROGRESS.md](docs/PROGRESS.md) for details and [docs/DESIGN_SPEC.md](docs/DESIGN_SPEC.md) for the full design.
+> **Status:** Roadmap phases 1 (Foundations), 2 (Library) and 3 (Curation) are done. Phase 4 (Requisitions) is in progress: the engine, the bridges to Blender, Daz Studio and command-line tools, and requisitions in the window are in; the first real process (Daz cross-figure) comes next. See [docs/PROGRESS.md](docs/PROGRESS.md) for details and [docs/DESIGN_SPEC.md](docs/DESIGN_SPEC.md) for the full design.
 
 ## What it does today
 
@@ -34,14 +34,14 @@ It indexes Daz Studio libraries, Unreal Engine projects, Mod Organizer 2 instanc
   - **Suggestions:** texture links, variant groups and lexicon words, to accept or reject in batches.
 - **Watches your folders.** An environment whose files change is marked *changes detected*; you rescan when you're ready.
 - **Edits lexicons** in Settings (⚙): add or remove words, then apply them to the library.
-- **Runs requisitions:** plan getting an asset or a whole product into an environment with a pipeline, queue it, run it.
+- **Runs requisitions:** plan getting an asset or a whole product into an environment with a process, queue it, run it.
   - **In the window:** right-click → *Requisition to…* (or the inspector's button) shows the plan, with option forms, presets and the options last used. Select several assets to queue them all.
   - **The queue:** *Requisitions* in the sidebar runs it in the background, holds, reorders and resumes items, shows each item's log, and removes or rebuilds output.
-  - **Settings:** *Pipelines* installs and trusts packages and sets tool paths; *Endpoints* sets where each environment's output goes and whether it's publishable.
+  - **Settings:** *Processes* installs and trusts packages and sets tool paths; *Endpoints* sets where each environment's output goes and whether it's publishable.
   - **Where output goes:** only to an endpoint (a new MO2 mod, an *Exchange Conversions* content directory), with a record of every file written and a `.exchange` sidecar beside the output.
-  - **Afterwards:** the output joins the asset's ledgers. Removing it moves the files to a recycle folder. Requisitions whose source or pipeline changed show as stale and can be rebuilt.
+  - **Afterwards:** the output joins the asset's ledgers. Removing it moves the files to a recycle folder. Requisitions whose source or process changed show as stale and can be rebuilt.
   - **Built in:** *Copy to another container*, and *Convert mesh*: FBX, OBJ, glTF, DAE, STL or PLY to GLB, glTF, FBX or OBJ with Blender, which is found automatically.
-  - **Bridges:** pipelines can run steps in Blender (headless) and Daz Studio (a separate instance), one job per app at a time.
+  - **Bridges:** processes can run steps in Blender (headless) and Daz Studio (a separate instance), one job per app at a time.
 - **Suggests links and groupings.** `Barrel01_D.png` + `Barrel01_N.png` → `Barrel01.glb`; `Donut01_Pink` + `Donut01_Blue` → one asset with two variants. You accept or reject them in batches.
 - **Lets you browse and search.** A desktop window with a sidebar, a thumbnail grid and an inspector, plus a search language: `donut env:skyrim_se tag:food -is:product`, `type:mesh has:broken`, `collection:"Lard Lads assets"`.
 
@@ -103,10 +103,10 @@ Or use the command line. A few examples:
 | `curate …`, `collection …` | Edit dossiers and collections (`set`, `tag`, `link`, `merge`, `fold`, `split`, `product` …). |
 | `history`, `undo ID` | Recent curation actions; undo one (undo an undo to redo). |
 | `desk [ROOT [FOLDER]]` | Unattached files by folder; `curate dismiss` and `curate ignore-folder` act on the desk. |
-| `pipelines list / show / check / install / trust`, `tools set` | Pipeline packages, their prerequisites, and where external tools are. |
+| `processes list / show / check / install / trust`, `tools set` | Process packages, their prerequisites, and where external tools are. |
 | `requisition routes / plan / list / show / run / resume / hold / move / remove / check-stale / rebuild` | Plan (`--queue`, `--preset`, `--save-preset`), run and manage requisitions. |
-| `presets list / show / delete` | Requisition presets: options for every pipeline of a plan. |
-| `test-pipeline FOLDER UID` | Run a pipeline you are writing on one asset, into a temporary folder. |
+| `presets list / show / delete` | Requisition presets: options for every process of a plan. |
+| `test-process FOLDER UID` | Run a process you are writing on one asset, into a temporary folder. |
 
 Every command takes `--json` for machine-readable output, and `--db PATH` to use another library.
 
@@ -120,9 +120,10 @@ Every command takes `--json` for machine-readable output, and `--db PATH` to use
 
 - **Environments, dossier types and lexicons are TOML data files.** See the built-ins in `src/exchange/definitions/builtin/`. Adding a game is a definition file, not a code change, as long as an existing organizational layer (MO2, Daz, Unreal, folders) fits.
 - **Validation is strict.** A typo is reported with its file and key.
-- **Pipelines are packages:** a `pipeline.toml` manifest plus Python operations; see `src/exchange/pipelines/manifest.py` for the format.
-  - **Install and trust:** `exchange pipelines install FOLDER`, then `exchange pipelines trust ID` once you've read what it runs.
-  - **Test as you write:** `exchange test-pipeline FOLDER UID`.
+- **Processes are packages:** a `process.toml` manifest plus Python operations; see `src/exchange/processes/manifest.py` for the format.
+  - **Install and trust:** `exchange processes install FOLDER`, then `exchange processes trust ID` once you've read what it runs.
+  - **Test as you write:** `exchange test-process FOLDER UID`.
+  - **Data from before the rename** (pipelines became processes in Roadmap phase 6): on first run, `<data>/pipelines/` moves to `<data>/processes/`. Each package's `pipeline.toml` becomes `process.toml`, and its imports of `exchange.pipelines` become `exchange.processes`. A package stays trusted only if it was unchanged since you trusted it. The database migrates after a backup. Sidecars already written into your environments are left as they are; scans read both kinds.
 
 ## Develop
 

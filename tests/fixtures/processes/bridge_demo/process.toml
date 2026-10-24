@@ -1,6 +1,6 @@
-# A test pipeline whose step runs in "Blender" (a stand-in in tests).
+# A test process whose step runs in "Blender" (a stand-in in tests).
 
-[pipeline]
+[process]
 id = "bridge_demo"
 name = "Bridge demo"
 version = "1.0.0"

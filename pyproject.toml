@@ -31,7 +31,7 @@ where = ["src"]
 [tool.setuptools.package-data]
 "exchange.db" = ["migrations/*.sql"]
 "exchange.definitions" = ["builtin/environments/*.toml", "builtin/dossier_types/*.toml", "builtin/lexicons/*.toml"]
-"exchange.pipelines" = ["builtin/*/pipeline.toml", "builtin/*/operations/*.py", "builtin/*/scripts/*", "builtin/*/templates/*", "builtin/*/presets/*"]
+"exchange.processes" = ["builtin/*/process.toml", "builtin/*/operations/*.py", "builtin/*/scripts/*", "builtin/*/templates/*", "builtin/*/presets/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

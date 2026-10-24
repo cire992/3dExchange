@@ -1,9 +1,9 @@
 """Requisition to…: plan getting assets into an environment, set the options, queue it.
 
 The plan is a tree: each asset (and, for a product, each child) with an include checkbox, the
-pipeline it would go through, the entry it starts from, and any problem. Options are forms
-generated from the pipelines' manifests, filled in from a preset if one is chosen, otherwise from
-the options last used with each pipeline. Several selected assets are planned and queued
+process it would go through, the entry it starts from, and any problem. Options are forms
+generated from the processes' manifests, filled in from a preset if one is chosen, otherwise from
+the options last used with each process. Several selected assets are planned and queued
 together, with the same options (batch apply).
 """
 
@@ -41,7 +41,7 @@ AUTO = "auto"
 
 
 def make_editor(parameter, value) -> tuple[QWidget, callable]:
-    """An editor for one pipeline option, and a function reading its value."""
+    """An editor for one process option, and a function reading its value."""
     kind = parameter.type
     if kind == "bool":
         box = QCheckBox()
@@ -127,7 +127,7 @@ class RequisitionDialog(QDialog):
         form.addRow("If files exist", self.collision)
 
         self.tree = QTreeWidget()
-        self.tree.setHeaderLabels(["Asset", "Pipeline", "From", "Notes"])
+        self.tree.setHeaderLabels(["Asset", "Process", "From", "Notes"])
         self.tree.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.tree.itemChanged.connect(self._on_check)
         self.options_area = QScrollArea()
@@ -198,8 +198,8 @@ class RequisitionDialog(QDialog):
             for uid in subjects[:200]:
                 try:
                     for r in self.service.routes(uid, env):
-                        names = " → ".join(self.service.registry().get(p).manifest.name for p in r["pipelines"])
-                        chains.setdefault(tuple(r["pipelines"]), ("Copy: " if r["route"] == "copy" else "") + names)
+                        names = " → ".join(self.service.registry().get(p).manifest.name for p in r["processes"])
+                        chains.setdefault(tuple(r["processes"]), ("Copy: " if r["route"] == "copy" else "") + names)
                 except ExchangeError:
                     continue
             for chain, label in chains.items():
@@ -207,8 +207,8 @@ class RequisitionDialog(QDialog):
         self.route.blockSignals(False)
         self.replan()
 
-    def set_route(self, pipelines: list[str] | None) -> None:
-        index = self.route.findData(pipelines if pipelines else AUTO)
+    def set_route(self, processes: list[str] | None) -> None:
+        index = self.route.findData(processes if processes else AUTO)
         if index >= 0:
             self.route.setCurrentIndex(index)
 
@@ -216,7 +216,7 @@ class RequisitionDialog(QDialog):
         self.presets = load_presets(self.service.registry())
         self.preset.blockSignals(True)
         self.preset.clear()
-        self.preset.addItem("Options last used with each pipeline", None)
+        self.preset.addItem("Options last used with each process", None)
         for name in sorted(self.presets, key=str.casefold):
             self.preset.addItem(name, name)
         self.preset.blockSignals(False)
@@ -244,14 +244,14 @@ class RequisitionDialog(QDialog):
         self.replan(keep_options=True)
 
     def options(self) -> dict[str, dict]:
-        """The option forms' values, by pipeline."""
+        """The option forms' values, by process."""
         out: dict[str, dict] = {}
-        for (pipeline, key), (_, read) in self.editors.items():
-            out.setdefault(pipeline, {})[key] = read()
+        for (process, key), (_, read) in self.editors.items():
+            out.setdefault(process, {})[key] = read()
         return out
 
-    def set_option(self, pipeline: str, key: str, value) -> None:
-        widget, _ = self.editors[(pipeline, key)]
+    def set_option(self, process: str, key: str, value) -> None:
+        widget, _ = self.editors[(process, key)]
         target = widget.findChild(QLineEdit) if not isinstance(widget, (QCheckBox, QSpinBox, QDoubleSpinBox,
                                                                        QComboBox, QLineEdit)) else widget
         if isinstance(target, QCheckBox):
@@ -277,12 +277,12 @@ class RequisitionDialog(QDialog):
         route = self.route.currentData()
         chain = None if route in (None, AUTO) else route
         typed = {f"{p}.{k}": v for p, values in (self.options() if keep_options else {}).items() for k, v in values.items()}
-        # A chosen preset's options, otherwise those last used with each pipeline; what the forms
+        # A chosen preset's options, otherwise those last used with each process; what the forms
         # hold (typed) wins over both.
         defaults = self.defaults or last_used_params(sorted(self.service.registry().packages))
         for uid in self.uids:
             try:
-                plan = self.service.plan(uid, env, pipelines=chain, params=typed, defaults=defaults,
+                plan = self.service.plan(uid, env, processes=chain, params=typed, defaults=defaults,
                                          endpoint_folder=self.endpoint_folder,
                                          on_collision=self.collision.currentData())
             except ExchangeError as exc:
@@ -302,12 +302,12 @@ class RequisitionDialog(QDialog):
             top = None
             for n, item in enumerate(plan.items):
                 registry = self.service.registry()
-                how = " → ".join(registry.get(p).manifest.name for p in item.pipelines) if item.pipelines else "—"
+                how = " → ".join(registry.get(p).manifest.name for p in item.processes) if item.processes else "—"
                 row = QTreeWidgetItem([item.name, how, item.source, "; ".join(item.problems)])
                 for column in range(4):
                     row.setToolTip(column, row.text(column))
                 row.setData(0, Qt.ItemDataRole.UserRole, item.dossier_uid)
-                if item.pipelines:
+                if item.processes:
                     row.setFlags(row.flags() | Qt.ItemFlag.ItemIsUserCheckable)
                     row.setCheckState(0, Qt.CheckState.Checked if item.include else Qt.CheckState.Unchecked)
                 else:
@@ -338,13 +338,13 @@ class RequisitionDialog(QDialog):
         self.add_button.setText(f"Add to queue ({count})" if count else "Add to queue")
 
     def _build_options(self, plans: list) -> None:
-        """One form per pipeline in the plan, keeping values the user already set."""
+        """One form per process in the plan, keeping values the user already set."""
         values: dict[str, dict] = {}
         for plan in plans:
             for item in plan.items:
                 if item.include:
-                    for pipeline, v in item.params.items():
-                        values.setdefault(pipeline, v)
+                    for process, v in item.params.items():
+                        values.setdefault(process, v)
         wanted = [(p, k) for p, v in values.items() for k in v]
         if [k for k in self.editors] == wanted and not getattr(self, "_rebuild_forms", False):
             return  # the same forms: keep them (and their focus)
@@ -355,8 +355,8 @@ class RequisitionDialog(QDialog):
                 widget.deleteLater()
         self.editors = {}
         registry = self.service.registry()
-        for pipeline, current in values.items():
-            manifest = registry.get(pipeline).manifest
+        for process, current in values.items():
+            manifest = registry.get(process).manifest
             if not manifest.parameters:
                 continue
             group = QGroupBox(manifest.name)
@@ -368,10 +368,10 @@ class RequisitionDialog(QDialog):
                     if hasattr(editor, signal):
                         getattr(editor, signal).connect(lambda *_: self.timer.start())
                 form.addRow(parameter.label or parameter.id, editor)
-                self.editors[(pipeline, parameter.id)] = (editor, read)
+                self.editors[(process, parameter.id)] = (editor, read)
             self.options_layout.addWidget(group)
         if not self.editors:
-            self.options_layout.addWidget(QLabel("These pipelines have no options."))
+            self.options_layout.addWidget(QLabel("These processes have no options."))
         self.options_layout.addStretch(1)
 
     def _on_check(self, row: QTreeWidgetItem, column: int) -> None:
@@ -383,14 +383,14 @@ class RequisitionDialog(QDialog):
         for plan in self.plans:
             for item in plan.items:
                 if item.dossier_uid == uid:
-                    item.include = row.checkState(0) == Qt.CheckState.Checked and bool(item.pipelines)
+                    item.include = row.checkState(0) == Qt.CheckState.Checked and bool(item.processes)
         # Not _show: rebuilding the tree here would delete the row whose signal this is.
         self._summary(self.plans, [w for p in self.plans for w in p.warnings])
 
     # Saving -------------------------------------------------------------------------------------
 
     def save_preset(self) -> None:
-        name = self.window.ask_text("Save as preset", "Preset name (it holds these options for every pipeline):")
+        name = self.window.ask_text("Save as preset", "Preset name (it holds these options for every process):")
         if not name:
             return
         env = next((e for e in self.service.environments() if e["id"] == self.environment_id()), None)

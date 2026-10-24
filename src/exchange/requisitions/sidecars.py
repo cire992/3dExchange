@@ -1,7 +1,7 @@
 """Sidecar manifests: what a requisition wrote into a container, written next to it.
 
 Each output container gets ``.exchange/<requisition uid>.json`` listing, per converted asset,
-its dossier (uid, name, type), the entry it came from, the pipelines and options used, and the
+its dossier (uid, name, type), the entry it came from, the processes and options used, and the
 files written (relative to the container folder). Scans read them back (``read_sidecars`` and
 ``apply_sidecars``, called from identification): the files join the source asset's dossier as a
 *requisitioned* (or *copied*) entry instead of becoming new dossiers. Because the record lives

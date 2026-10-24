@@ -1,4 +1,4 @@
-"""Operations: the smallest reusable steps of a pipeline.
+"""Operations: the smallest reusable steps of a process.
 
 An operation is a Python function taking a context and input artifacts and returning one artifact::
 
@@ -11,7 +11,7 @@ An operation is a Python function taking a context and input artifacts and retur
 An **artifact** is a typed set of files laid out under a folder (``root`` plus "/"-separated
 paths), so a Daz product's ``People/.../Item.duf`` layout survives the whole chain. Types are
 names ("Files", "Images", "DazWearable"); "Files" accepts any artifact. Declared types let
-Exchange check a pipeline's chain before it runs.
+Exchange check a process's chain before it runs.
 """
 
 from __future__ import annotations

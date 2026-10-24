@@ -193,6 +193,6 @@ def _clause(term: Term, definitions: DefinitionSet, threshold: float) -> tuple[s
             return ("EXISTS (SELECT 1 FROM suggestion s WHERE s.subject_uid = d.uid"
                     " AND s.state = 'pending')"), []
         if v == "candidate":
-            raise SearchError("has:candidate needs pipelines, which arrive in Roadmap phase 4")
+            raise SearchError("has:candidate needs processes, which arrive in Roadmap phase 4")
         raise SearchError(f"unknown has:{value} (has:thumbnail, has:broken, has:variants, has:suggestion)")
     raise SearchError(f"unknown filter {key}:")  # parse_query already rejects these
