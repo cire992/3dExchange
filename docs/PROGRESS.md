@@ -1,10 +1,77 @@
 # Exchange: progress and handoff
 
-Last updated 2026-10-22, during Roadmap phase 4. `main` has phases 1-3 and 4a-4c (#10-#13). The Daz Studio bridge has been checked against the real Daz Studio; its fixes are #14. 205 tests pass.
+Last updated 2026-10-24, after the design pivot. `main` has phases 1-3, 4a-4c (#10-#13) and the Daz Studio bridge fixes checked against the real app (#14). 205 tests passed as of #14.
 
-Read this first, then `docs/DESIGN_SPEC.md` (the source of truth; use its terms exactly) and
-`docs/USEFUL_PATHS.md` (real asset folders and tools on the dev machine, for testing). The
-[README](../README.md) covers install and usage.
+Read this first, then `docs/IDENTITY.md` (what Exchange is for), `docs/DESIGN_SPEC.md` (how it
+works; the source of truth, use its terms exactly) and `docs/USEFUL_PATHS.md` (real asset
+folders and tools on the dev machine, for testing). The [README](../README.md) covers install
+and usage.
+
+## Design pivot (2026-10-24)
+
+**Exchange has grown from an asset manager into a personal, AI-assisted project workspace** for
+building interactive 3D worlds in Unreal Engine and by modding Bethesda games. Everything built in
+phases 1-4 stays and becomes the core of the new design. Read `IDENTITY.md` and the new
+`DESIGN_SPEC.md` in full before planning anything.
+
+**What changed:**
+- **Projects.** Exchange now manages projects: git-tracked project homes holding an identity,
+  domains, goals and claims, plus a devlog, decisions, knowledge and game data. See the spec's
+  *Projects* section.
+- **Two repositories.** A desktop shell forked from Mr. Mak Workspace (Tauri, HTML frontend, a
+  Chats window running CLI agents in real terminals) lives in its own repository and has its own
+  handoff doc (path in `USEFUL_PATHS.md`). **This repository stays the Python core** and becomes
+  the Exchange service: the core plus a local API for the shell's Workspace window and an
+  Exchange MCP server for agent sessions.
+- **The PySide6 window stays** as the working UI until the Workspace window reaches library
+  parity (roadmap phase 6), then it is removed. Keep it working until then.
+- **Vocabulary.** Pipelines are now **processes**. The spec's *Names in code* table maps spec
+  terms to current code names until the rename PR lands. Endpoints stay; project targets are a
+  kind of endpoint.
+- **Scope.** Plugin records and game data are now in scope for project homes. Exchange is a
+  personal tool for the user, Windows only; generality is welcome only when it costs nothing.
+
+**What stays:** every decision recorded below still stands, except where the spec's *Decided*
+section (entries dated 2026-10-24) supersedes it. Two supersede older text: the stack now uses
+Tauri for the UI (the core stays Python), and the "asset art only" restriction is lifted. The
+working method under *How we work* is unchanged: plan each phase with open questions and
+recommended answers, wait for approval, one PR per chunk, check against real data.
+
+**The new roadmap** (goal numbers refer to `IDENTITY.md`):
+
+| Phase | What | Repository | Goal |
+| --- | --- | --- | --- |
+| 1-3 | Foundations, Library, Curation | this one | G1, done |
+| 4 | Requisitions v1; first process Daz cross-figure (4d) | this one | G2, in progress |
+| 5 | Chats online: the shell fork, sessions, history, per-session bypass | shell | G3 |
+| 6 | Service and Workspace: local API, the rename, library view at parity | both | G4 |
+| 7 | Project homes: files and index, identity interview, claims, devlog, mission control | both | G5 |
+| 8 | Agents connected: Exchange MCP, generated agent files, claim dispatch, skills, drift review | both | G6 |
+| 9 | Benchmark: a fresh Sirenne-themed Unreal project run from Exchange, with a Daz → Unreal process | both | G7 |
+| 10-11 | Game environments; breadth | this one | |
+
+**Next, in order:**
+1. **The rename PR** (pipelines → processes), before 4d adds more pipeline code. It covers the
+   package and module names, `pipeline.toml` → `process.toml`, CLI commands and help, the user's
+   data folder (`<data>/pipelines/`, the trust list, tool paths), the `requisitions` table's
+   `pipelines` and `params` columns (a migration), the window's labels, and the README. Existing
+   data is migrated on first run; with a single user, no long-term aliases are needed. Test the
+   migration on a copy of the real database and data folder, never the originals.
+2. **4d**, once the user answers phase 4 question 1 (what cross-figure converts first, and with
+   which tool). The user has a Blender template scene for these conversions.
+3. **Phase 5** runs in parallel in the shell repository, in its own session; it does not touch
+   this repository.
+4. **Phase 6 plan** after the rename and 4d. Recommended answers to carry into it, not yet
+   approved:
+   - **API layer:** FastAPI with uvicorn as an optional `service` extra, like the `ui` extra, so
+     the core keeps its minimal dependencies.
+   - **Project-home commits** (phase 7): automatic commits at bypass-session checkpoints, when a
+     claim reaches review or done, and on request.
+
+**Between the repositories:** this repository owns the service API and the Exchange MCP; the
+shell consumes them. Until phase 6 the shell's Workspace window is a placeholder, so phase 5 needs
+nothing from here. When the API exists, its schema is the contract between the two, and changes
+to it are noted in both handoff docs.
 
 ## Where we are
 
@@ -15,7 +82,7 @@ pipeline (Daz cross-figure, G9/G2 → G8).** The phase 4 plan was approved with 
 answers (see Decisions).
 
 **Next:**
-- **Daz Studio bridge fixes** (settings copied from the main instance, Daz's own log in errors, a longer exit grace): #14, open.
+- **The rename PR, then 4d:** see *Design pivot* above.
 - **Stacked PRs next time:** after merging one, change the next PR's base to `main` before merging it (or delete the merged branch, and GitHub moves it). #11 and #12 merged into their base branches and needed #13 to reach `main`.
 - **4d** waits for the user's answer to open question 1: what cross-figure converts first, and with which tool.
 
@@ -34,7 +101,7 @@ answers (see Decisions).
 | #11 | 4b: bridges: Blender (headless), Daz Studio (DazScript at launch), command-line tools; one job per app; built-in Convert mesh (Blender) | merged (via #13) |
 | #12 | 4c: requisitions in the window: Requisition to… (plan tree, option forms, presets, last-used options, batch), the queue view, Settings › Pipelines and Endpoints | merged (via #13) |
 | #13 | 4b and 4c onto `main`, with this doc | merged |
-| #14 | Daz Studio bridge, checked against the real app: instance settings from the main instance, Daz's log in errors | open |
+| #14 | Daz Studio bridge, checked against the real app: instance settings from the main instance, Daz's log in errors | merged |
 | 4d | First pipeline: Daz cross-figure (G9/G2 → G8) | needs the user's answer to open question 1 |
 
 ## How we work
@@ -302,7 +369,7 @@ Key ideas:
 
 - **4d** (see the table above) needs the user's answer on what cross-figure converts first.
 - **Not done yet in phase 4:**
-  - The `new-pipeline` scaffold and the authoring guide (phase 6).
+  - The `new-process` scaffold and the authoring guide (`PROCESS_GUIDE.md`, roadmap phase 11).
   - **Manual checkpoints in the window:** they show as *Needs attention* with the pipeline's message, and Resume continues. There's no button yet to open the work folder in the app at that point.
   - **Queue mode:** the queue only runs when you press Run; there's no "run immediately" setting yet.
   - Parallel command-line operations: the runner does one step at a time.
@@ -327,4 +394,4 @@ Key ideas:
 - **Not used yet:** the chosen MO2 profile is stored but unused. (Endpoints and visibility are used by requisitions since 4a.)
 - **Unreal:** no `.uasset` class detection (types come from name prefixes).
 - **Discovery noise:** Steam games without definitions make the wizard's found list long. Consider hiding them behind a toggle.
-- **Untracked files:** `docs/USEFUL_PATHS.md` and `KICKOFF_PROMPT.md` are the user's and haven't been committed. `.claude/launch.json` serves `docs/` on port 8765 to view the UI mockup (`docs/Exchange_Main_Window_Add_Environment.html`) in the browser pane.
+- **Untracked files:** `docs/USEFUL_PATHS.md` and `KICKOFF_PROMPT.md` are the user's and haven't been committed. `KICKOFF_PROMPT.md` predates the 2026-10-24 pivot; `IDENTITY.md` and `DESIGN_SPEC.md` replace it as the brief. `.claude/launch.json` serves `docs/` on port 8765 to view the UI mockup (`docs/Exchange_Main_Window_Add_Environment.html`) in the browser pane.
