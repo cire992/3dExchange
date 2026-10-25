@@ -1,6 +1,6 @@
 # Exchange: progress and handoff
 
-Last updated 2026-10-24, during phase 6e. `main` has phases 1-3, 4a-4c (#10-#13), the Daz Studio bridge fixes checked against the real app (#14), the pivot docs (#15), phase 6's core chunks 6a and 6b (via #19), and phase 7 part 1's core chunks (#20-#22). The shell repository has merged 6c and 7c; its 6d (library browsing) is in review. 6e (the write API) is in review here.
+Last updated 2026-10-25, during phase 6g. `main` has phases 1-3, 4a-4c (#10-#13), the Daz Studio bridge fixes checked against the real app (#14), the pivot docs (#15), phase 6's core chunks 6a, 6b (via #19) and 6e (#23), scoped file links (#24), and phase 7 part 1's core chunks (#20-#22). The shell repository has merged 6c, 6d, 6f and 7c. 6g part 1 (jobs and environments) is in review here.
 
 Read this first, then `docs/OVERVIEW.md` (how the parts connect), `docs/IDENTITY.md` (what
 Exchange is for), `docs/GAME_DATA_MODEL.md` (records and claims), `docs/DESIGN_SPEC.md` (how it
@@ -112,7 +112,10 @@ answers (see Decisions).
 | #20 | The game data model: identity v2, overview, game data model; the spec's *Projects* brought in line; the phase 7 plan | merged |
 | #21 | 7a: project homes: formats, parser, schemas, validator, `exchange project init/validate/checkpoint/config` | merged |
 | #22 | 7b: gap claims, dossier hints and relink candidates, fast capture, `exchange claims list/ack` | merged |
-| 6e | The write API: curation edits, Undo/Redo and history, collections, suggestions, the desk, lexicons | in review |
+| #23 | 6e: the write API: curation edits, Undo/Redo and history, collections, suggestions, the desk, lexicons | merged |
+| #24 | Curation edits apply only the file links they name | merged |
+| 6g, part 1 | The jobs API: environments (discover, detect, register, configure), scans and rescans in worker processes with progress, classify, change notices | in review |
+| 6g, part 2 | Requisitions, process prerequisites, endpoints | next |
 | 4d | First process: Daz cross-figure (G9/G2 → G8) | needs the user's answer to open question 1 |
 
 ## Phase 6: Service and Workspace
@@ -295,6 +298,84 @@ Decisions:
   | Undo it | 3.4 s | 0.04 s |
   | Link 5 files | 4.5 s | 0.08 s |
   | Undo it | 3.5 s | 0.04 s |
+
+### 6g, part 1: jobs and environments
+
+`exchange/service/jobs.py` and `watch.py`. The routes are in `docs/api/openapi.json`, tagged *jobs*
+and *environments*. 6g is split in two PRs, along the shell chunks they serve: part 1 is what 6h
+(environments and scanning) and the lexicon editor's "Apply to library" need; part 2 brings
+requisitions, process prerequisites and endpoints for 6i.
+
+- **Jobs are worker processes** (the phase 6 decision), as the window's `ScanRunner`: `python -m
+  exchange <command> --progress-json` with the service's library, threshold and definition folders.
+  Its JSON lines become the job's progress and its report. The service's token is not passed on, and
+  on Windows the worker opens no console window.
+  - `POST /jobs/detect {folder}`: which environments a folder holds (`scan --dry-run`); writes nothing
+  - `POST /jobs/scan {folder}`: detect, register and scan a folder (`exchange scan`)
+  - `POST /jobs/rescan {environments}`: rescan some environments, or all
+  - `POST /jobs/classify {regroup, environments}`: classify again after lexicon edits ("Apply to
+    library"); `regroup` also regroups hand-installed Daz products. It prints one JSON result, read
+    when it ends.
+  - `POST /jobs/{id}/stop`: kills the worker. A scan keeps what it finished (it commits as it goes);
+    a classification is not saved (one transaction).
+- **Following a job:** `GET /jobs/{id}?since=<version>&wait=<s>` returns as soon as the job's version
+  passes `since` (at most 25 s), so progress arrives without a polling loop and without streaming
+  through the shell's proxy. `GET /jobs` lists running jobs first, then the 20 latest finished ones,
+  with a version of its own. Reports come with the job once it ends: a scan's `ScanReport`, or
+  `result` for classify.
+- **One writing job at a time** (scan, rescan, classify), as in the window: another writer, registering
+  environments or changing their settings answers **409** until it ends or is stopped. Detection only
+  lists folders and may run beside it. Edits during a scan may find the library busy (**503**, 6e).
+- **Environments** (not curation, so not undoable; written on the editor's write connection):
+  - `GET /environment-types`: the definitions, with handler, multi-root, fallback, always-ignored
+    globs and variants
+  - `GET /environments/discover`: game, engine and content-library folders found on this PC (the
+    wizard's first step); a failure lists nothing, as in the window
+  - `GET /environments/mo2-profiles?folder=`: an MO2 instance's profiles and the selected one
+  - `GET /environments/{id}`: its roots and settings (`user_config`, `layer_config`)
+  - `POST /environments/register`: the wizard's third step: environments with their roots and
+    settings, and folders never to index (unticked ones inside an added folder). Then
+    `/jobs/rescan` scans them.
+  - `POST /environments/{id}/config`: change settings (`exchange env config`): ignore rules, MO2
+    profile, visibility, endpoint folder. The fields given replace the ones it has; null or an empty
+    list removes one; unknown keys are refused (422).
+- **Change notices** (`watch.py`, the window's `ChangeWatcher` without Qt): `GET /changes` lists the
+  environments whose roots changed since they were last scanned, and waits by version like jobs.
+  A rescan clears what it scanned; new roots are watched after each writing job and registration. It
+  needs `watchdog`, now in the `service` extra; without it `available` is false.
+- **The service stops its jobs** when it stops (`--exit-with-stdin`), so no worker outlives it.
+- **Endpoint settings:** the API takes the endpoint as a folder, as requisitions read it
+  (`requisitions/endpoints.py`) and as the CLI and the window's `set_endpoint` write it. The
+  window's add-environment wizard writes `{"mode", "value"}` instead, which requisitions cannot
+  read (see *Known gaps*).
+- **Tests:** `tests/test_service_jobs.py` (10; the suite is at 285) covers:
+  - the token
+  - detect, then register (with settings and an excluded folder), then rescan with progress, the
+    report and the sidebar
+  - scanning a folder, then classifying
+  - bad folders, unknown environments and types, bad settings
+  - one writer at a time with detection beside it, waiting without a change, and stopping (with a
+    stand-in worker)
+  - a failing worker's message
+  - closing the service stopping its jobs
+  - settings: replace, remove, validate, MO2 profiles
+  - environment types and discovery (with a stand-in)
+  - change notices, cleared by a rescan
+- **Through `exchange serve` on a fresh copy of the scratch scan of the real library** (235,043
+  assets). Detection and the rescan read the real Daz folder; they write only to the copy.
+
+  | Step | Time |
+  | --- | --- |
+  | Environments / environment types | 0.22 s / 0.02 s |
+  | Discover this PC (162 places found, 3 matching a Daz type, 2 MO2, 86 Unreal projects) | 1.6 s |
+  | Detect the Daz library (`scan --dry-run`, walks 3,558,616 file names) | 272 s |
+  | A rescan's first progress line | 0.02 s |
+  | Stop the rescan | 0.02 s |
+  | Classify (235,043 assets, 219,288 tagged) | 48.5 s |
+
+  While the rescan ran, a second writing job was refused (409) and the sidebar answered in 1.8 s.
+  The library read normally after the stop. The scanner's discovery phase reports no counts (0/0),
+  so a UI can only say "Discovering files" until phase 2, as the window does.
 
 ## Phase 7: Project homes, part 1
 
@@ -734,6 +815,7 @@ Key ideas:
   - Unattached Daz files (1.55M) are mostly `Runtime/Libraries` (Poser) content and data whose folder names are generic. The Unidentified desk (3c) groups them by folder.
   - Single-letter texture channels (`_D`, `_N`) only count for images whose base name matches a mesh.
 - **Unverified:** the Daz Connect folder layout (`data/cloud/<n>_<SKU>/`) hasn't been checked against a real Connect install. Connect products are named "Daz Connect product <SKU>" unless a DIM manifest names them.
+- **The window's wizard writes endpoints requisitions cannot read.** It stores `{"mode", "value"}`; `requisitions/endpoints.py` reads a folder, so a requisition into an environment added through the wizard (Daz, MO2, Unreal) fails with a TypeError. The service's API writes a folder.
 - **Not used yet:** the chosen MO2 profile is stored but unused. (Endpoints and visibility are used by requisitions since 4a.)
 - **Unreal:** no `.uasset` class detection (types come from name prefixes).
 - **Discovery noise:** Steam games without definitions make the wizard's found list long. Consider hiding them behind a toggle.
