@@ -8,7 +8,8 @@ directly: the shell's own local service proxies it on the Workspace's origin.
 
 The library is read through read-only connections, one per worker thread, exactly as the PySide6
 window does; scans and edits may write at the same time (WAL mode). Edits run on one write
-connection in one worker thread (see ``edits.py``).
+connection in one worker thread (see ``edits.py``); scans and other long jobs run in worker
+processes (``jobs.py``, 6g).
 """
 
 from __future__ import annotations
@@ -40,16 +41,20 @@ MAX_PAGE = 1000
 class Library:
     """The database the service reads, with one read-only connection per thread."""
 
-    def __init__(self, db_path: Path, definitions: DefinitionSet, threshold: float) -> None:
+    def __init__(self, db_path: Path, definitions: DefinitionSet, threshold: float,
+                 definition_dirs: tuple[Path, ...] = ()) -> None:
         self.db_path = Path(db_path).resolve()
         self.definitions = definitions
         self.threshold = threshold
+        self.definition_dirs = tuple(Path(d).resolve() for d in definition_dirs)  # handed to job workers
         self.thumbnails = thumbnail_dir(self.db_path)
         open_library(self.db_path).close()  # create or migrate once; then read only
         self._local = threading.local()
         self._open: list[sqlite3.Connection] = []
         self._lock = threading.Lock()
         self.editor = None  # set by create_app; closed with the library
+        self.jobs = None
+        self.watcher = None
 
     def conn(self) -> sqlite3.Connection:
         conn = getattr(self._local, "conn", None)
@@ -61,6 +66,10 @@ class Library:
         return conn
 
     def close(self) -> None:
+        if self.jobs is not None:
+            self.jobs.close()
+        if self.watcher is not None:
+            self.watcher.stop()
         if self.editor is not None:
             self.editor.close()
         with self._lock:
@@ -77,8 +86,9 @@ def _thumbnail_url(uid: str) -> str:
 
 
 def create_app(db_path: Path, *, token: str, definitions: DefinitionSet | None = None,
-               threshold: float = DEFAULT_THRESHOLD, allowed_hosts: tuple[str, ...] = ("127.0.0.1", "localhost")) -> FastAPI:
-    library = Library(db_path, definitions or load_definitions(), threshold)
+               threshold: float = DEFAULT_THRESHOLD, allowed_hosts: tuple[str, ...] = ("127.0.0.1", "localhost"),
+               definition_dirs: tuple[Path, ...] = (), watch: bool = True) -> FastAPI:
+    library = Library(db_path, definitions or load_definitions(definition_dirs), threshold, definition_dirs)
     expected = f"Bearer {token}".encode()
     app = FastAPI(title="Exchange", version=__version__, docs_url=None, redoc_url=None, openapi_url=None,
                   description="The local API of the Exchange service, for the desktop shell's Workspace window.")
@@ -195,4 +205,13 @@ def create_app(db_path: Path, *, token: str, definitions: DefinitionSet | None =
 
     library.editor = Editor(library)
     register(app, library, library.editor, api, errors)
+
+    from exchange.service import jobs
+    from exchange.service.watch import Watcher
+
+    library.watcher = Watcher()
+    library.jobs = jobs.Jobs(library, on_finished=lambda job: jobs.after_job(library, library.watcher, job))
+    jobs.register(app, library, library.jobs, library.watcher, api, errors)
+    if watch:
+        jobs.watch_roots(library, library.watcher)
     return app

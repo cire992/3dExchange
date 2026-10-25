@@ -34,11 +34,12 @@ LOOPBACK = "127.0.0.1"
 
 
 def serve(db_path: Path, *, port: int = 0, definitions: DefinitionSet | None = None, threshold: float,
-          exit_with_stdin: bool = False, out=None) -> None:
+          exit_with_stdin: bool = False, out=None, definition_dirs: tuple[Path, ...] = ()) -> None:
     out = out or sys.stdout
     given = os.environ.get(TOKEN_ENV, "").strip()
     token = given or secrets.token_urlsafe(32)
-    app = create_app(db_path, token=token, definitions=definitions, threshold=threshold)
+    app = create_app(db_path, token=token, definitions=definitions, threshold=threshold,
+                     definition_dirs=definition_dirs)
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):  # Windows: no other process may share the port
@@ -60,4 +61,7 @@ def serve(db_path: Path, *, port: int = 0, definitions: DefinitionSet | None = N
                 pass
             server.should_exit = True
         threading.Thread(target=watch, name="stdin-watch", daemon=True).start()
-    server.run(sockets=[sock])
+    try:
+        server.run(sockets=[sock])
+    finally:
+        app.state.library.close()  # stops running jobs: no worker outlives the service

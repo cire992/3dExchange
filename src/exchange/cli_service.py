@@ -32,5 +32,5 @@ def run(args, definitions) -> int:
         print(json.dumps(openapi_schema(), indent=2))
         return 0
     serve(args.db, port=args.port, definitions=definitions, threshold=args.threshold,
-          exit_with_stdin=args.exit_with_stdin)
+          exit_with_stdin=args.exit_with_stdin, definition_dirs=tuple(args.definitions))
     return 0

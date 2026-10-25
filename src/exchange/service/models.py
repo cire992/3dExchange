@@ -426,3 +426,175 @@ class Choices(BaseModel):
     types: list[TypeChoice]
     tags: list[str] = Field(description="The category lexicon's tags, for completion")
     fields: list[str] = Field(description="Fields POST /edits/fields can set")
+
+
+# Jobs and environments (6g) -----------------------------------------------------------------------
+
+
+class Progress(BaseModel):
+    """A worker's latest progress line (a scan's: phase 1 discovery, 2 identification, 3 enrichment)."""
+
+    model_config = {"extra": "allow"}
+    phase: int | None = None
+    environment: str | None = None
+    step: str | None = Field(None, description="e.g. discovery, identification, hashing, thumbnails")
+    done: int = 0
+    total: int = 0
+
+
+class RootReport(BaseModel):
+    model_config = {"extra": "allow"}
+    path: str
+    confidence: float
+    signals: list[str]
+    variant: str | None = None
+    registered: bool
+    status: str = Field(description="scanned, detected (a dry run) or offline")
+    files: int = 0
+    new: int = 0
+    changed: int = 0
+    unchanged: int = 0
+    gone: int = 0
+    offline_days: int | None = None
+    identification: dict[str, Any] | None = None
+
+
+class EnvironmentReport(BaseModel):
+    model_config = {"extra": "allow"}
+    id: int | None = Field(None, description="Null in a dry run for an environment not yet registered")
+    name: str
+    type_id: str
+    roots: list[RootReport]
+    enrichment: dict[str, Any] | None = None
+
+
+class ScanReport(BaseModel):
+    """What ``exchange scan`` (or ``rescan``) reports; a dry run only detects."""
+
+    model_config = {"extra": "allow"}
+    folder: str | None = None
+    dry_run: bool
+    environments: list[EnvironmentReport]
+    links_skipped: list[str] = []
+    excluded: list[str] = []
+    errors: list[str] = []
+    notes: list[str] = []
+    cancelled: bool = False
+
+
+class Job(BaseModel):
+    id: int
+    kind: Literal["scan", "detect", "rescan", "classify"]
+    label: str
+    state: Literal["running", "done", "failed", "stopped"]
+    writes: bool = Field(description="It writes the library: one such job runs at a time")
+    environments: list[int] = Field(description="The environments it was asked for; empty is all")
+    started_at: str
+    finished_at: str | None = None
+    progress: Progress | None = None
+    error: str | None = Field(None, description="Why it failed, or what stopping it kept")
+    version: int = Field(description="Grows with every change; ask again with since=version to wait for the next")
+    report: ScanReport | None = Field(None, description="A scan, detection or rescan's report, once it has ended")
+    result: dict[str, Any] | None = Field(None, description="Another job's result (classify: counts), once ended")
+
+
+class JobList(BaseModel):
+    version: int = Field(description="Grows with every change of any job")
+    jobs: list[Job] = Field(description="Running first, then the latest finished; without reports")
+
+
+class FolderJob(BaseModel):
+    folder: str = Field(description="An absolute folder path")
+
+
+class EnvironmentsJob(BaseModel):
+    environments: list[int] | None = Field(None, description="Environment ids; none or empty is every one")
+
+
+class ClassifyJob(EnvironmentsJob):
+    regroup: bool = Field(False, description="Also regroup hand-installed Daz products (after theme, author or "
+                          "category edits; minutes on a big library)")
+
+
+class VariantRef(BaseModel):
+    id: str
+    name: str
+
+
+class EnvironmentType(BaseModel):
+    id: str
+    name: str
+    handler: str = Field(description="mo2, daz, unreal or folder: how its files are organized")
+    multi_root: bool = Field(description="Every root of this type joins one environment (Daz content directories)")
+    fallback: bool = Field(description="Takes the files no other type claims (loose files)")
+    ignore_globs: list[str] = Field(description="Always ignored")
+    variants: list[VariantRef]
+
+
+class FoundSource(BaseModel):
+    path: str
+    name: str
+    via: str = Field(description="Where it was found (Steam, Epic, Daz, MO2...)")
+    type_id: str | None = Field(None, description="The environment type it matches, if any")
+    confidence: float = 0.0
+    signals: list[str] = []
+    registered: bool = False
+
+
+class Mo2Profiles(BaseModel):
+    profiles: list[str]
+    selected: str | None = Field(None, description="The profile the instance's ini selects")
+
+
+class EnvironmentConfig(BaseModel):
+    """An environment's settings; in a change, the fields given replace the ones it has (null or an
+    empty list removes one)."""
+
+    model_config = {"extra": "forbid"}
+    ignore: list[str] | None = Field(None, description="Ignore rules (globs), from the next rescan")
+    mo2_profile: str | None = None
+    visibility: str | None = Field(None, description="personal or publishable")
+    endpoint: str | None = Field(None, description="The folder requisitions write to; null is the default")
+
+
+class ConfigResult(BaseModel):
+    user_config: dict[str, Any] = Field(description="All its settings now")
+
+
+class EnvironmentDetail(Environment):
+    user_config: dict[str, Any] = Field(description="The settings the user chose")
+    layer_config: dict[str, Any] = Field(description="What scans found (an MO2 instance's profiles...)")
+
+
+class RootPlan(BaseModel):
+    path: str
+    confidence: float = 0.0
+    signals: list[str] = []
+
+
+class EnvironmentPlan(BaseModel):
+    type_id: str
+    name: str | None = Field(None, description="Default: from the type and the folder")
+    roots: list[RootPlan]
+    config: EnvironmentConfig = EnvironmentConfig()
+
+
+class RegisterEnvironments(BaseModel):
+    environments: list[EnvironmentPlan]
+    exclude: list[str] = Field([], description="Folders found inside added ones that scans must never index")
+
+
+class RegisteredEnvironment(BaseModel):
+    id: int
+    name: str
+    type_id: str
+
+
+class Registered(BaseModel):
+    environments: list[RegisteredEnvironment]
+
+
+class Changes(BaseModel):
+    available: bool = Field(description="False without watchdog: no change notices")
+    environments: list[int] = Field(description="Environments whose roots changed since they were last scanned")
+    version: int = Field(description="Ask again with since=version to wait for the next change")

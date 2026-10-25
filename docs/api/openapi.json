@@ -3423,6 +3423,1269 @@
           }
         ]
       }
+    },
+    "/api/v1/jobs": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "List Jobs",
+        "description": "Running jobs first, then the latest finished ones (without their reports).",
+        "operationId": "list_jobs_api_v1_jobs_get",
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The list's version you have: wait for a newer one",
+              "title": "Since"
+            },
+            "description": "The list's version you have: wait for a newer one"
+          },
+          {
+            "name": "wait",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 25,
+              "minimum": 0,
+              "description": "Seconds to wait for a change",
+              "default": 0,
+              "title": "Wait"
+            },
+            "description": "Seconds to wait for a change"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobList"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/jobs/{job_id}": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Get Job",
+        "description": "One job with its latest progress, and its report or result once it has ended.",
+        "operationId": "get_job_api_v1_jobs__job_id__get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The job's version you have: wait for a newer one",
+              "title": "Since"
+            },
+            "description": "The job's version you have: wait for a newer one"
+          },
+          {
+            "name": "wait",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 25,
+              "minimum": 0,
+              "description": "Seconds to wait for a change",
+              "default": 0,
+              "title": "Wait"
+            },
+            "description": "Seconds to wait for a change"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/jobs/{job_id}/stop": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Stop Job",
+        "description": "Stop a running job (a scan keeps what it finished).",
+        "operationId": "stop_job_api_v1_jobs__job_id__stop_post",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/jobs/scan": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Scan",
+        "description": "Detect the environments in a folder, register them and scan them (``exchange scan``).",
+        "operationId": "scan_api_v1_jobs_scan_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FolderJob"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/jobs/detect": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Detect",
+        "description": "Which environments a folder holds, without reading any file (``exchange scan --dry-run``);\nnothing is written. The add-environment wizard's second step.",
+        "operationId": "detect_api_v1_jobs_detect_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FolderJob"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/jobs/rescan": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Rescan",
+        "description": "Rescan known environments (all of them without ``environments``).",
+        "operationId": "rescan_api_v1_jobs_rescan_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnvironmentsJob"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/jobs/classify": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Classify",
+        "description": "Classify the library again with the lexicons as they are now (\"Apply to library\" after lexicon\nedits); ``regroup`` also regroups hand-installed Daz products (after theme, author or category\nedits; minutes on a big library).",
+        "operationId": "classify_api_v1_jobs_classify_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClassifyJob"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/environment-types": {
+      "get": {
+        "tags": [
+          "environments"
+        ],
+        "summary": "Environment Types",
+        "description": "The environment definitions an environment can be of, for the add-environment wizard.",
+        "operationId": "environment_types_api_v1_environment_types_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EnvironmentType"
+                  },
+                  "type": "array",
+                  "title": "Response Environment Types Api V1 Environment Types Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/environments/discover": {
+      "get": {
+        "tags": [
+          "environments"
+        ],
+        "summary": "Discover",
+        "description": "Game, engine and content-library folders found on this PC (Steam, Epic, Unreal projects, Daz,\nMO2). Reads only where they are, never their files.",
+        "operationId": "discover_api_v1_environments_discover_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FoundSource"
+                  },
+                  "type": "array",
+                  "title": "Response Discover Api V1 Environments Discover Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/environments/mo2-profiles": {
+      "get": {
+        "tags": [
+          "environments"
+        ],
+        "summary": "Get Mo2 Profiles",
+        "description": "An MO2 instance's profiles and the one it has selected (folder names and its ini only).",
+        "operationId": "get_mo2_profiles_api_v1_environments_mo2_profiles_get",
+        "parameters": [
+          {
+            "name": "folder",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "An MO2 instance folder",
+              "title": "Folder"
+            },
+            "description": "An MO2 instance folder"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mo2Profiles"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/environments/{env_id}": {
+      "get": {
+        "tags": [
+          "environments"
+        ],
+        "summary": "Get Environment",
+        "description": "One environment with its roots and settings.",
+        "operationId": "get_environment_api_v1_environments__env_id__get",
+        "parameters": [
+          {
+            "name": "env_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Env Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/environments/register": {
+      "post": {
+        "tags": [
+          "environments"
+        ],
+        "summary": "Register Environments",
+        "description": "Add environments (the wizard's third step): their roots and settings, and the folders never to\nindex. Nothing is read from them until they are scanned (``/jobs/rescan`` with the ids).",
+        "operationId": "register_environments_api_v1_environments_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterEnvironments"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Registered"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/environments/{env_id}/config": {
+      "post": {
+        "tags": [
+          "environments"
+        ],
+        "summary": "Configure",
+        "description": "Change an environment's settings: the fields given replace the ones it has (``exchange env\nconfig``). Ignore rules apply from the next rescan.",
+        "operationId": "configure_api_v1_environments__env_id__config_post",
+        "parameters": [
+          {
+            "name": "env_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Env Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnvironmentConfig"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/changes": {
+      "get": {
+        "tags": [
+          "environments"
+        ],
+        "summary": "Changes",
+        "description": "Environments whose roots changed since they were last scanned (``available`` is false without\n``watchdog``). A rescan of an environment clears it.",
+        "operationId": "changes_api_v1_changes_get",
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The version you have: wait for a newer one",
+              "title": "Since"
+            },
+            "description": "The version you have: wait for a newer one"
+          },
+          {
+            "name": "wait",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 25,
+              "minimum": 0,
+              "description": "Seconds to wait for a change",
+              "default": 0,
+              "title": "Wait"
+            },
+            "description": "Seconds to wait for a change"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Changes"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -3510,6 +4773,35 @@
         "title": "Brick",
         "description": "One item card in the browser."
       },
+      "Changes": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available",
+            "description": "False without watchdog: no change notices"
+          },
+          "environments": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Environments",
+            "description": "Environments whose roots changed since they were last scanned"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "description": "Ask again with since=version to wait for the next change"
+          }
+        },
+        "type": "object",
+        "required": [
+          "available",
+          "environments",
+          "version"
+        ],
+        "title": "Changes"
+      },
       "Choices": {
         "properties": {
           "types": {
@@ -3543,6 +4835,33 @@
           "fields"
         ],
         "title": "Choices"
+      },
+      "ClassifyJob": {
+        "properties": {
+          "environments": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Environments",
+            "description": "Environment ids; none or empty is every one"
+          },
+          "regroup": {
+            "type": "boolean",
+            "title": "Regroup",
+            "description": "Also regroup hand-installed Daz products (after theme, author or category edits; minutes on a big library)",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "ClassifyJob"
       },
       "Collection": {
         "properties": {
@@ -3633,6 +4952,21 @@
           "name"
         ],
         "title": "CollectionRef"
+      },
+      "ConfigResult": {
+        "properties": {
+          "user_config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "User Config",
+            "description": "All its settings now"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_config"
+        ],
+        "title": "ConfigResult"
       },
       "ContainerCount": {
         "properties": {
@@ -4338,6 +5672,178 @@
         ],
         "title": "Environment"
       },
+      "EnvironmentConfig": {
+        "properties": {
+          "ignore": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ignore",
+            "description": "Ignore rules (globs), from the next rescan"
+          },
+          "mo2_profile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mo2 Profile"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visibility",
+            "description": "personal or publishable"
+          },
+          "endpoint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endpoint",
+            "description": "The folder requisitions write to; null is the default"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EnvironmentConfig",
+        "description": "An environment's settings; in a change, the fields given replace the ones it has (null or an\nempty list removes one)."
+      },
+      "EnvironmentDetail": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "uid": {
+            "type": "string",
+            "title": "Uid"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "type_id": {
+            "type": "string",
+            "title": "Type Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "online",
+              "offline",
+              "partial"
+            ],
+            "title": "Status",
+            "description": "From its roots, as in the sidebar"
+          },
+          "added_at": {
+            "type": "string",
+            "title": "Added At"
+          },
+          "last_scanned_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Scanned At"
+          },
+          "roots": {
+            "items": {
+              "$ref": "#/components/schemas/Root"
+            },
+            "type": "array",
+            "title": "Roots"
+          },
+          "user_config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "User Config",
+            "description": "The settings the user chose"
+          },
+          "layer_config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Layer Config",
+            "description": "What scans found (an MO2 instance's profiles...)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "uid",
+          "name",
+          "type_id",
+          "status",
+          "added_at",
+          "roots",
+          "user_config",
+          "layer_config"
+        ],
+        "title": "EnvironmentDetail"
+      },
+      "EnvironmentPlan": {
+        "properties": {
+          "type_id": {
+            "type": "string",
+            "title": "Type Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Default: from the type and the folder"
+          },
+          "roots": {
+            "items": {
+              "$ref": "#/components/schemas/RootPlan"
+            },
+            "type": "array",
+            "title": "Roots"
+          },
+          "config": {
+            "$ref": "#/components/schemas/EnvironmentConfig",
+            "default": {}
+          }
+        },
+        "type": "object",
+        "required": [
+          "type_id",
+          "roots"
+        ],
+        "title": "EnvironmentPlan"
+      },
       "EnvironmentRef": {
         "properties": {
           "id": {
@@ -4360,6 +5866,131 @@
           "type_id"
         ],
         "title": "EnvironmentRef"
+      },
+      "EnvironmentReport": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id",
+            "description": "Null in a dry run for an environment not yet registered"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "type_id": {
+            "type": "string",
+            "title": "Type Id"
+          },
+          "roots": {
+            "items": {
+              "$ref": "#/components/schemas/RootReport"
+            },
+            "type": "array",
+            "title": "Roots"
+          },
+          "enrichment": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enrichment"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "name",
+          "type_id",
+          "roots"
+        ],
+        "title": "EnvironmentReport"
+      },
+      "EnvironmentType": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "handler": {
+            "type": "string",
+            "title": "Handler",
+            "description": "mo2, daz, unreal or folder: how its files are organized"
+          },
+          "multi_root": {
+            "type": "boolean",
+            "title": "Multi Root",
+            "description": "Every root of this type joins one environment (Daz content directories)"
+          },
+          "fallback": {
+            "type": "boolean",
+            "title": "Fallback",
+            "description": "Takes the files no other type claims (loose files)"
+          },
+          "ignore_globs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ignore Globs",
+            "description": "Always ignored"
+          },
+          "variants": {
+            "items": {
+              "$ref": "#/components/schemas/VariantRef"
+            },
+            "type": "array",
+            "title": "Variants"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "handler",
+          "multi_root",
+          "fallback",
+          "ignore_globs",
+          "variants"
+        ],
+        "title": "EnvironmentType"
+      },
+      "EnvironmentsJob": {
+        "properties": {
+          "environments": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Environments",
+            "description": "Environment ids; none or empty is every one"
+          }
+        },
+        "type": "object",
+        "title": "EnvironmentsJob"
       },
       "FieldEdit": {
         "properties": {
@@ -4463,6 +6094,74 @@
           "variant"
         ],
         "title": "FoldEdit"
+      },
+      "FolderJob": {
+        "properties": {
+          "folder": {
+            "type": "string",
+            "title": "Folder",
+            "description": "An absolute folder path"
+          }
+        },
+        "type": "object",
+        "required": [
+          "folder"
+        ],
+        "title": "FolderJob"
+      },
+      "FoundSource": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "via": {
+            "type": "string",
+            "title": "Via",
+            "description": "Where it was found (Steam, Epic, Daz, MO2...)"
+          },
+          "type_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type Id",
+            "description": "The environment type it matches, if any"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence",
+            "default": 0.0
+          },
+          "signals": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Signals",
+            "default": []
+          },
+          "registered": {
+            "type": "boolean",
+            "title": "Registered",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "name",
+          "via"
+        ],
+        "title": "FoundSource"
       },
       "HTTPValidationError": {
         "properties": {
@@ -4620,6 +6319,152 @@
           "folder"
         ],
         "title": "IgnoreEdit"
+      },
+      "Job": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "scan",
+              "detect",
+              "rescan",
+              "classify"
+            ],
+            "title": "Kind"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "running",
+              "done",
+              "failed",
+              "stopped"
+            ],
+            "title": "State"
+          },
+          "writes": {
+            "type": "boolean",
+            "title": "Writes",
+            "description": "It writes the library: one such job runs at a time"
+          },
+          "environments": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Environments",
+            "description": "The environments it was asked for; empty is all"
+          },
+          "started_at": {
+            "type": "string",
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Progress"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "Why it failed, or what stopping it kept"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "description": "Grows with every change; ask again with since=version to wait for the next"
+          },
+          "report": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScanReport"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A scan, detection or rescan's report, once it has ended"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result",
+            "description": "Another job's result (classify: counts), once ended"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "label",
+          "state",
+          "writes",
+          "environments",
+          "started_at",
+          "version"
+        ],
+        "title": "Job"
+      },
+      "JobList": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "description": "Grows with every change of any job"
+          },
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/Job"
+            },
+            "type": "array",
+            "title": "Jobs",
+            "description": "Running first, then the latest finished; without reports"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "jobs"
+        ],
+        "title": "JobList"
       },
       "Ledger": {
         "properties": {
@@ -4799,6 +6644,34 @@
         ],
         "title": "MergeEdit"
       },
+      "Mo2Profiles": {
+        "properties": {
+          "profiles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Profiles"
+          },
+          "selected": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected",
+            "description": "The profile the instance's ini selects"
+          }
+        },
+        "type": "object",
+        "required": [
+          "profiles"
+        ],
+        "title": "Mo2Profiles"
+      },
       "Page": {
         "properties": {
           "items": {
@@ -4913,6 +6786,58 @@
         ],
         "title": "ProductEdit"
       },
+      "Progress": {
+        "properties": {
+          "phase": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase"
+          },
+          "environment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Environment"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step",
+            "description": "e.g. discovery, identification, hashing, thumbnails"
+          },
+          "done": {
+            "type": "integer",
+            "title": "Done",
+            "default": 0
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "title": "Progress",
+        "description": "A worker's latest progress line (a scan's: phase 1 discovery, 2 identification, 3 enrichment)."
+      },
       "PromoteEdit": {
         "properties": {
           "uid": {
@@ -4930,6 +6855,70 @@
           "variant"
         ],
         "title": "PromoteEdit"
+      },
+      "RegisterEnvironments": {
+        "properties": {
+          "environments": {
+            "items": {
+              "$ref": "#/components/schemas/EnvironmentPlan"
+            },
+            "type": "array",
+            "title": "Environments"
+          },
+          "exclude": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Exclude",
+            "description": "Folders found inside added ones that scans must never index",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "environments"
+        ],
+        "title": "RegisterEnvironments"
+      },
+      "Registered": {
+        "properties": {
+          "environments": {
+            "items": {
+              "$ref": "#/components/schemas/RegisteredEnvironment"
+            },
+            "type": "array",
+            "title": "Environments"
+          }
+        },
+        "type": "object",
+        "required": [
+          "environments"
+        ],
+        "title": "Registered"
+      },
+      "RegisteredEnvironment": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "type_id": {
+            "type": "string",
+            "title": "Type Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "type_id"
+        ],
+        "title": "RegisteredEnvironment"
       },
       "Root": {
         "properties": {
@@ -4968,6 +6957,200 @@
           "status"
         ],
         "title": "Root"
+      },
+      "RootPlan": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence",
+            "default": 0.0
+          },
+          "signals": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Signals",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "path"
+        ],
+        "title": "RootPlan"
+      },
+      "RootReport": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "confidence": {
+            "type": "number",
+            "title": "Confidence"
+          },
+          "signals": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Signals"
+          },
+          "variant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variant"
+          },
+          "registered": {
+            "type": "boolean",
+            "title": "Registered"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "scanned, detected (a dry run) or offline"
+          },
+          "files": {
+            "type": "integer",
+            "title": "Files",
+            "default": 0
+          },
+          "new": {
+            "type": "integer",
+            "title": "New",
+            "default": 0
+          },
+          "changed": {
+            "type": "integer",
+            "title": "Changed",
+            "default": 0
+          },
+          "unchanged": {
+            "type": "integer",
+            "title": "Unchanged",
+            "default": 0
+          },
+          "gone": {
+            "type": "integer",
+            "title": "Gone",
+            "default": 0
+          },
+          "offline_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offline Days"
+          },
+          "identification": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Identification"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "path",
+          "confidence",
+          "signals",
+          "registered",
+          "status"
+        ],
+        "title": "RootReport"
+      },
+      "ScanReport": {
+        "properties": {
+          "folder": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run"
+          },
+          "environments": {
+            "items": {
+              "$ref": "#/components/schemas/EnvironmentReport"
+            },
+            "type": "array",
+            "title": "Environments"
+          },
+          "links_skipped": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Links Skipped",
+            "default": []
+          },
+          "excluded": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Excluded",
+            "default": []
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Errors",
+            "default": []
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes",
+            "default": []
+          },
+          "cancelled": {
+            "type": "boolean",
+            "title": "Cancelled",
+            "default": false
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "dry_run",
+          "environments"
+        ],
+        "title": "ScanReport",
+        "description": "What ``exchange scan`` (or ``rescan``) reports; a dry run only detects."
       },
       "Session": {
         "properties": {
@@ -5497,6 +7680,24 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VariantRef": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "VariantRef"
       },
       "WordEdit": {
         "properties": {

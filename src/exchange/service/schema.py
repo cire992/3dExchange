@@ -14,7 +14,7 @@ from exchange.service.app import create_app
 def openapi_schema() -> dict:
     """The schema of the app as it would be served (built against a throwaway empty library)."""
     with tempfile.TemporaryDirectory() as folder:
-        app = create_app(Path(folder) / "library.db", token="schema")
+        app = create_app(Path(folder) / "library.db", token="schema", watch=False)
         schema = app.openapi()
         app.state.library.close()
     schema["components"]["securitySchemes"] = {"token": {"type": "http", "scheme": "bearer",
