@@ -1,6 +1,6 @@
 # Exchange: progress and handoff
 
-Last updated 2026-10-24, at the start of Roadmap phase 7. `main` has phases 1-3, 4a-4c (#10-#13), the Daz Studio bridge fixes checked against the real app (#14), the pivot docs (#15), and phase 6's core chunks: the Daz bridge include fix, 6a (the rename) and 6b (the service), landed by #19. The shell's 6c is merged in the shell repository. The phase 7 plan (project homes, part 1) is approved; see *Phase 7*.
+Last updated 2026-10-24, during phase 6e. `main` has phases 1-3, 4a-4c (#10-#13), the Daz Studio bridge fixes checked against the real app (#14), the pivot docs (#15), phase 6's core chunks 6a and 6b (via #19), and phase 7 part 1's core chunks (#20-#22). The shell repository has merged 6c and 7c; its 6d (library browsing) is in review. 6e (the write API) is in review here.
 
 Read this first, then `docs/OVERVIEW.md` (how the parts connect), `docs/IDENTITY.md` (what
 Exchange is for), `docs/GAME_DATA_MODEL.md` (records and claims), `docs/DESIGN_SPEC.md` (how it
@@ -109,9 +109,10 @@ answers (see Decisions).
 | #17 | 6a: pipelines renamed processes, with the migration of existing data | merged (via #19) |
 | #18 | 6b: `exchange serve` and the read API | merged (via #19) |
 | #19 | #16-#18 onto `main` | merged |
-| docs | The game data model: identity v2, overview, game data model; the spec's *Projects* brought in line; the phase 7 plan | in review |
-| 7a | Project homes: formats, parser, schemas, validator, `exchange project init/validate/checkpoint/config` | in review |
-| 7b | Gap claims, dossier hints and relink candidates, fast capture, `exchange claims list/ack` | in review (on 7a) |
+| #20 | The game data model: identity v2, overview, game data model; the spec's *Projects* brought in line; the phase 7 plan | merged |
+| #21 | 7a: project homes: formats, parser, schemas, validator, `exchange project init/validate/checkpoint/config` | merged |
+| #22 | 7b: gap claims, dossier hints and relink candidates, fast capture, `exchange claims list/ack` | merged |
+| 6e | The write API: curation edits, Undo/Redo and history, collections, suggestions, the desk, lexicons | in review |
 | 4d | First process: Daz cross-figure (G9/G2 → G8) | needs the user's answer to open question 1 |
 
 ## Phase 6: Service and Workspace
@@ -209,6 +210,77 @@ Decisions:
 
   The sidebar is the slow call: the shell should load it once and refresh it when the library
   changes, not on every navigation.
+
+### 6e: the write API
+
+`exchange/service/edits.py`. The routes are in `docs/api/openapi.json`, tagged *editing*.
+
+- **Edits** go through the curation engine, so each is one undoable step in `curation_log`:
+  - fields, single or bulk, where a null value reverts; names go one asset at a time
+  - tags, and reverting a tag
+  - the product (parent), and reverting it
+  - merge, fold variant, split, promote variant
+  - new products, from assets and/or a desk folder's unattached files
+  - linking files, or a desk folder, and unlinking them
+  - dismissing assets and ignoring folders
+  - collections: create, smart (saved search) or manual; delete; members
+  - lexicon words
+  - accepting and rejecting suggestions, in one step per batch
+- **What every edit returns:** its log id and a label (as the window's Undo menu shows it). Also
+  `new_uid` when it made an asset or collection, what to refresh (`none`, `detail`, `collections`,
+  `all`, as the window's `_edit` scopes), and this session's Undo and Redo labels.
+- **Undo and Redo:**
+  - **The session's own stack:** `POST /undo` and `/redo` work on this service session's edits,
+    like the window's Ctrl+Z and Ctrl+Y, and `GET /session` says what they would do.
+  - **Any history entry:** `POST /history/{id}/undo` undoes one, from any session, and is itself
+    undoable. `GET /history` lists the library's edits, newest first.
+- **One write connection in one worker thread** (a single-thread pool), so edits never interleave and
+  the connection's cache stays warm. It has the window's 1.5 s busy timeout.
+- **Errors:**
+  - a busy library (a scan holding the write lock) is **503** with the window's message and
+    `Retry-After: 2`
+  - a refused edit is **409**: merging into itself, a smart collection's members, a duplicate name,
+    a search that does not compile, or a desk folder of more than 5,000 unattached files
+  - an unknown asset, collection, history entry or lexicon is **404**
+- **New reads, for the editors:**
+  - `suggestions`: pages, with counts by kind
+  - `desk/roots`, `desk/folders` (one level, with counts) and `desk/files`
+  - `lexicons`: each term's file words and the words scans found, plus excluded words
+  - `choices`: dossier types, category tags and the editable fields
+- **Not in 6e:** the shell's proxy still allows GET only. 6f opens it to the editing routes, and
+  adds them to its type generator (the generated types already compile against this schema).
+- **The PySide6 window and the service** each keep their own Undo stack on the same library (the
+  phase 6 decision); avoid editing in both at once.
+- **Tests:** `tests/test_service_edits.py` (9 tests) covers:
+  - the token on writes
+  - fields with Undo, Redo and the session labels, bulk edits, reverts, and refusals
+  - tags and products, including reverting a product to the scanned one
+  - merge, fold, promote, split and dismiss
+  - collections, including undoing a deletion
+  - suggestions and history, including undoing an entry by id
+  - lexicons and choices
+  - the desk: folders, a product from a folder, linking a folder, ignoring one, the 5,000-file limit
+  - a library locked by another writer, which answers 503 at once and records nothing
+
+  The suite is at 274.
+- **On a copy of the scratch scan of the real library** (235,087 dossiers; the original scan was
+  left untouched):
+
+  | Step | Time |
+  | --- | --- |
+  | Rename | 0.02 s |
+  | Undo or redo | 0.02-0.03 s |
+  | Tag 200 assets | 0.07 s |
+  | Author on 200 assets | 0.03 s |
+  | Add 200 to a collection | 0.04 s |
+  | Accept 300 variant groups in one step (the window: 1.3 s, 5-8 s cold) | 0.76 s |
+  | Undo that batch | 0.16 s |
+  | Lexicons (1,167 author terms) | 0.04 s |
+  | History | 0.02 s |
+  | The desk's top level (1.55M unattached files, as in the window) | 7.5 s |
+  | `Runtime/Libraries` | 1.7 s |
+
+  The desk's counts run on the server's thread pool, so other requests are not held up.
 
 ## Phase 7: Project homes, part 1
 

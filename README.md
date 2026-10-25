@@ -123,8 +123,15 @@ local HTTP API (FastAPI and uvicorn, the optional `service` extra):
 - **Ready line:** on start it prints one JSON line,
   `{"event": "ready", "url": …, "api": 1, …}`, plus the token when it made it.
 - **Lifetime:** with `--exit-with-stdin` it stops when its stdin closes.
-- **Read-only (6b):** the sidebar, environments, pages of assets with the search language,
+- **Reading (6b):** the sidebar, environments, pages of assets with the search language,
   one asset's detail, its thumbnail, and collections, under `/api/v1/`. `/health` needs no token.
+- **Editing (6e):** everything the window edits, each change one undoable step:
+  - fields, tags and products
+  - merge, split and variants
+  - collections, the Unidentified desk, suggestions and lexicons
+
+  Undo and Redo cover the session's own edits, or any history entry. A library busy with a scan
+  answers 503 at once.
 - **Contract:** the schema is committed as [`docs/api/openapi.json`](docs/api/openapi.json);
   regenerate it with `exchange serve --openapi > docs/api/openapi.json` after changing the API
   (a test checks it).

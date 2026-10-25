@@ -1,4 +1,5 @@
-"""The Exchange service's HTTP API (Roadmap phase 6): what the desktop shell's Workspace window reads.
+"""The Exchange service's HTTP API (Roadmap phase 6): what the desktop shell's Workspace window reads,
+and (``edits.py``, 6e) the edits it makes.
 
 Local and single-user. The service listens on loopback only; every ``/api`` request carries the
 per-launch token as ``Authorization: Bearer <token>``, and requests addressed to any other host
@@ -6,7 +7,8 @@ name are refused (a web page cannot reach it through DNS rebinding). No browser 
 directly: the shell's own local service proxies it on the Workspace's origin.
 
 The library is read through read-only connections, one per worker thread, exactly as the PySide6
-window does; scans and edits may write at the same time (WAL mode).
+window does; scans and edits may write at the same time (WAL mode). Edits run on one write
+connection in one worker thread (see ``edits.py``).
 """
 
 from __future__ import annotations
@@ -47,6 +49,7 @@ class Library:
         self._local = threading.local()
         self._open: list[sqlite3.Connection] = []
         self._lock = threading.Lock()
+        self.editor = None  # set by create_app; closed with the library
 
     def conn(self) -> sqlite3.Connection:
         conn = getattr(self._local, "conn", None)
@@ -58,6 +61,8 @@ class Library:
         return conn
 
     def close(self) -> None:
+        if self.editor is not None:
+            self.editor.close()
         with self._lock:
             for conn in self._open:
                 try:
@@ -78,6 +83,7 @@ def create_app(db_path: Path, *, token: str, definitions: DefinitionSet | None =
     app = FastAPI(title="Exchange", version=__version__, docs_url=None, redoc_url=None, openapi_url=None,
                   description="The local API of the Exchange service, for the desktop shell's Workspace window.")
     app.state.library = library
+    app.state.prefix = PREFIX
 
     @app.middleware("http")
     async def only_this_host(request: Request, call_next):
@@ -185,4 +191,8 @@ def create_app(db_path: Path, *, token: str, definitions: DefinitionSet | None =
         """Manual and smart collections with their member counts."""
         return list_collections(library.conn(), library.definitions, threshold=library.threshold)
 
+    from exchange.service.edits import Editor, register
+
+    library.editor = Editor(library)
+    register(app, library, library.editor, api, errors)
     return app

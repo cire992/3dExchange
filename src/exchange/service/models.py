@@ -208,3 +208,221 @@ class Collection(BaseModel):
 
 class Problem(BaseModel):
     detail: str
+
+
+# Editing (Roadmap phase 6e) ---------------------------------------------------------------------
+
+Refresh = Literal["none", "detail", "collections", "all"]
+
+
+class EditResult(BaseModel):
+    """One undoable edit, as the window reports it."""
+
+    log_id: int = Field(description="The curation log entry; POST /history/{id}/undo undoes it")
+    label: str = Field(description="What the edit was, for Undo and Redo, e.g. 'tag 3 assets'")
+    new_uid: str | None = Field(None, description="The asset or collection the edit created, if any")
+    refresh: Refresh = Field(description="What the edit can have changed: the page and inspector (detail), "
+                             "also the sidebar's collections (collections), or also the sidebar's counts (all)")
+    session: Session
+
+
+class Session(BaseModel):
+    """This service session's Undo and Redo, as the window's Edit menu shows them."""
+
+    undo: str | None = Field(None, description="The label Undo would undo; null when there is nothing")
+    redo: str | None = None
+
+
+EditResult.model_rebuild()
+
+
+class UndoResult(BaseModel):
+    label: str | None = Field(None, description="What was undone or redone; null when there was nothing")
+    refresh: Refresh
+    session: Session
+
+
+class FieldEdit(BaseModel):
+    uids: list[str] = Field(min_length=1)
+    field: str = Field(description="One of the editable fields (GET /choices); names are set one asset at a time")
+    value: Any = Field(None, description="The new value; null reverts to the scanned one")
+
+
+class TagEdit(BaseModel):
+    uids: list[str] = Field(min_length=1)
+    add: list[str] = []
+    remove: list[str] = Field([], description="Removing a scanned tag hides it")
+
+
+class TagRevert(BaseModel):
+    uid: str
+    tag: str
+
+
+class ParentEdit(BaseModel):
+    uids: list[str] = Field(min_length=1)
+    parent: str | None = Field(description="The product to put them in; null takes them out of any product")
+
+
+class ParentRevert(BaseModel):
+    uid: str
+
+
+class MergeEdit(BaseModel):
+    uid: str = Field(description="The asset found twice; its entries join `into`")
+    into: str
+
+
+class FoldEdit(BaseModel):
+    uid: str = Field(description="A variant of `into` (Donut01_Blue of Donut01_Pink)")
+    into: str
+    variant: str
+    target_variant: str | None = Field(None, description="The variant name for `into`'s own entries, if they have none")
+
+
+class SplitEdit(BaseModel):
+    uid: str
+    entries: list[int] = Field(min_length=1, description="Entry ids that become an asset of their own")
+    name: str | None = None
+
+
+class PromoteEdit(BaseModel):
+    uid: str
+    variant: str
+
+
+class FileRef(BaseModel):
+    root: int
+    key: str = Field(description="The file's rel_key in that root (case-folded, '/' separators)")
+
+
+class DeskFolder(BaseModel):
+    root: int
+    path: str = Field(description="A folder in that root, '/' separators; '' is the whole root")
+
+
+class ProductEdit(BaseModel):
+    name: str
+    children: list[str] = []
+    folder: DeskFolder | None = Field(None, description="The unattached files under this folder join the product")
+
+
+class LinkEdit(BaseModel):
+    uid: str
+    files: list[FileRef] = []
+    folder: DeskFolder | None = Field(None, description="Link the unattached files under this folder")
+
+
+class UnlinkEdit(BaseModel):
+    files: list[FileRef] = Field(min_length=1)
+
+
+class DismissEdit(BaseModel):
+    uids: list[str] = Field(min_length=1)
+    dismissed: bool = Field(True, description="False counts them as assets again")
+
+
+class IgnoreEdit(BaseModel):
+    environment: int
+    folder: str
+    ignored: bool = True
+
+
+class CollectionCreate(BaseModel):
+    name: str
+    query: str | None = Field(None, description="A saved search makes a smart collection")
+
+
+class MembersEdit(BaseModel):
+    uids: list[str] = Field(min_length=1)
+    present: bool = Field(True, description="False removes them")
+
+
+class WordEdit(BaseModel):
+    value: str = Field(description="The term the word belongs to: a tag, variant group, channel or author")
+    word: str
+    present: bool = Field(True, description="False removes it (and excludes it, in a generated lexicon)")
+
+
+class SuggestionIds(BaseModel):
+    ids: list[int] = Field(min_length=1)
+
+
+class SuggestionItem(BaseModel):
+    id: int
+    kind: str
+    subject: str | None = None
+    subject_name: str | None = None
+    confidence: float
+    state: str
+    payload: dict[str, Any]
+
+
+class Suggestions(BaseModel):
+    total: int = Field(description="Pending suggestions of this kind (or all kinds)")
+    counts: dict[str, int] = Field(description="Pending suggestions by kind")
+    offset: int
+    items: list[SuggestionItem]
+
+
+class DeskRoot(BaseModel):
+    id: int
+    path: str
+    environment_id: int
+    environment: str
+
+
+class DeskFolderCount(BaseModel):
+    name: str
+    path: str
+    count: int
+
+
+class DeskLevel(BaseModel):
+    folders: list[DeskFolderCount] = Field(description="Subfolders with their unattached files (all levels), largest first")
+    files: int = Field(description="Unattached files directly in this folder")
+    total: int
+
+
+class DeskFile(BaseModel):
+    id: int
+    rel_path: str
+    rel_key: str
+    size: int | None = None
+
+
+class LexiconTermView(BaseModel):
+    value: str
+    words: list[str]
+    patterns: list[str]
+    found: list[str] = Field([], description="Words scans found (generated lexicons); not in the file")
+
+
+class LexiconView(BaseModel):
+    id: str
+    name: str
+    kind: str
+    generated: bool = Field(description="Scans add words to it (known authors)")
+    terms: list[LexiconTermView]
+    exclude: list[str] = Field([], description="Found words the user removed; scans never add them back")
+
+
+class HistoryEntry(BaseModel):
+    id: int
+    at: str
+    action: str
+    dossiers: list[str]
+    details: dict[str, Any] = Field(description="The action's own details (field, value, tags, names...)")
+    undoable: bool
+
+
+class TypeChoice(BaseModel):
+    id: str
+    name: str
+    extends: str | None = None
+
+
+class Choices(BaseModel):
+    types: list[TypeChoice]
+    tags: list[str] = Field(description="The category lexicon's tags, for completion")
+    fields: list[str] = Field(description="Fields POST /edits/fields can set")
