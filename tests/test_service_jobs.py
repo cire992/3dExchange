@@ -144,7 +144,8 @@ def test_one_writing_job_at_a_time_and_stopping(client, monkeypatch, mixed, tmp_
     job = ok(client.post(f"{V1}/jobs/rescan", json={}))
     assert job["label"] == "Rescanning every environment"
     job = ok(client.get(f"{V1}/jobs/{job['id']}", params={"since": job["version"], "wait": 10}))
-    assert job["progress"] == {"phase": 1, "environment": "Fake", "step": "discovery", "done": 1, "total": 4}
+    assert {k: v for k, v in job["progress"].items() if v is not None} == {
+        "phase": 1, "environment": "Fake", "step": "discovery", "done": 1, "total": 4}
     job = ok(client.get(f"{V1}/jobs/{job['id']}", params={"since": job["version"], "wait": 10}))
     assert job["progress"]["done"] == 2
 

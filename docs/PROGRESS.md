@@ -1,6 +1,6 @@
 # Exchange: progress and handoff
 
-Last updated 2026-10-25, during phase 6g. `main` has phases 1-3, 4a-4c (#10-#13), the Daz Studio bridge fixes checked against the real app (#14), the pivot docs (#15), phase 6's core chunks 6a, 6b (via #19) and 6e (#23), scoped file links (#24), and phase 7 part 1's core chunks (#20-#22). The shell repository has merged 6c, 6d, 6f and 7c. 6g part 1 (jobs and environments) is in review here.
+Last updated 2026-10-25, during phase 6g. `main` has phases 1-3, 4a-4c (#10-#13), the Daz Studio bridge fixes checked against the real app (#14), the pivot docs (#15), phase 6's core chunks 6a, 6b (via #19) and 6e (#23), scoped file links (#24), and phase 7 part 1's core chunks (#20-#22). The shell repository has merged 6c, 6d, 6f and 7c. 6g part 1 (jobs and environments) and part 2 (requisitions, stacked on it) are in review here.
 
 Read this first, then `docs/OVERVIEW.md` (how the parts connect), `docs/IDENTITY.md` (what
 Exchange is for), `docs/GAME_DATA_MODEL.md` (records and claims), `docs/DESIGN_SPEC.md` (how it
@@ -115,7 +115,7 @@ answers (see Decisions).
 | #23 | 6e: the write API: curation edits, Undo/Redo and history, collections, suggestions, the desk, lexicons | merged |
 | #24 | Curation edits apply only the file links they name | merged |
 | 6g, part 1 | The jobs API: environments (discover, detect, register, configure), scans and rescans in worker processes with progress, classify, change notices | in review |
-| 6g, part 2 | Requisitions, process prerequisites, endpoints | next |
+| 6g, part 2 | Requisitions: planning, the queue and running it, process packages, tools, presets, endpoints; the wizard's endpoint setting read (stacked on part 1) | in review |
 | 4d | First process: Daz cross-figure (G9/G2 → G8) | needs the user's answer to open question 1 |
 
 ## Phase 6: Service and Workspace
@@ -344,10 +344,9 @@ requisitions, process prerequisites and endpoints for 6i.
   A rescan clears what it scanned; new roots are watched after each writing job and registration. It
   needs `watchdog`, now in the `service` extra; without it `available` is false.
 - **The service stops its jobs** when it stops (`--exit-with-stdin`), so no worker outlives it.
-- **Endpoint settings:** the API takes the endpoint as a folder, as requisitions read it
-  (`requisitions/endpoints.py`) and as the CLI and the window's `set_endpoint` write it. The
-  window's add-environment wizard writes `{"mode", "value"}` instead, which requisitions cannot
-  read (see *Known gaps*).
+- **Endpoint settings:** the API takes the endpoint as a folder, as the CLI and the window's
+  `set_endpoint` write it. The window's add-environment wizard writes `{"mode", "value"}`, which
+  requisitions now read too (6g, part 2).
 - **Tests:** `tests/test_service_jobs.py` (10; the suite is at 285) covers:
   - the token
   - detect, then register (with settings and an excluded folder), then rescan with progress, the
@@ -376,6 +375,66 @@ requisitions, process prerequisites and endpoints for 6i.
   While the rescan ran, a second writing job was refused (409) and the sidebar answered in 1.8 s.
   The library read normally after the stop. The scanner's discovery phase reports no counts (0/0),
   so a UI can only say "Discovering files" until phase 2, as the window does.
+
+### 6g, part 2: requisitions
+
+`exchange/service/requisitions.py`. The routes are in `docs/api/openapi.json`, tagged
+*requisitions*, *processes* and *jobs*. What 6i (requisitions, the queue, Settings › Processes and
+Endpoints) needs, as the window's *Requisition to…* dialog, queue view and settings use it.
+
+- **Planning** only reads:
+  - `POST /requisitions/routes {uids, environment}`: the chains that take these assets (and up to
+    50 children of each of the first 20 products, 200 in all) there: the dialog's route list
+  - `POST /requisitions/plan`: per asset, its items (a product's children too) with their chain
+    (ids and names), source, options and problems; the option forms of the processes in it (their
+    parameters and the values the plan would use); warnings; how many items are included. Options
+    in the request win over a preset's, or over those last used with each process; `excluded`
+    leaves items out; `endpoint_folder`, `on_collision` and `name` as in the dialog.
+  - `POST /requisitions/queue` takes the same request, plans it again on the server and queues
+    every plan with something included (a client never sends a plan to trust). Its options become
+    each process's last used.
+- **The queue:** `GET /requisitions` (waiting or running in order, then finished, newest first),
+  `GET /requisitions/{id}` (items with outputs, every file written), and `hold`, `move`, `resume`
+  (with how to settle collisions), `rebuild` and `check-stale`. These write on the editor's
+  connection and answer 409 while a job writes, as the window disables them during a run.
+- **Jobs:** `POST /jobs/requisitions {ids}` runs the queue (or some requisitions) in a worker; its
+  progress says the requisition, item, step and message, and its result what ran. `POST
+  /jobs/remove-output {requisition}` moves a requisition's output to the recycle folder, puts
+  back what it overwrote, and rescans. Stopping a run queues the running requisition again.
+- **Processes:** `GET /processes` (state, prerequisites green or red with how to fix them, chain
+  problems, options, and what trusting allows), `POST /processes/install {folder}` (untrusted) and
+  `POST /processes/{id}/trust` (the client asks first). `GET`/`POST /tools` set where external
+  tools are (a path must be a file; null forgets it).
+- **Presets:** list (shipped and the user's), save, delete (not shipped ones), and the options last
+  used.
+- **Endpoints:** `GET /endpoints`: each environment's output folder, whether the user chose it, its
+  visibility, or why it has none (no online folder). Change them with `/environments/{id}/config`.
+- **The wizard's endpoint setting:** `requisitions/endpoints.py` now reads the window wizard's
+  `{"mode", "value"}` as well as a folder: a Daz content directory, an Unreal content folder
+  (relative to the project), one Exchange-managed MO2 mod by name, or a new MO2 mod per requisition
+  (the default). A relative folder is relative to the environment's first root. Requisitions into
+  environments the wizard added used to fail with a TypeError.
+- **Tests:** `tests/test_service_requisitions.py` (7; the suite is at 292) covers:
+  - the token
+  - processes: install, trust, prerequisites and options; tools; presets
+  - endpoints, including a wizard setting
+  - the wizard's settings in `configured_folder`
+  - routes, plans (options, bad values, excluded items, unknown assets, environments and presets),
+    queueing and last-used options, move and hold, a run as a job, check stale, rebuild, and removing
+    output as a job (which puts back what a rebuild overwrote)
+  - a review checkpoint and resume
+  - queue actions refused while a job writes, and a stopped run's message
+- **On a copy of the scratch scan of the real library** (planned and queued on the copy only; nothing
+  ran, so nothing was written beside the real library):
+
+  | Step | Time |
+  | --- | --- |
+  | Processes (Convert mesh ready: Blender found) | 0.22 s |
+  | Endpoints | < 0.01 s |
+  | Routes for 3 Genesis 9 hair products | 0.47 s |
+  | Plan them (120 items: copies, and Convert mesh for a beard) | 0.51 s |
+  | Queue them | 0.52 s |
+  | The queue / hold / check stale | 0.02-0.03 s |
 
 ## Phase 7: Project homes, part 1
 
@@ -815,7 +874,6 @@ Key ideas:
   - Unattached Daz files (1.55M) are mostly `Runtime/Libraries` (Poser) content and data whose folder names are generic. The Unidentified desk (3c) groups them by folder.
   - Single-letter texture channels (`_D`, `_N`) only count for images whose base name matches a mesh.
 - **Unverified:** the Daz Connect folder layout (`data/cloud/<n>_<SKU>/`) hasn't been checked against a real Connect install. Connect products are named "Daz Connect product <SKU>" unless a DIM manifest names them.
-- **The window's wizard writes endpoints requisitions cannot read.** It stores `{"mode", "value"}`; `requisitions/endpoints.py` reads a folder, so a requisition into an environment added through the wizard (Daz, MO2, Unreal) fails with a TypeError. The service's API writes a folder.
 - **Not used yet:** the chosen MO2 profile is stored but unused. (Endpoints and visibility are used by requisitions since 4a.)
 - **Unreal:** no `.uasset` class detection (types come from name prefixes).
 - **Discovery noise:** Steam games without definitions make the wizard's found list long. Consider hiding them behind a toggle.

@@ -432,7 +432,8 @@ class Choices(BaseModel):
 
 
 class Progress(BaseModel):
-    """A worker's latest progress line (a scan's: phase 1 discovery, 2 identification, 3 enrichment)."""
+    """A worker's latest progress line: a scan's (phase 1 discovery, 2 identification, 3
+    enrichment), or a requisition run's (requisition, item, step and message)."""
 
     model_config = {"extra": "allow"}
     phase: int | None = None
@@ -440,6 +441,9 @@ class Progress(BaseModel):
     step: str | None = Field(None, description="e.g. discovery, identification, hashing, thumbnails")
     done: int = 0
     total: int = 0
+    requisition: str | None = Field(None, description="A requisition run: the requisition's name")
+    item: str | None = Field(None, description="A requisition run: the asset it is converting")
+    message: str | None = None
 
 
 class RootReport(BaseModel):
@@ -484,7 +488,7 @@ class ScanReport(BaseModel):
 
 class Job(BaseModel):
     id: int
-    kind: Literal["scan", "detect", "rescan", "classify"]
+    kind: Literal["scan", "detect", "rescan", "classify", "requisitions", "remove"]
     label: str
     state: Literal["running", "done", "failed", "stopped"]
     writes: bool = Field(description="It writes the library: one such job runs at a time")
@@ -495,7 +499,8 @@ class Job(BaseModel):
     error: str | None = Field(None, description="Why it failed, or what stopping it kept")
     version: int = Field(description="Grows with every change; ask again with since=version to wait for the next")
     report: ScanReport | None = Field(None, description="A scan, detection or rescan's report, once it has ended")
-    result: dict[str, Any] | None = Field(None, description="Another job's result (classify: counts), once ended")
+    result: dict[str, Any] | None = Field(None, description="Another job's result, once it has ended (classify: "
+                                          "counts; requisitions: what ran)")
 
 
 class JobList(BaseModel):
@@ -598,3 +603,243 @@ class Changes(BaseModel):
     available: bool = Field(description="False without watchdog: no change notices")
     environments: list[int] = Field(description="Environments whose roots changed since they were last scanned")
     version: int = Field(description="Ask again with since=version to wait for the next change")
+
+
+# Requisitions, processes and endpoints (6g, part 2) ------------------------------------------------
+
+
+class ParameterView(BaseModel):
+    id: str
+    type: Literal["str", "int", "float", "bool", "choice", "path"]
+    default: Any = None
+    label: str
+    help: str = ""
+    choices: list[str] = []
+    min: float | None = None
+    max: float | None = None
+
+
+class PrerequisiteView(BaseModel):
+    id: str
+    label: str
+    ok: bool
+    detail: str = Field(description="The path found, or how to fix it")
+    tool: str | None = Field(None, description="The shared tool id it needs a path for (blender, texconv...)")
+
+
+class ProcessView(BaseModel):
+    id: str
+    name: str
+    version: str
+    author: str
+    description: str
+    builtin: bool
+    trusted: bool
+    state: Literal["ready", "not trusted", "needs setup"] = Field(description="Only ready ones are offered")
+    path: str
+    input_types: list[str]
+    input_tags: list[str]
+    output_environment: str
+    output_dossier_type: str
+    prerequisites: list[PrerequisiteView]
+    problems: list[str] = Field(description="What is wrong with a trusted package's chain")
+    trust: list[str] = Field(description="What trusting it lets it do, to show before asking")
+    parameters: list[ParameterView]
+
+
+class ProcessList(BaseModel):
+    processes: list[ProcessView]
+    problems: list[str] = Field(description="Packages that could not be read, and why")
+
+
+class ToolPath(BaseModel):
+    tool: str = Field(description="A tool id, e.g. blender")
+    path: str | None = Field(None, description="The executable; null forgets it")
+
+
+class PresetView(BaseModel):
+    name: str
+    description: str = ""
+    environment: str | None = Field(None, description="The environment type it was made for")
+    shipped: bool = Field(description="From a process package: read-only")
+    processes: list[str]
+    options: dict[str, dict[str, Any]] = Field(description="Option values by process")
+
+
+class PresetSave(BaseModel):
+    name: str
+    options: dict[str, dict[str, Any]]
+    description: str = ""
+    environment: str | None = None
+
+
+class EndpointView(BaseModel):
+    environment_id: int
+    environment: str
+    type_id: str
+    folder: str | None = Field(None, description="Where output goes (null when it has no online folder)")
+    label: str | None = None
+    custom: bool = Field(description="The user chose the folder (otherwise the type's default)")
+    visibility: str
+    problem: str | None = None
+
+
+class RoutesRequest(BaseModel):
+    uids: list[str] = Field(min_length=1)
+    environment: int
+
+
+class RouteChoice(BaseModel):
+    processes: list[str]
+    route: Literal["convert", "copy"]
+    label: str
+
+
+class PlanRequest(BaseModel):
+    uids: list[str] = Field(min_length=1, description="Assets or products; several are planned with the same options")
+    environment: int = Field(description="The target environment")
+    processes: list[str] | None = Field(None, description="A chain from /requisitions/routes; null is automatic")
+    options: dict[str, dict[str, Any]] = Field({}, description="Option values by process; they win over the preset's")
+    preset: str | None = Field(None, description="Start from a preset; null is the options last used with each process")
+    endpoint_folder: str | None = Field(None, description="Write here instead of the environment's endpoint")
+    on_collision: Literal["ask", "overwrite", "rename", "skip"] = "ask"
+    excluded: list[str] = Field([], description="Items (asset uids) left out")
+    name: str | None = Field(None, description="The requisition's name, for one asset")
+
+
+class EndpointRef(BaseModel):
+    folder: str
+    root: str
+    visibility: str
+    label: str
+
+
+class PlanItemView(BaseModel):
+    dossier_uid: str
+    name: str
+    type_id: str
+    source_entry_id: int | None = None
+    source: str = Field(description="Where the source entry is, in words")
+    route: Literal["convert", "copy", "none"]
+    processes: list[str]
+    process_names: list[str]
+    params: dict[str, dict[str, Any]]
+    include: bool
+    problems: list[str]
+
+
+class PlanView(BaseModel):
+    name: str
+    environment_id: int
+    on_collision: str
+    endpoint: EndpointRef
+    warnings: list[str]
+    items: list[PlanItemView]
+
+
+class OptionForm(BaseModel):
+    process: str
+    name: str
+    values: dict[str, Any] = Field(description="What the plan would use")
+    parameters: list[ParameterView]
+
+
+class PlanResult(BaseModel):
+    plans: list[PlanView]
+    problems: list[str] = Field(description="Assets that could not be planned, and warnings")
+    forms: list[OptionForm] = Field(description="One per process in the included items")
+    included: int
+
+
+class Queued(BaseModel):
+    ids: list[int]
+
+
+class RequisitionRow(BaseModel):
+    model_config = {"extra": "allow"}
+    id: int
+    uid: str
+    name: str
+    state: Literal["queued", "held", "running", "needs_attention", "fulfilled", "partially_fulfilled", "failed",
+                   "stale", "removed", "replaced"]
+    position: int
+    environment_id: int
+    environment: str
+    on_collision: str
+    message: str | None = None
+    replaces: int | None = None
+    created_at: str
+    started_at: str | None = None
+    finished_at: str | None = None
+    items: int = Field(description="Included items")
+    done: int
+
+
+class RequisitionItem(BaseModel):
+    model_config = {"extra": "allow"}
+    id: int
+    dossier_uid: str
+    name: str
+    source_entry_id: int | None = None
+    processes: list[dict[str, Any]] = Field(description='[{"id", "version"}]')
+    params: dict[str, dict[str, Any]]
+    include: int
+    state: str
+    message: str | None = None
+    outputs: list[dict[str, Any]]
+
+
+class RequisitionWrite(BaseModel):
+    model_config = {"extra": "allow"}
+    id: int
+    item_id: int | None = None
+    path: str
+    action: Literal["created", "overwritten", "sidecar"]
+    recycled_to: str | None = None
+    written_at: str
+    removed_at: str | None = None
+
+
+class RequisitionDetail(BaseModel):
+    model_config = {"extra": "allow"}
+    id: int
+    uid: str
+    name: str
+    state: str
+    position: int
+    environment_id: int
+    endpoint: EndpointRef
+    on_collision: str
+    message: str | None = None
+    replaces: int | None = None
+    created_at: str
+    started_at: str | None = None
+    finished_at: str | None = None
+    items: list[RequisitionItem]
+    writes: list[RequisitionWrite]
+
+
+class HoldRequest(BaseModel):
+    held: bool = True
+
+
+class MoveRequest(BaseModel):
+    position: int = Field(ge=1, description="1 is first")
+
+
+class ResumeRequest(BaseModel):
+    on_collision: Literal["ask", "overwrite", "rename", "skip"] | None = Field(
+        None, description="How to settle collisions now; null keeps the requisition's")
+
+
+class StaleRequisition(BaseModel):
+    id: int
+    why: str
+
+
+class RunRequest(BaseModel):
+    ids: list[int] | None = Field(None, description="Only these requisitions; none is the whole queue")
+
+
+class RemoveRequest(BaseModel):
+    requisition: int

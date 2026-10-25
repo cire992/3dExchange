@@ -12,7 +12,10 @@ Exchange-managed container, never an existing one of the user's:
 * **Loose files:** an "Exchange Conversions" folder in the root.
 
 The user can point an environment elsewhere (``endpoint`` in its settings) or pass a folder for
-one requisition. An endpoint's **visibility** (personal or publishable) comes from the
+one requisition. The setting is a folder (absolute, or relative to the environment's first root);
+the window's add-environment wizard also wrote ``{"mode", "value"}``, which ``configured_folder``
+reads: a Daz content directory, an Unreal content folder, one Exchange-managed MO2 mod by name,
+or ``new_container`` (a new MO2 mod per requisition, the default). An endpoint's **visibility** (personal or publishable) comes from the
 environment's settings and drives the license check.
 """
 
@@ -56,6 +59,21 @@ def _safe_name(name: str) -> str:
     return cleaned or "Requisition"
 
 
+def configured_folder(setting, handler: str, first: Path, layer: dict) -> Path | None:
+    """The folder an environment's ``endpoint`` setting names, or None for the default."""
+    if isinstance(setting, dict):  # the window's wizard: {"mode", "value"}
+        mode, value = setting.get("mode"), str(setting.get("value") or "").strip()
+        if mode == "new_container" or not value:
+            return None  # a new mod per requisition: the default
+        if mode == "managed_container" and handler == "mo2":
+            return first.joinpath(*str(layer.get("mods_dir", "mods")).split("/")) / _safe_name(value)
+        setting = value
+    if not isinstance(setting, str) or not setting.strip():
+        return None
+    folder = Path(setting.strip())
+    return folder if folder.is_absolute() else first.joinpath(*folder.as_posix().split("/"))
+
+
 def default_endpoint(conn: sqlite3.Connection, definitions: DefinitionSet, environment_id: int,
                      name: str, folder: str | Path | None = None) -> Endpoint:
     """The endpoint a requisition named ``name`` writes to in an environment (or ``folder``)."""
@@ -71,9 +89,10 @@ def default_endpoint(conn: sqlite3.Connection, definitions: DefinitionSet, envir
     handler = definition.handler if definition else "folder"
     first = Path(roots[0]["path"])
 
-    chosen = folder or config.get("endpoint")
+    layer = json.loads(env["layer_config"] or "{}")
+    chosen = Path(folder) if folder else configured_folder(config.get("endpoint"), handler, first, layer)
     if chosen:
-        target = Path(chosen).resolve()
+        target = chosen.resolve()
         root = next((Path(r["path"]) for r in roots if is_within(target, Path(r["path"]))), target)
         return Endpoint(environment_id, str(target), str(root), visibility, f"{target}")
 
@@ -83,7 +102,6 @@ def default_endpoint(conn: sqlite3.Connection, definitions: DefinitionSet, envir
         return Endpoint(environment_id, str(target), str(known or target), visibility,
                         f"{CONVERSIONS} content directory")
     if handler == "mo2":
-        layer = json.loads(env["layer_config"] or "{}")
         mods = first.joinpath(*str(layer.get("mods_dir", "mods")).split("/"))
         target = mods / f"Exchange - {_safe_name(name)}"
         return Endpoint(environment_id, str(target), str(first), visibility, f"new mod “{target.name}”")

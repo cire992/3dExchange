@@ -55,6 +55,7 @@ class Library:
         self.editor = None  # set by create_app; closed with the library
         self.jobs = None
         self.watcher = None
+        self.processes = None
 
     def conn(self) -> sqlite3.Connection:
         conn = getattr(self._local, "conn", None)
@@ -212,6 +213,10 @@ def create_app(db_path: Path, *, token: str, definitions: DefinitionSet | None =
     library.watcher = Watcher()
     library.jobs = jobs.Jobs(library, on_finished=lambda job: jobs.after_job(library, library.watcher, job))
     jobs.register(app, library, library.jobs, library.watcher, api, errors)
+
+    from exchange.service import requisitions
+
+    requisitions.register(app, library, library.jobs, api, errors)
     if watch:
         jobs.watch_roots(library, library.watcher)
     return app

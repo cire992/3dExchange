@@ -41,7 +41,9 @@ KEEP_FINISHED = 20
 STOPPED = {"scan": "Stopped; everything finished before that is saved.",
            "rescan": "Stopped; everything finished before that is saved.",
            "classify": "Stopped; the classification was not saved.",
-           "detect": "Stopped."}
+           "detect": "Stopped.",
+           "requisitions": "Stopped; the requisition that was running is queued again.",
+           "remove": "Stopped; the files moved so far stay in the recycle folder."}
 
 
 def _now() -> str:
