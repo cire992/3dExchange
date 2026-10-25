@@ -216,6 +216,68 @@ def test_linking_files_survives_rescans(scan, mixed, lib, defs):
         curator.link_files(barrel, [(root, "nope.png")])
 
 
+def link_state(conn):
+    return [[tuple(r) for r in conn.execute(sql)] for sql in (
+        "SELECT * FROM entry_file ORDER BY entry_id, file_id",
+        "SELECT id, ledger_id, container_id, identity_key, status, moved_from, variant FROM entry ORDER BY id",
+        "SELECT * FROM ledger ORDER BY id")]
+
+
+def assert_same_as_full(conn):
+    """Edits apply only the links of the files they name; re-applying every root changes nothing.
+    (Edits naming no files, such as merges, leave links alone in both cases.)"""
+    from exchange.links import apply_file_links
+
+    scoped = link_state(conn)
+    conn.execute("SAVEPOINT full")
+    for (root_id,) in conn.execute("SELECT id FROM environment_root").fetchall():
+        apply_file_links(conn, root_id)
+    full = link_state(conn)
+    conn.execute("ROLLBACK TO full")
+    conn.execute("RELEASE full")
+    assert [sorted(set(a) ^ set(b)) for a, b in zip(scoped, full)] == [[], [], []]  # nothing either way
+
+
+def test_edits_apply_the_links_of_the_files_they_name(lib):
+    conn, curator = lib
+    barrel, ding, props = uid_of(conn, "Barrel01"), uid_of(conn, "ding"), uid_of(conn, "props", "product")
+    container, root = conn.execute("SELECT id, root_id FROM container WHERE rel_path = 'Loose/Downloads/props'").fetchone()
+    folder = [(root, r[0]) for r in conn.execute("SELECT rel_key FROM file WHERE container_id = ? ORDER BY rel_key",
+                                                 (container,))]
+    assert len(folder) >= 3
+    owners = ("SELECT e.id, d.uid, e.identity_key FROM entry e JOIN ledger l ON l.id = e.ledger_id"
+              " JOIN dossier d ON d.id = l.dossier_id ORDER BY e.id")
+    start, start_owners, logs = link_state(conn)[0], conn.execute(owners).fetchall(), []
+
+    def step(log_id, names_files=True):
+        logs.append((log_id, names_files))
+        if names_files:
+            assert_same_as_full(conn)
+
+    # Into an existing entry (the barrel's folder) and into a new link entry (the loose root).
+    step(curator.link_files(barrel, [(root, "loose/downloads/barrel/barrel01_n.png"), (root, "loose/notes.txt")]))
+    step(curator.link_files(ding, folder[:2]))  # ding has no entry there: one link entry for both
+    step(curator.link_files(barrel, folder[1:2]))  # moves a file between dossiers
+    step(curator.unlink_files(folder[:1]))  # ding's link entry is left empty and goes
+    log_id, product = curator.create_product("Props kit", [], files=folder)  # a folder from the desk
+    step(log_id)
+    curator.undo(logs.pop()[0])  # removing the product: its link entry and ledger must go first
+    assert_same_as_full(conn)
+    assert conn.execute("SELECT 1 FROM dossier WHERE uid = ?", (product,)).fetchone() is None
+    # ding gets a link entry in the props folder, then the props product's older entry there by a
+    # merge: the next link moves both files to the older entry, as applying the whole root does.
+    step(curator.link_files(ding, folder[:1]))
+    step(curator.merge(props, ding), names_files=False)
+    step(curator.link_files(ding, folder[2:3]))
+    assert conn.execute("SELECT 1 FROM entry WHERE container_id = ? AND identity_key = ?",
+                        (container, f"link:{ding}")).fetchone() is None
+    for log_id, names_files in reversed(logs):
+        curator.undo(log_id)
+        if names_files:
+            assert_same_as_full(conn)
+    assert link_state(conn)[0] == start and conn.execute(owners).fetchall() == start_owners  # ledgers are new
+
+
 def test_collections(lib, defs):
     conn, curator = lib
     _, cid = curator.create_collection("Lard Lads assets")

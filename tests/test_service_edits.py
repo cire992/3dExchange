@@ -181,6 +181,9 @@ def test_lexicons(client):
     assert "donut" in food["words"]
     added = ok(client.post(f"{V1}/lexicons/category/words", json={"value": "Food", "word": "kringle"}))
     assert added["refresh"] == "none" and added["label"] == "add the word kringle to Food"
+    ignored = ok(client.post(f"{V1}/lexicons/ignore/words", json={"value": "", "word": "draft"}))
+    assert ignored["label"] == "add the word draft to the Ignore lexicon"
+    ok(client.post(f"{V1}/undo"))
     food = next(t for t in {lex["id"]: lex for lex in ok(client.get(f"{V1}/lexicons"))}["category"]["terms"]
                 if t["value"] == "Food")
     assert "kringle" in food["words"]
