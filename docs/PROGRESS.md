@@ -281,6 +281,20 @@ Decisions:
   | `Runtime/Libraries` | 1.7 s |
 
   The desk's counts run on the server's thread pool, so other requests are not held up.
+- **Edits that link files** (a product from a desk folder, linking or unlinking files, their Undo) took
+  3.4-18 s each on that copy: each one re-applied every file link of the root (1.5M files), and found
+  each linked file's home entry by scanning the one Daz container's 235k entries. They now apply only
+  the files they name, plus the other linked files sharing a home with them, and look homes up
+  through the asset's ledgers. Through the service, on a fresh copy (69-file folder):
+
+  | Step | Before | After |
+  | --- | --- | --- |
+  | New product from the folder | 18.4 s | 0.21 s |
+  | Undo it | 6.9 s | 0.12 s |
+  | Link the folder to a product | 18.3 s | 0.09 s |
+  | Undo it | 3.4 s | 0.04 s |
+  | Link 5 files | 4.5 s | 0.08 s |
+  | Undo it | 3.5 s | 0.04 s |
 
 ## Phase 7: Project homes, part 1
 

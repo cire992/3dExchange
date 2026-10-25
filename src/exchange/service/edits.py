@@ -281,7 +281,10 @@ def register(app: FastAPI, library, editor: Editor, api, errors: dict) -> None:
         """Add a word to a lexicon term (written to the user's lexicon file), or remove it. Applies on the
         next rescan or classification."""
         verb = "add" if body.present else "remove"
-        return editor.edit(f"{verb} the word {body.word} {'to' if body.present else 'from'} {body.value}", "none",
+        lexicon = library.definitions.lexicons.get(lexicon_id)
+        # Ignore and index lexicons are plain word lists: their terms have no value to name.
+        where = body.value or f"the {lexicon.name if lexicon else lexicon_id} lexicon"
+        return editor.edit(f"{verb} the word {body.word} {'to' if body.present else 'from'} {where}", "none",
                            lambda c: c.set_lexicon_word(lexicon_id, body.value, body.word, body.present))
 
     # Suggestions ----------------------------------------------------------------------------------

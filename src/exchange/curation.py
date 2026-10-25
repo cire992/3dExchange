@@ -417,17 +417,17 @@ class Curator:
     def _run(self, action: str, changes: list[Change], dossiers: list[str], details: dict) -> int:
         with self._transaction():
             inverse = []
-            roots: set[int] = set()
+            linked: dict[int, set[str]] = {}  # root id -> rel_keys of the files the changes (un)link
             touched: set[str] = set(dossiers)
             for kind, key, value in changes:
                 if kind == "dossier" and value is None:
                     # Removing a dossier (undoing one you made): unlinked files must leave it first.
-                    for root_id in roots:
-                        apply_file_links(self.conn, root_id)
+                    for root_id, rel_keys in linked.items():
+                        apply_file_links(self.conn, root_id, rel_keys)
                 inverse.append([kind, list(key), self._read(kind, key)])
-                touched |= self._write(kind, key, value, roots)
-            for root_id in roots:
-                apply_file_links(self.conn, root_id)
+                touched |= self._write(kind, key, value, linked)
+            for root_id, rel_keys in linked.items():
+                apply_file_links(self.conn, root_id, rel_keys)
             inverse.reverse()
             payload = {"action": action, "dossier": dossiers[0] if dossiers else None,
                        "dossiers": list(dict.fromkeys(dossiers)), **details,
@@ -482,7 +482,7 @@ class Curator:
             return True if key[1] in repo.user_config(c, key[0]).get("ignore", []) else None
         raise CurationError(f"unknown state kind {kind!r}")
 
-    def _write(self, kind: str, key: tuple, value: Any, roots: set[int]) -> set[str]:
+    def _write(self, kind: str, key: tuple, value: Any, linked: dict[int, set[str]]) -> set[str]:
         """Write one state; returns dossier uids whose search index needs refreshing."""
         c, now = self.conn, repo.now()
         if kind == "field":
@@ -504,7 +504,8 @@ class Curator:
         if kind in ("parent", "link"):
             link_kind = "dossier_to_parent" if kind == "parent" else "file_to_dossier"
             if kind == "link":
-                roots.add(int(key[0].split(":")[1]))
+                _, root_id, rel_key = key[0].split(":", 2)
+                linked.setdefault(int(root_id), set()).add(rel_key)
             if value is None:
                 c.execute("DELETE FROM override_link WHERE kind = ? AND subject = ?", (link_kind, key[0]))
             else:
