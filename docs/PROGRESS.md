@@ -1,92 +1,44 @@
 # Exchange: progress and handoff
 
-Last updated 2026-10-25, after phase 6g. `main` has phases 1-3, 4a-4c (#10-#13), the Daz Studio bridge fixes checked against the real app (#14), the pivot docs (#15), phase 6's core chunks 6a, 6b (via #19), 6e (#23) and 6g (#25, and #26 via #27), scoped file links (#24), and phase 7 part 1's core chunks (#20-#22). The shell repository has merged 6c, 6d, 6f, 6h, 6i (onto its `main` with its #16) and 7c. Phase 6 has 6j left.
+Last updated 2026-10-28, at the restart (R1). `main` has phases 1-3, 4a-4c (#10-#13), the Daz Studio bridge fixes checked against the real app (#14), the pivot docs (#15), phase 6's core chunks 6a, 6b (via #19), 6e (#23) and 6g (#25, and #26 via #27), scoped file links (#24), phase 7 part 1's core chunks (#20-#22) and the progress doc after 6g (#28). The shell repository has merged 6c, 6d, 6f, 6h, 6i (its #16) and 7c. Phase 6 has 6j left.
 
-Read this first, then `docs/OVERVIEW.md` (how the parts connect), `docs/IDENTITY.md` (what
-Exchange is for), `docs/GAME_DATA_MODEL.md` (records and claims), `docs/DESIGN_SPEC.md` (how it
-works; use its terms exactly) and `docs/USEFUL_PATHS.md` (real asset folders and tools on the dev
-machine, for testing). Where the game data model and the spec disagree, the game data model wins;
-the spec's *Projects* section was brought in line with it for phase 7. The
-[README](../README.md) covers install and usage.
+Read this first, then `docs/VISION.md` (the brief: what Exchange is for, the one loop, the scope and the decisions), `docs/RESTART_PLAN.md` (the current plan), `docs/DESIGN_SPEC.md` (how the built parts work; use its terms exactly), `docs/PROCESS_FILES.md` (files outside the repository that processes need) and `docs/USEFUL_PATHS.md` (untracked: real asset folders and tools on the dev machine, for testing). Where VISION.md and anything else disagree, VISION.md wins. The [README](../README.md) covers install and usage.
 
-## Game data model (2026-10-24)
+## The restart (2026-10-28)
 
-Records (compiled game data, with maturity) are now separate from claims (work, with status).
-See docs/OVERVIEW.md for how the parts connect, docs/IDENTITY.md (v2) for the amendment, and
-docs/GAME_DATA_MODEL.md for the record and claim design. Phase 7 builds the first slice:
-project home files, schemas for NPC_, RACE, FACT and LOT_, validation, gap claims and fast capture.
+Exchange is refocused on one loop: **Exchange notices a thing → Luke claims it ("this thing, as this, in that place") → Exchange finds or builds the path → it lands, milestone by milestone.** The scope is asset conversion. The 2026-10-24 design pivot (projects, game data, the Tauri shell) is in `docs/archive/` (identity, overview, game data model) and the spec; VISION.md says what of it stays.
 
-## Design pivot (2026-10-24)
+**What changes:**
+- **The UI.** The shell's Workspace carries the loop. The PySide6 window gets no new features and is removed at 6j.
+- **Game data is frozen.** `exchange.projects` (7a, 7b) and the shell's checkpoint (7c) stay as they are, with their tests; nothing new is built on them. Phase 7 part 2 and the benchmark (phase 9) are cancelled. In R3, `exchange claims list/ack` move to `exchange project claims list/ack`.
+- **Claims** now mean the loop's claims: intent for one asset, with milestones (Claimed → Acquired → Converted → Installed → In play). They are new work (R3-R5).
+- **Agents.** The Chats window stays as it is. Phase 8 shrinks to the second proof: Hand to agent (a brief opened in a chat) and a small Exchange MCP.
+- **Vocabulary.** A *process* is one automated chain; a *path* is a claim's whole route.
 
-**Exchange has grown from an asset manager into a personal, AI-assisted project workspace** for
-building interactive 3D worlds in Unreal Engine and by modding Bethesda games. Everything built in
-phases 1-4 stays and becomes the core of the new design. Read `IDENTITY.md` and the new
-`DESIGN_SPEC.md` in full before planning anything.
+**What stays:** every decision recorded below still stands unless VISION.md supersedes it. *How we work* is unchanged: plan with open questions and recommended answers, wait for approval, one PR per chunk, check against real data.
 
-**What changed:**
-- **Projects.** Exchange now manages projects: git-tracked project homes holding an identity,
-  domains, goals and claims, plus a devlog, decisions, knowledge and game data. See the spec's
-  *Projects* section.
-- **Two repositories.** A desktop shell forked from Mr. Mak Workspace (Tauri, HTML frontend, a
-  Chats window running CLI agents in real terminals) lives in its own repository and has its own
-  handoff doc (path in `USEFUL_PATHS.md`). **This repository stays the Python core** and becomes
-  the Exchange service: the core plus a local API for the shell's Workspace window and an
-  Exchange MCP server for agent sessions.
-- **The PySide6 window stays** as the working UI until the Workspace window reaches library
-  parity (roadmap phase 6), then it is removed. Keep it working until then.
-- **Vocabulary.** Pipelines are now **processes**, in the code too since 6a (see *Phase 6*).
-  Endpoints stay; project targets are a kind of endpoint.
-- **Scope.** Plugin records and game data are now in scope for project homes. Exchange is a
-  personal tool for the user, Windows only; generality is welcome only when it costs nothing.
+**The roadmap** (replaces the phase roadmap; details in `RESTART_PLAN.md`):
 
-**What stays:** every decision recorded below still stands, except where the spec's *Decided*
-section (entries dated 2026-10-24) supersedes it. Two supersede older text: the stack now uses
-Tauri for the UI (the core stays Python), and the "asset art only" restriction is lifted. The
-working method under *How we work* is unchanged: plan each phase with open questions and
-recommended answers, wait for approval, one PR per chunk, check against real data.
+| # | Repo | What |
+| --- | --- | --- |
+| R1 | both | Docs reset: VISION.md and the plan, old docs archived, this file around the loop |
+| R2 | both | 6j: parity signed off on a real library, then the PySide6 window removed |
+| R3 | core | Claims core: claim files (Markdown + YAML frontmatter), index, path finding by role and place, milestones, `exchange claim` |
+| R4 | core | Claims in the service API and the OpenAPI contract |
+| R5 | shell | Claims in the Workspace: Claim…, the Claims view, new since last scan |
+| R6 | core | The G8 path, shape: `daz_character_to_g8f` (was 4d) |
+| R7 | both | The G8 path, skin, and the first proof end to end in the Workspace |
+| later | both | The second proof: Hand to agent and the Exchange MCP |
 
-**The new roadmap** (goal numbers refer to `IDENTITY.md`):
+**4d's open question 1 is answered** by the restart: the first cross-figure path is Genesis 9 → Genesis 8 Female, the shape through Daz Generations and the verified morph recipe, the skin through the Texture Converter G9 → G8F template. The Exchange G9 copy is finished (`PROCESS_FILES.md`).
 
-| Phase | What | Repository | Goal |
-| --- | --- | --- | --- |
-| 1-3 | Foundations, Library, Curation | this one | G1, done |
-| 4 | Requisitions v1; first process Daz cross-figure (4d) | this one | G2, in progress |
-| 5 | Chats online: the shell fork, sessions, history, per-session bypass | shell | G3, done |
-| 6 | Service and Workspace: local API, the rename, library view at parity | both | G4, in progress |
-| 7 | Project homes, part 1: file formats, record schemas, validation, gap claims, fast capture, the bypass checkpoint | both | G5 |
-| 7, part 2 | After 6d-6j: the identity interview, devlog, mission control, the claims board, Card and Table views, the project index | both | G5 |
-| 8 | Agents connected: Exchange MCP, generated agent files, claim dispatch, skills, drift review | both | G6 |
-| 9 | Benchmark: a fresh Sirenne-themed Unreal project run from Exchange, with a Daz → Unreal process | both | G7 |
-| 10-11 | Game environments; breadth | this one | |
-
-**Next, in order:**
-1. **The rename** is 6a, the first chunk of Roadmap phase 6 (see *Phase 6*).
-2. **4d**, once the user answers phase 4 question 1 (what cross-figure converts first, and with
-   which tool). It may run alongside 6b-6d, which touch other modules. The user has a Blender
-   template scene for these conversions.
-3. **Phase 5** is done in the shell repository (its PRs #1, #4, #5, #6).
-4. **Phase 6** goes on with 6d (the shell's library browsing) when the user says so.
-5. **Phase 7, part 1** (see *Phase 7*) is approved and starts now. Of the project-home commits
-   carried from phase 6, only the checkpoint before a bypassed session is decided (7c); commits
-   when a claim reaches review or done, and on request, are still open.
-
-**Between the repositories:** this repository owns the service API and the Exchange MCP; the
-shell consumes them. Until phase 6 the shell's Workspace window is a placeholder, so phase 5 needs
-nothing from here. When the API exists, its schema is the contract between the two, and changes
-to it are noted in both handoff docs.
+**Between the repositories:** this repository owns the service API and the Exchange MCP; the shell consumes them. The API's schema (`docs/api/openapi.json`) is the contract between the two, and changes to it are noted in both handoff docs.
 
 ## Where we are
 
-**Roadmap phases 1 (Foundations), 2 (Library) and 3 (Curation) are merged. Phase 4 (Requisitions
-v1) is in progress, split into four PRs: 4a the requisition engine (core and CLI), 4b bridges
-(Blender, Daz Studio, command-line tools), 4c requisitions in the window, 4d the first real
-pipeline (Daz cross-figure, G9/G2 → G8).** The phase 4 plan was approved with all recommended
-answers (see Decisions).
+**Phases 1-3, 4a-4c, phase 6 up to 6i, and phase 7 part 1 are merged.** Next is R2 (6j), then R3.
 
-**Next:**
-- **Phase 6: 6j**, the parity checklist: the PySide6 window's features against the Workspace, signed off by the user on a real library, then the window removed. Then 4d. See *Phase 6* below and *Design pivot* above.
 - **Stacked PRs:** after merging one, change the next PR's base to `main` before merging it (or delete the merged branch, and GitHub moves it). This has gone wrong three times: #11 and #12 needed #13 to reach `main`, #26 needed #27, and the shell's #14 needed its #16. Turning on *Automatically delete head branches* (Settings › General › Pull Requests, in both repositories) makes GitHub retarget them by itself; until then, prefer branching from `main`.
-- **4d** waits for the user's answer to open question 1: what cross-figure converts first, and with which tool.
 
 | PR | What | State |
 | --- | --- | --- |
@@ -117,7 +69,8 @@ answers (see Decisions).
 | #25 | 6g, part 1: the jobs API: environments (discover, detect, register, configure), scans and rescans in worker processes with progress, classify, change notices | merged |
 | #26 | 6g, part 2: requisitions: planning, the queue and running it, process packages, tools, presets, endpoints; the wizard's endpoint setting read | merged into #25's branch (via #27) |
 | #27 | #26 onto `main` | merged |
-| 4d | First process: Daz cross-figure (G9/G2 → G8) | needs the user's answer to open question 1 |
+| #28 | This doc after 6g | merged |
+| R1 | The restart: VISION.md and RESTART_PLAN.md, old docs archived, this doc around the loop | in review |
 
 ## Phase 6: Service and Workspace
 
@@ -438,6 +391,8 @@ Endpoints) needs, as the window's *Requisition to…* dialog, queue view and set
   | The queue / hold / check stale | 0.02-0.03 s |
 
 ## Phase 7: Project homes, part 1
+
+**Frozen by the restart (2026-10-28):** what's below is built and tested, and stays as it is. Part 2 is cancelled; see *The restart*.
 
 Approved 2026-10-24 with every recommended answer. Goal G5. Phase 6 had not merged past 6c when
 this was planned, so the Workspace views (Card and Table for the first four signatures) move to
@@ -851,14 +806,14 @@ Key ideas:
 
 ## Known gaps and good next candidates
 
-- **4d** (see the table above) needs the user's answer on what cross-figure converts first.
+- **4d** is now R6 and R7 of the restart: Genesis 9 → Genesis 8 Female (see *The restart*).
 - **Not done yet in phase 4:**
   - The `new-process` scaffold and the authoring guide (`PROCESS_GUIDE.md`, roadmap phase 11).
   - **Manual checkpoints in the window:** they show as *Needs attention* with the pipeline's message, and Resume continues. There's no button yet to open the work folder in the app at that point.
   - **Queue mode:** the queue only runs when you press Run; there's no "run immediately" setting yet.
   - Parallel command-line operations: the runner does one step at a time.
   - Blender thumbnails for formats the small renderer can't draw.
-- **The Daz Studio bridge has run only a trivial job** (version, scene, one file written), not a real conversion. That's for 4d.
+- **The Daz Studio bridge has run only a trivial job** (version, scene, one file written), not a real conversion. That's for R6.
 - **Rebuilding from sidecars after a lost database** keeps each output with its asset's original uid. The source environment's rescan makes a new uid for the same asset, so the two show as separate assets until merged.
 - **Overwriting another requisition's output:** both sidecars list the files, so the asset shows an entry for each until one is removed.
 - **Edits run on the UI thread.** Those that change counts (merge, new product, accepted suggestions, retype, undo) reload the sidebar, about 1.7 s on the real library. The first big batch after opening can take several seconds while the database warms up.
@@ -878,4 +833,4 @@ Key ideas:
 - **Not used yet:** the chosen MO2 profile is stored but unused. (Endpoints and visibility are used by requisitions since 4a.)
 - **Unreal:** no `.uasset` class detection (types come from name prefixes).
 - **Discovery noise:** Steam games without definitions make the wizard's found list long. Consider hiding them behind a toggle.
-- **Untracked files:** `docs/USEFUL_PATHS.md` and `KICKOFF_PROMPT.md` are the user's and haven't been committed. `KICKOFF_PROMPT.md` predates the 2026-10-24 pivot; `IDENTITY.md` and `DESIGN_SPEC.md` replace it as the brief. `.claude/launch.json` serves `docs/` on port 8765 to view the UI mockup (`docs/Exchange_Main_Window_Add_Environment.html`) in the browser pane.
+- **Untracked files:** `docs/USEFUL_PATHS.md` and `KICKOFF_PROMPT.md` are the user's and stay out of git, since this repository is public. `KICKOFF_PROMPT.md` predates both the 2026-10-24 pivot and the restart; `VISION.md` is the brief. `.claude/launch.json` serves `docs/` on port 8765 to view the UI mockup (`docs/Exchange_Main_Window_Add_Environment.html`) in the browser pane.

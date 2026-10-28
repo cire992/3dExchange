@@ -1,5 +1,7 @@
 # Exchange: Game Data Model
 
+> **Archived 2026-10-28.** [VISION.md](../VISION.md) replaces this document as the brief. It is kept as reference for what was designed and built.
+
 Draft, 2026-10-24. Developed from "Brainstorming claim types for Unreal project." Settled points are listed under Decisions; everything else is a proposal. Vocabulary changes go through the identity document's amendment log.
 
 ## Starting point

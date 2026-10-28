@@ -1,5 +1,7 @@
 # Exchange: Identity
 
+> **Archived 2026-10-28.** [VISION.md](../VISION.md) replaces this document as the brief. It is kept as reference for what was designed and built.
+
 Version 2, 2026-10-24. This document changes only through amendments, recorded in the log at the bottom.
 
 ## Thesis

@@ -1,7 +1,7 @@
 # Project home formats
 
 The reference for the files in a project home, as `exchange.projects` reads and validates them
-(Roadmap phase 7). The design is in `GAME_DATA_MODEL.md` and the spec's *Projects* section; this
+(Roadmap phase 7). The design is in `archive/GAME_DATA_MODEL.md` and the spec's *Projects* section; this
 document is the exact format.
 
 ## Layout

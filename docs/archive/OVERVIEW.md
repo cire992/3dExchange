@@ -1,5 +1,7 @@
 # Exchange: Overview
 
+> **Archived 2026-10-28.** [VISION.md](../VISION.md) replaces this document as the brief. It is kept as reference for what was designed and built.
+
 2026-10-24. The forest view: what Exchange is for and how its parts connect. Read this first. The identity document holds the commitments; the game data model holds the record and claim design.
 
 ## In one sentence
