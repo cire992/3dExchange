@@ -197,7 +197,7 @@ def dossier_detail(conn: sqlite3.Connection, definitions: DefinitionSet, uid: st
                 " JOIN environment_root r ON r.id = c.root_id WHERE e.ledger_id = ? ORDER BY e.id",
                 (ledger["id"],)):
             files = conn.execute(
-                "SELECT f.id, f.rel_path, f.size, f.hash, f.state, ef.role FROM entry_file ef"
+                "SELECT f.id, f.root_id AS root, f.rel_key AS key, f.rel_path, f.size, f.hash, f.state, ef.role FROM entry_file ef"
                 " JOIN file f ON f.id = ef.file_id WHERE ef.entry_id = ?"
                 " ORDER BY ef.role = 'primary' DESC, lower(f.rel_path)", (e["id"],)).fetchall()
             entries.append({

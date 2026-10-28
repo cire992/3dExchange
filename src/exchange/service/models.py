@@ -109,6 +109,8 @@ class EnvironmentRef(BaseModel):
 
 class EntryFile(BaseModel):
     id: int
+    root: int = Field(description="With `key`, the file as a FileRef, for linking it elsewhere")
+    key: str
     rel_path: str
     path: str = Field(description="Absolute path on this PC")
     size: int | None = None
