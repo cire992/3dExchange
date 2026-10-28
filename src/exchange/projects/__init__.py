@@ -4,7 +4,7 @@ A project home holds the project's identity, goals, records (compiled game data,
 each, typed by the signature prefix of its editor ID) and claims (dated work and ideas), plus a
 coverage rules file. Files are the source of truth; this package reads, validates and creates
 them, and takes git checkpoints. See ``docs/PROJECT_HOME.md`` for the formats and
-``docs/GAME_DATA_MODEL.md`` for the design.
+``docs/archive/GAME_DATA_MODEL.md`` for the design.
 """
 
 from exchange.projects.home import ProjectHome, find_home, init_home, resolve_project

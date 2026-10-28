@@ -1,6 +1,8 @@
 # Exchange — Design Specification
 
-Last updated 2026-10-24. This file is the source of truth for how Exchange works. Its companion, [IDENTITY.md](IDENTITY.md), says what Exchange is for: thesis, pillars, feel, boundaries and goals. When they seem to conflict, identity wins and this file gets fixed.
+> **Reference since 2026-10-28.** [VISION.md](VISION.md) is the brief: it sets what Exchange is for and what's in scope, and wins where this file disagrees. This file still describes how the built parts work.
+
+Last updated 2026-10-24. This file is the source of truth for how Exchange works. Its companion, [IDENTITY.md](archive/IDENTITY.md) (archived), says what Exchange is for: thesis, pillars, feel, boundaries and goals. When they seem to conflict, identity wins and this file gets fixed.
 
 Exchange is a personal, AI-assisted mission control for building sprawling interactive 3D worlds, in Unreal Engine or by modding Bethesda games. It holds each project's identity, maps the project's growing structure into domains and claims, catalogs every 3D asset Luke owns across every game, engine and content library, and dispatches work to CLI agents and creative tools from one place. Converting assets between environments is a queued, repeatable job.
 
@@ -10,7 +12,7 @@ Exchange is a personal, AI-assisted mission control for building sprawling inter
 
 Exchange began as an asset manager, because dealing with assets is the albatross around every modder's neck. It is now the workspace around those assets. Solo developers wear every hat, and the projects they build sprawl. Exchange's job is not to limit sprawl but to keep it legible: every idea written down, dated and connected; every asset found and matched to the work that needs it; every repetitive task automated or handed to an agent, so the developer's attention stays on design decisions.
 
-The product pillars are in IDENTITY.md. The engineering principles below hold across every part of the design.
+The product pillars are in `archive/IDENTITY.md`. The engineering principles below hold across every part of the design.
 
 1. **Asset-centric, not environment-centric.** A dossier describes what an asset *is*. Where it lives is tracked separately, in ledgers.
 2. **Read-only until asked.** Scanning never modifies an environment. Exchange writes to environments only through requisitions or explicit user actions, and says so in the UI. Project homes are the one place that Exchange, the user and agents write freely.
@@ -267,7 +269,7 @@ A project is a world being built. Many projects are open-ended explorations of a
 
 ### Project home
 
-The project home is a git-tracked folder of plain files. It is separate from the Unreal project and mod folders it builds: those are targets, with their own version control (Unreal projects may use Git LFS or Perforce; mod folders live under MO2). The layout follows `GAME_DATA_MODEL.md`:
+The project home is a git-tracked folder of plain files. It is separate from the Unreal project and mod folders it builds: those are targets, with their own version control (Unreal projects may use Git LFS or Perforce; mod folders live under MO2). The layout follows `archive/GAME_DATA_MODEL.md`:
 
 ```
 NJO/
@@ -297,7 +299,7 @@ New projects are created through an **identity interview**: an agent asks a few 
 
 ### Domains and records
 
-Domains are the world's structure: districts, factions, characters, systems, questlines. They grow without limit, so sprawl has somewhere to land. **In a game project the domains are records:** typed units of compiled game data, one Markdown file each, named by an editor ID whose signature prefix is the record type (`NPC_DockMaster`, `FACT_PortAuthority`, `LOT_SaltRowCantina`). A signature that ends in `_` uses that underscore as the separator. Records link to each other by editor ID and carry a maturity level (Sketch, Spec, Stub, Built, Polished; stored as 0-4) instead of a status. `GAME_DATA_MODEL.md` holds the record families, the maturity ladder and the authoring views.
+Domains are the world's structure: districts, factions, characters, systems, questlines. They grow without limit, so sprawl has somewhere to land. **In a game project the domains are records:** typed units of compiled game data, one Markdown file each, named by an editor ID whose signature prefix is the record type (`NPC_DockMaster`, `FACT_PortAuthority`, `LOT_SaltRowCantina`). A signature that ends in `_` uses that underscore as the separator. Records link to each other by editor ID and carry a maturity level (Sketch, Spec, Stub, Built, Polished; stored as 0-4) instead of a status. `archive/GAME_DATA_MODEL.md` holds the record families, the maturity ladder and the authoring views.
 
 ```markdown
 ---
@@ -360,7 +362,7 @@ triage: new
 The dockmaster's evening schedule points here, but the cantina is still a Sketch.
 ```
 
-- **Derived claims:** most claims are derived from the records (`GAME_DATA_MODEL.md`, *Claim derivation*). **Gap claims** open directly when validation finds a link to a record that does not exist or is not mature enough, or a broken dossier link. One gap claim stays open per target, `needed_by` lists every record waiting on it, and a fixed gap moves its claim to *review*. Ladder, coverage and mining claims wait in the triage inbox as proposals. Coverage rules live in one file per project, `coverage-rules.yaml`.
+- **Derived claims:** most claims are derived from the records (`archive/GAME_DATA_MODEL.md`, *Claim derivation*). **Gap claims** open directly when validation finds a link to a record that does not exist or is not mature enough, or a broken dossier link. One gap claim stays open per target, `needed_by` lists every record waiting on it, and a fixed gap moves its claim to *review*. Ladder, coverage and mining claims wait in the triage inbox as proposals. Coverage rules live in one file per project, `coverage-rules.yaml`.
 - **Fast capture:** a capture box in both windows, and `exchange capture` on the command line, turns one line into an *idea* claim or, when the line starts with an editor ID, a Sketch record. In a window it defaults to the record or domain in view. Agents can create claims through the Exchange MCP.
 - **Needs:** a claim can list `needs`. An asset need carries a library search query. Exchange shows what matches: dossiers already in a target, dossiers elsewhere with a process that can bring them in, or nothing found.
 - **Agent work never self-approves.** Agents move claims as far as *review*. Done is the user's call.
@@ -373,7 +375,7 @@ Exchange's job is connecting things, so relations are first-class. Records link 
 
 Game data is in scope. **Records are the source of truth for the game's data;** the compile process turns them into what the engine reads.
 
-- **Unreal:** a compile process reads the record files and writes Data Assets and DataTables through Unreal's editor Python. The project home owns definitions; Unreal owns geometry, placement and presentation (`GAME_DATA_MODEL.md`, *Getting records into Unreal*).
+- **Unreal:** a compile process reads the record files and writes Data Assets and DataTables through Unreal's editor Python. The project home owns definitions; Unreal owns geometry, placement and presentation (`archive/GAME_DATA_MODEL.md`, *Getting records into Unreal*).
 - **Bethesda:** plugins serialized to text in `data/plugins/<plugin>/`, using the serializer the game's environment definition names (Spriggit for the games it supports, tes3conv for Morrowind). A *build plugin* process converts the text back into an ESP/ESM/ESL in the target mod folder. Plugins become diffable, reviewable and editable by agents.
 
 ### Devlog and knowledge
@@ -733,7 +735,7 @@ It removes the voice coordinator, mobile access, the persona and its card regist
 
 ## Roadmap
 
-The library and the first processes come first, then the workspace around them, proven on a real Unreal project. Goal numbers refer to IDENTITY.md.
+The library and the first processes come first, then the workspace around them, proven on a real Unreal project. Goal numbers refer to `archive/IDENTITY.md`.
 
 1. **Foundations** (done): core package, SQLite schema, environment and dossier-type definition formats, command-line scan.
 2. **Library** (done): Daz, Unreal, MO2 and Loose Files environments; three-phase scanning; dossiers and ledgers; main window with browser, inspector, search and thumbnails. *G1.*
@@ -775,6 +777,6 @@ Decided 2026-10-24, with the move to a project workspace:
 - **Game data:** plugin records and engine data are in scope for project homes, with text in `data/` as the source of truth.
 - **Permission bypass:** a per-session checkbox when starting a session, off by default.
 - **Image generation:** Mr. Mak's concept-art skills are kept. fal.ai first; Higgsfield once the workflow is in weekly use.
-- **Game data model** (`GAME_DATA_MODEL.md`, identity v2): records are separate from claims, and project homes follow its layout, with YAML front matter. Where it and this spec disagree, it wins.
+- **Game data model** (`archive/GAME_DATA_MODEL.md`, identity v2): records are separate from claims, and project homes follow its layout, with YAML front matter. Where it and this spec disagree, it wins.
 - **Bypass checkpoint:** before each launch of a bypassed session in a project home, resumes included, Exchange commits the home's changes. If that fails the session does not start unless the user chooses to start it without one.
 - **Priorities:** the Daz library is the first asset-management priority; Unreal projects are the first project priority, with a fresh Sirenne-themed Unreal project as the benchmark.
