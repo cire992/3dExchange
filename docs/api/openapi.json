@@ -7512,6 +7512,15 @@
             "type": "integer",
             "title": "Id"
           },
+          "root": {
+            "type": "integer",
+            "title": "Root",
+            "description": "With `key`, the file as a FileRef, for linking it elsewhere"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
           "rel_path": {
             "type": "string",
             "title": "Rel Path"
@@ -7562,6 +7571,8 @@
         "type": "object",
         "required": [
           "id",
+          "root",
+          "key",
           "rel_path",
           "path",
           "role"

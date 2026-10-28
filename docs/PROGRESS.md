@@ -36,7 +36,7 @@ Exchange is refocused on one loop: **Exchange notices a thing → Luke claims it
 
 ## Where we are
 
-**Phases 1-3, 4a-4c, phase 6 up to 6i, and phase 7 part 1 are merged.** Next is R2 (6j), then R3.
+**Phases 1-3, 4a-4c, phase 6 up to 6i, phase 7 part 1 and R1 are merged.** R2 (6j) is under way: R2a closes the parity gaps `PARITY_CHECKLIST.md` lists, then Luke signs the checklist off (R2b) and the PySide6 window goes (R2c). Then R3.
 
 - **Stacked PRs:** after merging one, change the next PR's base to `main` before merging it (or delete the merged branch, and GitHub moves it). This has gone wrong three times: #11 and #12 needed #13 to reach `main`, #26 needed #27, and the shell's #14 needed its #16. Turning on *Automatically delete head branches* (Settings › General › Pull Requests, in both repositories) makes GitHub retarget them by itself; until then, prefer branching from `main`.
 
@@ -70,7 +70,8 @@ Exchange is refocused on one loop: **Exchange notices a thing → Luke claims it
 | #26 | 6g, part 2: requisitions: planning, the queue and running it, process packages, tools, presets, endpoints; the wizard's endpoint setting read | merged into #25's branch (via #27) |
 | #27 | #26 onto `main` | merged |
 | #28 | This doc after 6g | merged |
-| R1 | The restart: VISION.md and RESTART_PLAN.md, old docs archived, this doc around the loop | in review |
+| #29 | R1, the restart: VISION.md and RESTART_PLAN.md, old docs archived, this doc around the loop | merged |
+| R2a | 6j's parity gaps (with Exchange-Shell's R2a): each file in a dossier's detail carries `root` and `key`, its file ref, so the Workspace's drop menu can link one asset's files onto another | in review |
 
 ## Phase 6: Service and Workspace
 

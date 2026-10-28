@@ -246,3 +246,22 @@ def test_a_busy_library_answers_at_once(client, db_path):
         blocker.close()
     ok(client.post(f"{V1}/edits/fields", json={"uids": [barrel], "field": "notes", "value": "x"}))
     assert detail(client, barrel)["fields"]["notes"]["value"] == "x"
+
+
+def test_a_dossiers_files_can_be_linked_onto_another_by_their_refs(client, db_path):
+    # The Workspace's drop menu: "Link their files to …" sends the dragged assets' files, as read
+    # from their details, to link-files.
+    texture, mesh = uid_of(db_path, "Donut01_Pink"), uid_of(db_path, "Donut01_Blue")
+
+    def live_files(uid):
+        return [f for ledger in detail(client, uid)["ledgers"] for entry in ledger["entries"]
+                if entry["status"] != "retired" for f in entry["files"]]
+
+    files = live_files(texture)
+    assert files and all(isinstance(f["root"], int) and f["key"] for f in files)
+    refs = [{"root": f["root"], "key": f["key"]} for f in files]
+    linked = ok(client.post(f"{V1}/edits/link-files", json={"uid": mesh, "files": refs}))
+    assert linked["label"] == f"link {len(refs)} file{'s' if len(refs) > 1 else ''}"
+    assert {f["path"] for f in files} <= {f["path"] for f in live_files(mesh)}
+    ok(client.post(f"{V1}/undo"))
+    assert not {f["path"] for f in files} & {f["path"] for f in live_files(mesh)}
