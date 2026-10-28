@@ -1,6 +1,6 @@
 # Exchange: progress and handoff
 
-Last updated 2026-10-25, during phase 6g. `main` has phases 1-3, 4a-4c (#10-#13), the Daz Studio bridge fixes checked against the real app (#14), the pivot docs (#15), phase 6's core chunks 6a, 6b (via #19) and 6e (#23), scoped file links (#24), and phase 7 part 1's core chunks (#20-#22). The shell repository has merged 6c, 6d, 6f and 7c. 6g part 1 (jobs and environments) and part 2 (requisitions, stacked on it) are in review here.
+Last updated 2026-10-25, after phase 6g. `main` has phases 1-3, 4a-4c (#10-#13), the Daz Studio bridge fixes checked against the real app (#14), the pivot docs (#15), phase 6's core chunks 6a, 6b (via #19), 6e (#23) and 6g (#25, and #26 via #27), scoped file links (#24), and phase 7 part 1's core chunks (#20-#22). The shell repository has merged 6c, 6d, 6f, 6h, 6i (onto its `main` with its #16) and 7c. Phase 6 has 6j left.
 
 Read this first, then `docs/OVERVIEW.md` (how the parts connect), `docs/IDENTITY.md` (what
 Exchange is for), `docs/GAME_DATA_MODEL.md` (records and claims), `docs/DESIGN_SPEC.md` (how it
@@ -84,8 +84,8 @@ pipeline (Daz cross-figure, G9/G2 → G8).** The phase 4 plan was approved with 
 answers (see Decisions).
 
 **Next:**
-- **Phase 6, then 4d:** see *Phase 6* below and *Design pivot* above.
-- **Stacked PRs next time:** after merging one, change the next PR's base to `main` before merging it (or delete the merged branch, and GitHub moves it). #11 and #12 merged into their base branches and needed #13 to reach `main`.
+- **Phase 6: 6j**, the parity checklist: the PySide6 window's features against the Workspace, signed off by the user on a real library, then the window removed. Then 4d. See *Phase 6* below and *Design pivot* above.
+- **Stacked PRs:** after merging one, change the next PR's base to `main` before merging it (or delete the merged branch, and GitHub moves it). This has gone wrong three times: #11 and #12 needed #13 to reach `main`, #26 needed #27, and the shell's #14 needed its #16. Turning on *Automatically delete head branches* (Settings › General › Pull Requests, in both repositories) makes GitHub retarget them by itself; until then, prefer branching from `main`.
 - **4d** waits for the user's answer to open question 1: what cross-figure converts first, and with which tool.
 
 | PR | What | State |
@@ -114,8 +114,9 @@ answers (see Decisions).
 | #22 | 7b: gap claims, dossier hints and relink candidates, fast capture, `exchange claims list/ack` | merged |
 | #23 | 6e: the write API: curation edits, Undo/Redo and history, collections, suggestions, the desk, lexicons | merged |
 | #24 | Curation edits apply only the file links they name | merged |
-| 6g, part 1 | The jobs API: environments (discover, detect, register, configure), scans and rescans in worker processes with progress, classify, change notices | in review |
-| 6g, part 2 | Requisitions: planning, the queue and running it, process packages, tools, presets, endpoints; the wizard's endpoint setting read (stacked on part 1) | in review |
+| #25 | 6g, part 1: the jobs API: environments (discover, detect, register, configure), scans and rescans in worker processes with progress, classify, change notices | merged |
+| #26 | 6g, part 2: requisitions: planning, the queue and running it, process packages, tools, presets, endpoints; the wizard's endpoint setting read | merged into #25's branch (via #27) |
+| #27 | #26 onto `main` | merged |
 | 4d | First process: Daz cross-figure (G9/G2 → G8) | needs the user's answer to open question 1 |
 
 ## Phase 6: Service and Workspace
