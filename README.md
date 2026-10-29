@@ -60,20 +60,14 @@ You need Python 3.11 or newer. On Windows, with the Python launcher:
 py -3.12 -m venv .venv
 ```
 ```bash
-.venv/Scripts/python -m pip install -e ".[ui]"
+.venv/Scripts/python -m pip install -e ".[service]"
 ```
 
-Use `.[dev]` instead of `.[ui]` if you also want the test tools. Add `service` (`.[ui,service]`) for the local API the desktop shell uses.
+Use `.[dev]` instead of `.[service]` if you also want the test tools.
 
 ## Use
 
-Start the desktop app, then click **Add environment**:
-
-```bash
-.venv/Scripts/exchange-app
-```
-
-Or use the command line. A few examples:
+The window is the Workspace in cire992/Exchange-Shell, which starts `exchange serve` itself. The command line works on its own. A few examples:
 
 ```bash
 .venv/Scripts/exchange discover
@@ -192,6 +186,6 @@ exchange project validate --project NJO
 .venv/Scripts/python -m pytest -q
 ```
 
-- **Layout:** the core (`src/exchange`) never imports Qt. The desktop app is `src/exchange_ui` (PySide6).
-- **Tests:** they use small fake environments in `tests/fixtures/envs` and files built on the fly by `tests/builders.py`. UI tests run offscreen with pytest-qt.
+- **Layout:** the core (`src/exchange`) never imports Qt. The window is the Workspace in the shell (cire992/Exchange-Shell).
+- **Tests:** they use small fake environments in `tests/fixtures/envs` and files built on the fly by `tests/builders.py`.
 - **More:** see [docs/PROGRESS.md](docs/PROGRESS.md) for the architecture, the decisions made so far and how the project is being built.

@@ -34,57 +34,57 @@ Not gaps:
 Tick each line after doing it in the Workspace on the real library. Don't edit in the window and the Workspace at the same time: they keep separate undo stacks.
 
 ### Environments and scanning
-- [ ] Add environment: the found-on-this-PC list, Browse…, detection with confidence, choosing an MO2 profile, ignore rules
-- [ ] A scan runs with progress; it continues after closing the wizard; *Review Unidentified* at the end
-- [ ] Changes detected on an environment, then *Rescan changed*; Stop a running scan
-- [ ] An environment's settings: ignore rules, MO2 profile, endpoint and visibility
+- [x] Add environment: the found-on-this-PC list, Browse…, detection with confidence, choosing an MO2 profile, ignore rules
+- [x] A scan runs with progress; it continues after closing the wizard; *Review Unidentified* at the end
+- [x] Changes detected on an environment, then *Rescan changed*; Stop a running scan
+- [x] An environment's settings: ignore rules, MO2 profile, endpoint and visibility
 
 ### Browsing
-- [ ] The sidebar: all assets, collections, environments with their types, Unidentified with its count
-- [ ] Item cards with thumbnails scroll smoothly through the whole library
-- [ ] Search with filters (`env:`, `tag:`, `type:`, `-tag:`), and saving a search as a smart collection
-- [ ] Selection: click, Ctrl+click, Shift+click, Ctrl+A; the keyboard moves through the cards
+- [x] The sidebar: all assets, collections, environments with their types, Unidentified with its count
+- [x] Item cards with thumbnails scroll smoothly through the whole library
+- [x] Search with filters (`env:`, `tag:`, `type:`, `-tag:`), and saving a search as a smart collection
+- [x] Selection: click, Ctrl+click, Shift+click, Ctrl+A; the keyboard moves through the cards
 
 ### The inspector
-- [ ] Overview: type, tags with where each came from, variants, ledgers with their entries, origin and license
-- [ ] The Files, Dependencies and History tabs
-- [ ] Editing name, type, tags and notes; the revert marker (↺) on edited fields
-- [ ] Bulk edit with several selected: add and remove a tag, *Keep each* value
+- [x] Overview: type, tags with where each came from, variants, ledgers with their entries, origin and license
+- [x] The Files, Dependencies and History tabs
+- [x] Editing name, type, tags and notes; the revert marker (↺) on edited fields
+- [x] Bulk edit with several selected: add and remove a tag, *Keep each* value
 
 ### Curation
-- [ ] Card menu: Rename, Add to collection, New collection, Remove from collection
-- [ ] Put into a new product, Take out of the product
-- [ ] Merge the others into one, Split…, Make a variant its own asset
-- [ ] Not an asset, and Count as an asset again
-- [ ] Drop cards on a product (put into), on a card (merge, fold in as a variant), on a collection in the sidebar
-- [ ] Undo and Redo, with Ctrl+Z and Ctrl+Y, across several kinds of edit
-- [ ] Delete a collection
+- [x] Card menu: Rename, Add to collection, New collection, Remove from collection
+- [x] Put into a new product, Take out of the product
+- [x] Merge the others into one, Split…, Make a variant its own asset
+- [x] Not an asset, and Count as an asset again
+- [x] Drop cards on a product (put into), on a card (merge, fold in as a variant), on a collection in the sidebar
+- [x] Undo and Redo, with Ctrl+Z and Ctrl+Y, across several kinds of edit
+- [x] Delete a collection
 
 ### The Unidentified desk
-- [ ] Low confidence: retype, tag or dismiss
-- [ ] Unattached files by folder: expand to count, make a product from a folder, link files to an asset, mark *Not assets*, ignore a folder
-- [ ] Suggestions: select all shown, accept or reject in batches, Show more
+- [x] Low confidence: retype, tag or dismiss
+- [x] Unattached files by folder: expand to count, make a product from a folder, link files to an asset, mark *Not assets*, ignore a folder
+- [x] Suggestions: select all shown, accept or reject in batches, Show more
 
 ### Lexicons
-- [ ] Add and remove words, then *Apply to library* in the background
+- [x] Add and remove words, then *Apply to library* in the background
 
 ### Requisitions
-- [ ] *Requisition to…* from a card: the plan, per-process options, presets (save, choose), options last used, the collision policy
-- [ ] Add to queue, and Add and run
-- [ ] The queue: run it, hold and release, move up and down, the log of each item
-- [ ] Resume after a checkpoint or a collision (overwrite, rename, skip)
-- [ ] Rebuild, Remove output, Check for stale
-- [ ] Settings › Processes: install a package, trust it, set a tool's path, the prerequisites' state
-- [ ] Settings › Endpoints: change where each environment's output goes
+- [x] *Requisition to…* from a card: the plan, per-process options, presets (save, choose), options last used, the collision policy
+- [x] Add to queue, and Add and run
+- [x] The queue: run it, hold and release, move up and down, the log of each item
+- [x] Resume after a checkpoint or a collision (overwrite, rename, skip)
+- [x] Rebuild, Remove output, Check for stale
+- [x] Settings › Processes: install a package, trust it, set a tool's path, the prerequisites' state
+- [x] Settings › Endpoints: change where each environment's output goes
 
 ### After R2a (the gaps marked *fix*)
-- [ ] Show in folder
-- [ ] Open in app
-- [ ] Drop cards on a card: Link their files
-- [ ] Ctrl+F and F5
+- [x] Show in folder
+- [x] Open in app
+- [x] Drop cards on a card: Link their files
+- [x] Ctrl+F and F5
 
 ### Sign-off
-- [ ] Every line above works on the real library, or is listed here as an accepted gap with a reason. Signed off by Luke on ____.
+- [x] Every line above works on the real library, or is listed here as an accepted gap with a reason. Signed off by Luke on 2026-10-29.
 
 ## Decisions (the recommended answers, approved)
 
