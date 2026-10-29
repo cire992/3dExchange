@@ -74,6 +74,7 @@ Exchange is refocused on one loop: **Exchange notices a thing → Luke claims it
 | R2a | 6j's parity gaps (with Exchange-Shell's R2a): each file in a dossier's detail carries `root` and `key`, its file ref, so the Workspace's drop menu can link one asset's files onto another | merged (#30) |
 | R2c | 6j's end: the PySide6 window removed (its package and tests, the `ui` extra, the PySide6 and Qt test dependencies, the window's entry point) | in review |
 | R3a | Claims core, part 1: claim files in `<data>/claims/`, Claimed and Acquired, `exchange claim add / list / show / close` (#34) | in review |
+| R3b | Claims core, part 2: claim paths by role and place, whose turn, `exchange claim walk [--run]`, Converted and Installed (#36) | in review |
 
 ## Phase 6: Service and Workspace
 
