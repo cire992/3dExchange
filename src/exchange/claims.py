@@ -5,6 +5,11 @@ rewrites only ``requisitions``, ``milestone`` and ``closed`` in place, so hand e
 any other key and extra keys of your own survive. The milestone is derived from the library on
 every read of an open claim; a closed claim keeps the one it had. Claims are read from the folder
 each time; the database has no index of them.
+
+Beyond the file, a claim has a **path** (the processes that take the thing to the place, as the role),
+**whose turn** it is (Luke's, Exchange's, or a process nobody has built yet), and it can be **walked**:
+the path planned and queued as a requisition whose uid the claim records. Path and turn are derived on
+every read and never written.
 """
 
 from __future__ import annotations
@@ -16,11 +21,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from exchange.db import repository as repo
+from exchange.definitions.schema import DefinitionSet
 from exchange.errors import ExchangeError
 from exchange.paths import data_dir
+from exchange.processes.registry import ProcessPackage, Registry, check_prerequisites, ready, tool_paths, validate
 from exchange.projects import frontmatter
+from exchange.requisitions.endpoints import configured_folder
+from exchange.requisitions.plan import PlanError, _entries, find_chains, plan_requisition, queue_plan, routes
 
-MILESTONES = ("claimed", "acquired", "converted", "installed")  # in order; only the first two are derived so far
+MILESTONES = ("claimed", "acquired", "converted", "installed")  # in order, each derived from the library
 OWNED_KEYS = ("requisitions", "milestone", "closed")  # the only keys Exchange rewrites
 
 
@@ -68,12 +78,55 @@ def _new_path(day: dt.date, name: str) -> Path:
     return path
 
 
-def _derive(conn: sqlite3.Connection, thing: object) -> str:
-    """``acquired`` when the dossier has an entry that is not retired, else ``claimed``."""
+def _live(conn: sqlite3.Connection, thing: object) -> bool:
+    """Whether the dossier has an entry that is not retired."""
     row = conn.execute(
-        "SELECT count(*), sum(e.status != 'retired') FROM entry e JOIN ledger l ON l.id = e.ledger_id"
+        "SELECT sum(e.status != 'retired') FROM entry e JOIN ledger l ON l.id = e.ledger_id"
         " JOIN dossier d ON d.id = l.dossier_id WHERE d.uid = ?", (str(thing),)).fetchone()
-    return "acquired" if row[1] else "claimed"
+    return bool(row[0])
+
+
+def resolve_requisitions(conn: sqlite3.Connection, meta: dict[str, Any]) -> list[tuple[Any, sqlite3.Row | None]]:
+    """Each uid of the claim's ``requisitions`` with its requisition row, or None when it no longer resolves."""
+    uids = meta.get("requisitions")
+    uids = uids if isinstance(uids, list) else []
+    return [(uid, conn.execute("SELECT id, uid, state, message FROM requisition WHERE uid = ?", (uid,)).fetchone()
+             if isinstance(uid, str) else None) for uid in uids]
+
+
+def _latest(conn: sqlite3.Connection, meta: dict[str, Any]) -> sqlite3.Row | None:
+    found = [row for _, row in resolve_requisitions(conn, meta) if row is not None]
+    return found[-1] if found else None
+
+
+def _derive(conn: sqlite3.Connection, meta: dict[str, Any]) -> str:
+    """The least advanced of the walked subjects (the thing, or a product's children), each
+    ``installed`` (its entry sits in the place, written by one of the claim's requisitions),
+    ``converted`` (the latest requisition's item is done) or ``acquired``/``claimed`` (the
+    dossier has an entry that is not retired, or not)."""
+    thing = str(meta.get("thing"))
+    base = "acquired" if _live(conn, thing) else "claimed"
+    latest = _latest(conn, meta)
+    if latest is None:
+        return base
+    subjects = conn.execute(
+        "SELECT i.dossier_uid, i.state FROM requisition_item i WHERE i.requisition_id = ? AND i.include = 1"
+        " AND (i.dossier_uid = ? OR i.dossier_uid IN (SELECT c.uid FROM dossier_effective c"
+        " JOIN dossier_effective p ON p.id = c.parent_id WHERE p.uid = ?))", (latest["id"], thing, thing)).fetchall()
+    if not subjects:
+        return base
+    place = conn.execute("SELECT id FROM environment WHERE uid = ?", (str(meta.get("place")),)).fetchone()
+    ids = [row["id"] for _, row in resolve_requisitions(conn, meta) if row is not None]
+    least = len(MILESTONES)
+    for subject in subjects:
+        installed = place is not None and conn.execute(
+            "SELECT 1 FROM entry e JOIN ledger l ON l.id = e.ledger_id JOIN dossier d ON d.id = l.dossier_id"
+            f" WHERE d.uid = ? AND e.status != 'retired' AND l.environment_id = ?"
+            f" AND e.requisition_id IN ({', '.join('?' * len(ids))}) LIMIT 1",
+            (subject["dossier_uid"], place["id"], *ids)).fetchone()
+        milestone = "installed" if installed else "converted" if subject["state"] == "done" else base
+        least = min(least, MILESTONES.index(milestone))
+    return MILESTONES[least]
 
 
 def new(conn: sqlite3.Connection, uid: str, env_id: int, *, role: str | None = None,
@@ -88,7 +141,7 @@ def new(conn: sqlite3.Connection, uid: str, env_id: int, *, role: str | None = N
     path = _new_path(today, thing["name"])
     meta = {"id": path.stem, "thing": thing["uid"], "thing_name": thing["name"], "as": role,
             "place": place["uid"], "place_name": place["name"], "folder": folder, "requisitions": [],
-            "milestone": _derive(conn, thing["uid"]), "created": today, "closed": None}
+            "milestone": _derive(conn, {"thing": thing["uid"]}), "created": today, "closed": None}
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
         with open(path, "x", encoding="utf-8", newline="\n") as f:  # never over an existing file
@@ -107,7 +160,7 @@ def _read(conn: sqlite3.Connection, path: Path) -> Claim:
     doc = frontmatter.read(path)
     claim = Claim(path.stem, path, doc.meta, doc.body)
     if not claim.closed:
-        derived = _derive(conn, doc.meta.get("thing"))
+        derived = _derive(conn, doc.meta)
         if derived != doc.meta.get("milestone"):
             try:
                 update(claim, {"milestone": derived})
@@ -162,3 +215,144 @@ def close(conn: sqlite3.Connection, id: str, reason: str = "", today: dt.date | 
     except (frontmatter.FrontMatterError, OSError) as exc:
         raise ClaimError(f"{claim.path.name}: {exc}") from exc
     return claim
+
+
+# Path, whose turn, walking -------------------------------------------------------------------
+
+
+def _has_role(registry: Registry, chain: list[str], role: str) -> bool:
+    return role in {r.casefold() for r in registry.packages[chain[-1]].manifest.roles}
+
+
+def _setup_problem(package: ProcessPackage, tools: dict[str, str]) -> tuple[str, str]:
+    """Why a process is not ready, as the path's problem and as what Luke should do about it."""
+    if not package.trusted:
+        return "not trusted", "trust it"
+    problems = validate(package)
+    if problems:
+        return problems[0], problems[0]
+    red = next(s for s in check_prerequisites(package, tools) if not s.ok)
+    return f"{red.label}: {red.detail}", f"fix {red.label} ({red.detail})"
+
+
+def find_path(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Registry, claim: Claim,
+              tools: dict[str, str] | None = None) -> dict:
+    """The claim's path: ``ready`` (a route that can be walked now), ``not_ready`` (a chain whose first
+    non-ready process is named, with why) or ``none``. Never imports an untrusted package's code."""
+    tools = tool_paths() if tools is None else tools
+    meta = claim.meta
+    role = None if meta.get("as") in (None, "") else str(meta["as"]).casefold()
+    thing, place = str(meta.get("thing")), str(meta.get("place"))
+
+    def result(status, route=None, processes=(), process=None, problem=None, source=None) -> dict:
+        return {"status": status, "route": route, "processes": list(processes), "process": process,
+                "problem": problem, "source_entry_id": source}
+
+    dossier = conn.execute("SELECT type_id FROM dossier_effective WHERE uid = ?", (thing,)).fetchone()
+    if dossier is None:
+        return result("none", problem=f"no dossier {thing} in the library")
+    env = conn.execute("SELECT id, name, type_id FROM environment WHERE uid = ?", (place,)).fetchone()
+    if env is None:
+        return result("none", problem=f"no environment {place} in the library")
+    try:
+        found = routes(conn, definitions, registry, thing, env["id"], tools)
+    except PlanError as exc:
+        return result("none", problem=str(exc))
+    kept = [r for r in found if r["route"] == "copy" or role is None or _has_role(registry, r["processes"], role)]
+    kept.sort(key=lambda r: r["route"] != "convert")  # convert from the source unless it is already there
+    if kept:
+        return result("ready", kept[0]["route"], kept[0]["processes"], source=kept[0]["source_entry_id"])
+    tags = repo.effective_tags(conn, thing)
+    best = None  # (chain, source entry, first non-ready process): the shortest
+    for entry in _entries(conn, thing):
+        for chain in find_chains(registry, definitions, dossier["type_id"], tags, entry["env_type"], env["type_id"],
+                                 tools, ready_only=False):
+            if role is not None and not _has_role(registry, chain, role):
+                continue
+            unready = next((p for p in chain if not ready(registry.packages[p], tools)), None)
+            if unready is not None and (best is None or len(chain) < len(best[0])):
+                best = (chain, entry["id"], unready)
+    if best is not None:
+        chain, source, unready = best
+        return result("not_ready", "convert", chain, unready, _setup_problem(registry.packages[unready], tools)[0],
+                      source)
+    return result("none", problem=f"no process takes it to {env['name']}" + (f" as {meta['as']}" if role else ""))
+
+
+def whose_turn(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Registry, claim: Claim,
+               path: dict | None = None, tools: dict[str, str] | None = None) -> tuple[str, str]:
+    """``(turn, line)`` for an open claim: ``you``, ``exchange``, ``build`` (or ``none`` when closed)."""
+    if claim.closed:
+        return "none", ""
+    if not _live(conn, claim.meta.get("thing")):
+        return "you", "The source files are gone: rescan or relink"
+    tools = tool_paths() if tools is None else tools
+    path = path or find_path(conn, definitions, registry, claim, tools)
+    if path["status"] == "none":
+        return "build", "No path yet: a process has to be built"
+    if path["status"] == "not_ready":
+        return "you", f"Set up {path['process']}: {_setup_problem(registry.packages[path['process']], tools)[1]}"
+    latest = _latest(conn, claim.meta)
+    if latest is None:
+        return "you", "Walk it"
+    state, rid = latest["state"], latest["id"]
+    if state in ("queued", "running"):
+        return "exchange", ""
+    if state == "held":
+        return "you", f"Release requisition {rid}"
+    if state == "needs_attention":
+        return "you", latest["message"] or f"Requisition {rid} needs attention"
+    if state in ("failed", "partially_fulfilled"):
+        return "you", latest["message"] or f"Requisition {rid} failed"
+    if claim.milestone == "installed":
+        return "you", "Close it, or take it into play"
+    return "you", f"Walk it again: the place no longer holds what requisition {rid} wrote"
+
+
+def describe(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Registry, claim: Claim,
+             tools: dict[str, str] | None = None) -> dict:
+    """The claim's JSON object with its path and whose turn it is."""
+    tools = tool_paths() if tools is None else tools
+    path = find_path(conn, definitions, registry, claim, tools)
+    turn, line = whose_turn(conn, definitions, registry, claim, path, tools)
+    return {**claim.to_json(), "path": path, "turn": turn, "turn_line": line}
+
+
+def _endpoint_folder(conn: sqlite3.Connection, meta: dict[str, Any], env_id: int) -> str | None:
+    """The claim's folder: absolute as is, relative to the place's first online root; None for the default."""
+    folder = meta.get("folder")
+    if not isinstance(folder, str):
+        return None
+    roots = [r for r in repo.list_roots(conn, env_id) if r["status"] == "online"]
+    chosen = configured_folder(folder, "", Path(roots[0]["path"]), {}) if roots else None
+    return str(chosen) if chosen else None
+
+
+def walk(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Registry, id: str,
+         tools: dict[str, str] | None = None) -> tuple[Claim, int]:
+    """Plan and queue the claim's path as a requisition and record its uid; returns the claim and the
+    requisition's id. Running it is the caller's."""
+    claim = read_one(conn, id)
+    if claim.closed:
+        raise ClaimError(f"claim {id} is closed")
+    tools = tool_paths() if tools is None else tools
+    path = find_path(conn, definitions, registry, claim, tools)
+    if path["status"] != "ready":
+        raise ClaimError(whose_turn(conn, definitions, registry, claim, path, tools)[1])
+    latest = _latest(conn, claim.meta)
+    if latest is not None and latest["state"] in ("queued", "running"):
+        raise ClaimError(f"requisition {latest['id']} is {latest['state']}; it is Exchange's turn")
+    if latest is not None and latest["state"] == "held":
+        raise ClaimError(f"Release requisition {latest['id']}")
+    env_id = conn.execute("SELECT id FROM environment WHERE uid = ?", (str(claim.meta.get("place")),)).fetchone()[0]
+    plan = plan_requisition(conn, definitions, registry, str(claim.meta["thing"]), env_id, processes=path["processes"],
+                            source_entry_id=path["source_entry_id"],
+                            endpoint_folder=_endpoint_folder(conn, claim.meta, env_id), tools=tools)
+    requisition_id = queue_plan(conn, plan, registry)
+    uid = conn.execute("SELECT uid FROM requisition WHERE id = ?", (requisition_id,)).fetchone()[0]
+    existing = claim.meta.get("requisitions")
+    try:
+        update(claim, {"requisitions": [*(existing if isinstance(existing, list) else []), uid]})
+    except (frontmatter.FrontMatterError, OSError) as exc:
+        raise ClaimError(f"{claim.path.name}: {exc} (requisition {requisition_id} is queued, not recorded)") from exc
+    return read_one(conn, id), requisition_id
