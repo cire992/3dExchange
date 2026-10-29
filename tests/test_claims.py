@@ -92,6 +92,14 @@ def test_broken_file_is_a_problem_not_a_crash(conn):
         claims.read_one(conn, "2026-10-29-bad")
 
 
+def test_a_hand_edited_thing_that_is_not_a_uid_is_just_claimed(conn):
+    claim = new(conn)
+    text = claim.path.read_text(encoding="utf-8").replace(f"thing: {claim.meta['thing']}", "thing: {a: 1}")
+    claim.path.write_text(text, encoding="utf-8")
+    found, problems = claims.read_all(conn)
+    assert [c.milestone for c in found] == ["claimed"] and problems == []
+
+
 def test_no_folder_means_no_claims(conn):
     assert claims.read_all(conn) == ([], [])
 

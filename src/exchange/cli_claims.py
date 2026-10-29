@@ -48,7 +48,7 @@ def _line(claim: claims.Claim) -> str:
 def _add(args, conn) -> int:
     claim = claims.new(conn, _uid(conn, args.uid), args.env, role=args.role, folder=args.folder, note=args.note)
     _emit(args, claim.to_json(), f"Claimed {claim.meta['thing_name']} for {claim.meta['place_name']}: "
-                                 f"{claim.id} ({claim.milestone})")
+                                 f"{claim.id} ({claim.milestone})\nFile: {claim.path}")
     return 0
 
 
@@ -63,7 +63,7 @@ def _list(args, conn) -> int:
 
 def _show(args, conn) -> int:
     claim = claims.read_one(conn, args.id)
-    lines = [f"{key}: {value}" for key, value in claim.to_json().items() if key != "notes"]
+    lines = [f"File: {claim.path}"] + [f"{key}: {value}" for key, value in claim.to_json().items() if key != "notes"]
     _emit(args, claim.to_json(), "\n".join(lines) + ("\n\n" + claim.notes.rstrip("\n") if claim.notes.strip() else ""))
     return 0
 

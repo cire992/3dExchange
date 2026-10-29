@@ -38,7 +38,7 @@ def files():
 def test_add(capsys, lib):
     code, out, _ = run(capsys, lib, "add", lib["uid"][:12], "--env", lib["env"], "--as", "prop", "--note", "hi")
     assert code == 0 and "acquired" in out
-    assert len(files()) == 1 and files()[0].stem in out
+    assert len(files()) == 1 and files()[0].stem in out and f"File: {files()[0]}" in out
     claim = add(capsys, lib, "--as", "prop", "--note", "hi")
     assert claim["id"].endswith("-ding-2")
     assert claim["thing"] == lib["uid"] and claim["as"] == "prop" and claim["notes"] == "hi\n"
@@ -92,6 +92,7 @@ def test_show(capsys, lib):
         if key != "notes" and value not in (None, []):
             assert str(value) in out
     assert "milestone: acquired" in out and "the notes" in out
+    assert out.startswith(f"File: {files()[0]}")
     code, out, _ = run(capsys, lib, "show", claim["id"], "--json")
     assert json.loads(out) == claim
     assert run(capsys, lib, "show", "nosuch")[0] == 2

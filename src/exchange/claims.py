@@ -72,7 +72,7 @@ def _derive(conn: sqlite3.Connection, thing: object) -> str:
     """``acquired`` when the dossier has an entry that is not retired, else ``claimed``."""
     row = conn.execute(
         "SELECT count(*), sum(e.status != 'retired') FROM entry e JOIN ledger l ON l.id = e.ledger_id"
-        " JOIN dossier d ON d.id = l.dossier_id WHERE d.uid = ?", (thing,)).fetchone()
+        " JOIN dossier d ON d.id = l.dossier_id WHERE d.uid = ?", (str(thing),)).fetchone()
     return "acquired" if row[1] else "claimed"
 
 
