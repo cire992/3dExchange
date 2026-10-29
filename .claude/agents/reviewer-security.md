@@ -51,7 +51,7 @@ worst failures are lost or damaged files and running code it shouldn't.
   per-launch token, and nothing serves files outside what a route is for.
 - **Untrusted text**: names, manifests, `meta.ini` and sidecars from a
   library are data; they never reach SQL unparameterised, shell commands, or
-  HTML in the window unescaped.
+  HTML the Workspace renders unescaped.
 - **Network and secrets**: no new network access without the user turning it
   on; no keys or tokens in commits or logs.
 - **Dependencies**: new packages, and whether they're needed and maintained.

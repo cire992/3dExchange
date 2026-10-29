@@ -32,9 +32,10 @@ your files or your decision.
 Exchange is Luke's personal Windows desktop workspace for 3D modding and solo
 game development. Its core is making asset conversion between environments
 (Daz Studio, Blender, Unreal projects, Bethesda games through Mod Organizer 2)
-as automated and simple as possible. Work belongs here when it serves that,
-or keeps the existing library, curation, processes, service and window
-working well.
+as automated and simple as possible (`docs/VISION.md`). Work belongs here when
+it serves that, or keeps the existing library, curation, processes, service
+and CLI working well. The window users work in is the shell's Workspace, in
+another repository (cire992/Exchange-Shell); this repository serves it.
 
 - **ACCEPT** when it's worth building and clear enough to spec. Rescope it
   when it's too big for one PR or vague: cut it to the smallest useful piece
@@ -51,8 +52,9 @@ Rate:
   `medium`: several modules, or behaviour users rely on. `high`: data
   migrations, anything that writes into a user's environments or library,
   process trust, bridges that drive other applications, or wide refactors.
-- **SURFACES**, any of: `ui` when the PySide6 window (`src/exchange_ui/`) or
-  anything else a user sees changes; `security` when it touches what Exchange
+- **SURFACES**, any of: `ui` when what a user sees from this repository
+  changes: the service API's contract (`docs/api/openapi.json`, which the
+  Workspace is built on) or the CLI's commands and output; `security` when it touches what Exchange
   writes to disk and where, running external programs or user process code,
   the local service's API and its token, or network access. `none` otherwise.
 

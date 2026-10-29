@@ -48,8 +48,8 @@ Numbered list of what must be true when the work is done.
 
 ## Acceptance criteria
 Numbered list. Each criterion is one observable behaviour plus how to verify it:
-a command to run, a test that should pass, what the window should show, or a
-file that should contain something. The builder tests against this list and
+a command to run, a test that should pass, what an API route or CLI command
+should return, or a file that should contain something. The builder tests against this list and
 the approver checks it, so every item must be checkable by someone who only
 has the repo.
 

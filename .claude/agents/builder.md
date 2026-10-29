@@ -55,13 +55,13 @@ belongs to the user and to other jobs.
 ## Test against the acceptance criteria
 
 Verify every acceptance criterion and record the evidence in build.md: the
-command you ran and its result, or what the window showed.
+command you ran and its result, or what the API or CLI returned.
 
 - Run `bash <main checkout>/factory/checks.sh` from the worktree before you
   finish. The gate runs exactly that, and it must pass. When you stop, a hook
   runs it too and tells you if it fails.
 - Never run a command that rewrites files across the repo.
-- For criteria you can see in the window or on a page, look at it the way
+- For criteria about what users see, exercise the API or the CLI the way
   AGENTS.md describes, on your port where a server is involved.
 
 ## Commit, push and the PR

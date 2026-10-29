@@ -8,11 +8,12 @@ convert assets between those environments as queued **requisitions**.
 
 ## Read first
 
-- `docs/PROGRESS.md`: where the project stands, the decisions not to reopen,
-  *Architecture in one page*, and *How we work*. Read its architecture
-  section before changing code.
-- `docs/VISION.md`, when it exists: the brief. It wins over older design docs.
-- `docs/DESIGN_SPEC.md` and `docs/PROJECT_HOME.md` for the area you touch.
+- `docs/VISION.md`: the brief. It wins over every other doc.
+- `docs/PROGRESS.md`: where the project stands, the restart's roadmap, the
+  decisions not to reopen, *Architecture in one page*, and *How we work*. Read
+  its architecture section before changing code.
+- `docs/DESIGN_SPEC.md` for how the built parts work, `docs/PROJECT_HOME.md`
+  for the frozen project homes.
 - `README.md`: what the app does today, from the user's side.
 
 ## Layout
@@ -21,7 +22,7 @@ convert assets between those environments as queued **requisitions**.
 src/exchange/      the core: scanner, db (SQLite, migrations), library, curation,
                    processes, requisitions, bridges, projects, service (FastAPI).
                    Never imports Qt (a test enforces it).
-src/exchange_ui/   the PySide6 window
+src/exchange_ui/   the PySide6 window, being removed (R2c); the Workspace replaces it
 tests/             pytest; fake environments in tests/fixtures/envs; tests/ui uses pytest-qt
 docs/              design, progress and the service's OpenAPI contract (docs/api/)
 factory/           the software factory (see below)
@@ -41,9 +42,10 @@ A fresh worktree needs no setup of its own: run it with the main checkout's
 venv and `PYTHONPATH=src`, so the worktree's code wins over the editable
 install. `factory/checks.sh` does exactly that.
 
-There's no dev server. The app is `.venv/Scripts/exchange-app` (or
-`python -m exchange_ui`), the CLI `.venv/Scripts/exchange`, and the local
-service `exchange serve`.
+The CLI is `.venv/Scripts/exchange`, and the local service `exchange serve`
+(the shell starts it for the Workspace). The window users work in is the
+shell's Workspace, in cire992/Exchange-Shell: a change it needs to show is made
+there separately, against this repository's API contract.
 
 ## Validation
 
@@ -52,8 +54,7 @@ bash factory/checks.sh
 ```
 
 It installs the branch's declared dependencies into the venv if any are
-missing, byte-compiles `src`, and runs the whole pytest suite with the
-offscreen Qt platform. It must exit 0.
+missing, byte-compiles `src`, and runs the whole pytest suite. It must exit 0.
 
 ## Conventions
 
@@ -72,22 +73,24 @@ offscreen Qt platform. It must exit 0.
 - Comment density and style like the neighbouring code. Short one-line commit
   messages.
 
-## Looking at the window
+## Looking at what users see
 
-There's no browser page to open. To see a change, build the widget offscreen
-against a test library and grab it as a PNG in the system temp folder:
+Users see this repository through the service API (the Workspace is built on
+its contract, `docs/api/openapi.json`) and the CLI. To exercise a change:
 
-1. Scan a fixture into a temporary database:
-   `.venv/Scripts/python -m exchange scan tests/fixtures/envs/loose_files --db "$TMP/look.db"`
-   (with `PYTHONPATH=src`, from the worktree).
-2. In a script saved under the temp folder, with `QT_QPA_PLATFORM=offscreen`:
-   create the app with `exchange_ui.app.make_app([])`, open
-   `exchange_ui.service.LibraryService("<db>")`, build
-   `exchange_ui.main_window.MainWindow(service)` (or the widget that changed),
-   `resize` and `show` it, drive it, call `QApplication.processEvents()`, then
-   `widget.grab().save("<temp>/name.png")`.
-3. Open the PNG with the Read tool. `tests/ui/conftest.py` shows the same
-   setup as fixtures.
+- **The API:** in a test, build the app with
+  `exchange.service.app.create_app(db, token=..., definitions=...)` and call it
+  with FastAPI's `TestClient`, against a library scanned from
+  `tests/fixtures/envs` (`tests/test_service.py` and `tests/test_service_edits.py`
+  show the setup). To run it for real: `exchange serve --port <port>` with
+  `--db` pointing at a scratch database.
+- **The contract:** `exchange serve --openapi` prints the schema; the
+  committed `docs/api/openapi.json` must match it (a test checks). Adding
+  routes or fields is fine; removing or renaming them breaks the shell's
+  Workspace, so it must be in the spec and noted in `docs/PROGRESS.md`.
+- **The CLI:** run the command on a scratch database scanned from a fixture,
+  e.g. `.venv/Scripts/python -m exchange scan tests/fixtures/envs/loose_files --db "$TMP/look.db"`
+  (with `PYTHONPATH=src`, from the worktree), then the command being changed.
 
 ## Software factory
 
