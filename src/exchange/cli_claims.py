@@ -76,7 +76,7 @@ def _show(args, conn, definitions, registry) -> int:
     lines = [f"File: {claim.path}"] + [f"{key}: {value}" for key, value in data.items() if key != "notes"]
     for uid, row in claims.resolve_requisitions(conn, claim.meta):
         lines.append(f"{uid}  removed" if row is None else
-                     "  ".join(str(p) for p in (uid, row["id"], row["state"], row["message"]) if p))
+                     "  ".join(str(p) for p in (uid, row["id"], row["state"], claims.one_line(row["message"], row["id"])) if p))
     _emit(args, data, "\n".join(lines) + ("\n\n" + claim.notes.rstrip("\n") if claim.notes.strip() else ""))
     return 0
 
@@ -109,7 +109,7 @@ def _walk(args, conn, definitions, registry) -> int:
             conn.close()
     text = f"Queued requisition {row['id']} for {claim.id}"
     if args.run:
-        text = f"Ran requisition {row['id']} for {claim.id}: {row['state']}" + (f" ({row['message']})" if row["message"] else "")
+        text = f"Ran requisition {row['id']} for {claim.id}: {row['state']}" + (f" ({claims.one_line(row['message'], row['id'])})" if row["message"] else "")
         text += f"\n{claim.milestone}; turn: {data['turn']}" + (f"  {data['turn_line']}" if data["turn_line"] else "")
     else:
         text += f"; run it with: exchange requisition run {row['id']}"

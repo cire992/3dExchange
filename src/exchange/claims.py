@@ -94,6 +94,14 @@ def resolve_requisitions(conn: sqlite3.Connection, meta: dict[str, Any]) -> list
              if isinstance(uid, str) else None) for uid in uids]
 
 
+def one_line(message: str | None, rid: int) -> str:
+    """A requisition's message as one line: its first non-empty line, pointing at ``requisition show`` for the rest."""
+    lines = [line.strip() for line in (message or "").splitlines() if line.strip()]
+    if len(lines) > 1:
+        return f"{lines[0]} (exchange requisition show {rid})"
+    return lines[0] if lines else ""
+
+
 def _latest(conn: sqlite3.Connection, meta: dict[str, Any]) -> sqlite3.Row | None:
     found = [row for _, row in resolve_requisitions(conn, meta) if row is not None]
     return found[-1] if found else None
@@ -301,9 +309,9 @@ def whose_turn(conn: sqlite3.Connection, definitions: DefinitionSet, registry: R
     if state == "held":
         return "you", f"Release requisition {rid}"
     if state == "needs_attention":
-        return "you", latest["message"] or f"Requisition {rid} needs attention"
+        return "you", one_line(latest["message"], rid) or f"Requisition {rid} needs attention"
     if state in ("failed", "partially_fulfilled"):
-        return "you", latest["message"] or f"Requisition {rid} failed"
+        return "you", one_line(latest["message"], rid) or f"Requisition {rid} failed"
     if claim.milestone == "installed":
         return "you", "Close it, or take it into play"
     return "you", f"Walk it again: the place no longer holds what requisition {rid} wrote"

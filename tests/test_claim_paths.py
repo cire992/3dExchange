@@ -275,3 +275,13 @@ def test_describe_adds_the_path_and_the_turn(world):
     closed = claims.close(world["conn"], claim.id, today=TODAY)
     data = claims.describe(world["conn"], world["definitions"], registry, closed, {})
     assert (data["turn"], data["turn_line"]) == ("none", "") and data["path"]["status"] == "none"
+
+
+def test_a_long_failure_message_is_one_line_with_a_pointer(world):
+    registry = registry_with("stamp_images")
+    claim, rid = walk(world, registry, claim_of(world, world["barrel"], "loose_files"))
+    message = "Blender failed\nTraceback (most recent call last):\n  File x\nValueError: no"
+    world["conn"].execute("UPDATE requisition SET state = 'failed', message = ? WHERE id = ?", (message, rid))
+    assert turn_of(world, registry, reread(world, claim)) == (
+        "you", f"Blender failed (exchange requisition show {rid})")
+    assert claims.one_line("already exist", 3) == "already exist" and claims.one_line(None, 3) == ""
