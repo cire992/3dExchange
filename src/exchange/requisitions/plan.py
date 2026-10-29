@@ -81,9 +81,11 @@ def matches(package: ProcessPackage, definitions: DefinitionSet, type_id: str, t
 
 def find_chains(registry: Registry, definitions: DefinitionSet, type_id: str, tags: set[str],
                 source_env_type: str, target_env_type: str, tools: dict[str, str] | None = None,
-                ) -> list[list[str]]:
-    """Ready process chains from (type, environment) to the target environment, shortest first."""
-    usable = [p for p in registry.packages.values() if p.id != COPY_PROCESS and ready(p, tools)]
+                *, ready_only: bool = True) -> list[list[str]]:
+    """Ready process chains from (type, environment) to the target environment, shortest first.
+    ``ready_only=False`` searches every package, ready or not (from manifests alone)."""
+    usable = [p for p in registry.packages.values()
+              if p.id != COPY_PROCESS and (not ready_only or ready(p, tools))]
     found: list[list[str]] = []
     frontier: list[tuple[list[str], str, str]] = [([], type_id, source_env_type)]
     for depth in range(MAX_CHAIN):
