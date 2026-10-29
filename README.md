@@ -99,6 +99,7 @@ The window is the Workspace in cire992/Exchange-Shell, which starts `exchange se
 | `desk [ROOT [FOLDER]]` | Unattached files by folder; `curate dismiss` and `curate ignore-folder` act on the desk. |
 | `processes list / show / check / install / trust`, `tools set` | Process packages, their prerequisites, and where external tools are. |
 | `requisition routes / plan / list / show / run / resume / hold / move / remove / check-stale / rebuild` | Plan (`--queue`, `--preset`, `--save-preset`), run and manage requisitions. |
+| `claim add / list / show / close` | Claim a dossier for an environment (`add UID --env ID`, `--as`, `--folder`, `--note`); claims are markdown files in your data folder, with the milestone derived from the library. |
 | `presets list / show / delete` | Requisition presets: options for every process of a plan. |
 | `test-process FOLDER UID` | Run a process you are writing on one asset, into a temporary folder. |
 | `serve` | Serve the library over a local API for the desktop shell (needs the `service` extra; see below). |
