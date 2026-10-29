@@ -1,0 +1,26 @@
+# A test process that takes a mesh to a Daz Studio environment, with a tool no machine has.
+
+[process]
+id = "to_daz"
+name = "Mesh to Daz"
+version = "1.0.0"
+author = "Tests"
+format_version = 1
+
+[input]
+dossier_types = ["mesh"]
+artifact = "Files"
+
+[output]
+environment = "daz_studio"
+folder = "Imported/{name}"
+
+[[prerequisite]]
+id = "missing"
+kind = "tool"
+tool = "exchange_test_missing_tool"
+hint = "no machine has it"
+
+[[step]]
+id = "pass"
+operation = "daz.pass_through"

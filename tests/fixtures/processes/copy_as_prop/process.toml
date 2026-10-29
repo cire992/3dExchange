@@ -1,0 +1,21 @@
+# A test process that copies a mesh and declares what the result is there: a prop.
+
+[process]
+id = "copy_as_prop"
+name = "Copy as a prop"
+version = "1.0.0"
+author = "Tests"
+format_version = 1
+
+[input]
+dossier_types = ["mesh"]
+artifact = "Files"
+
+[output]
+environment = "same"
+folder = "Props/{name}"
+roles = ["prop"]
+
+[[step]]
+id = "copy"
+operation = "core.copy"
