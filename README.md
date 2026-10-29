@@ -99,7 +99,7 @@ The window is the Workspace in cire992/Exchange-Shell, which starts `exchange se
 | `desk [ROOT [FOLDER]]` | Unattached files by folder; `curate dismiss` and `curate ignore-folder` act on the desk. |
 | `processes list / show / check / install / trust`, `tools set` | Process packages, their prerequisites, and where external tools are. |
 | `requisition routes / plan / list / show / run / resume / hold / move / remove / check-stale / rebuild` | Plan (`--queue`, `--preset`, `--save-preset`), run and manage requisitions. |
-| `claim add / list / show / close` | Claim a dossier for an environment (`add UID --env ID`, `--as`, `--folder`, `--note`); claims are markdown files in your data folder, with the milestone derived from the library. |
+| `claim add / list / show / close / walk` | Claim a dossier for an environment (`add UID --env ID`, `--as`, `--folder`, `--note`); claims are markdown files in your data folder, with the milestone (claimed, acquired, converted, installed) derived from the library. `show` and `list` give each claim's path (the processes that take it there, as its role) and whose turn it is: yours, Exchange's, or a process still to be built (`list --turn you`). `walk ID [--run]` plans and queues the path as a requisition and records it in the claim (and runs it with `--run`). |
 | `presets list / show / delete` | Requisition presets: options for every process of a plan. |
 | `test-process FOLDER UID` | Run a process you are writing on one asset, into a temporary folder. |
 | `serve` | Serve the library over a local API for the desktop shell (needs the `service` extra; see below). |
