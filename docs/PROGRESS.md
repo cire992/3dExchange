@@ -36,7 +36,7 @@ Exchange is refocused on one loop: **Exchange notices a thing → Luke claims it
 
 ## Where we are
 
-**Phases 1-3, 4a-4c, phase 6 up to 6i, phase 7 part 1 and R1 are merged.** R2 (6j) is under way: R2a closes the parity gaps `PARITY_CHECKLIST.md` lists, then Luke signs the checklist off (R2b) and the PySide6 window goes (R2c). Then R3.
+**Phases 1-3, 4a-4c, phase 6 up to 6i, phase 7 part 1 and R1 are merged.** R2 (6j) is done: R2a (#30) closed the parity gaps `PARITY_CHECKLIST.md` lists, Luke signed the checklist off on 2026-10-29 (R2b), and the PySide6 window is removed in R2c. R3 is next.
 
 - **Stacked PRs:** after merging one, change the next PR's base to `main` before merging it (or delete the merged branch, and GitHub moves it). This has gone wrong three times: #11 and #12 needed #13 to reach `main`, #26 needed #27, and the shell's #14 needed its #16. Turning on *Automatically delete head branches* (Settings › General › Pull Requests, in both repositories) makes GitHub retarget them by itself; until then, prefer branching from `main`.
 
@@ -71,7 +71,8 @@ Exchange is refocused on one loop: **Exchange notices a thing → Luke claims it
 | #27 | #26 onto `main` | merged |
 | #28 | This doc after 6g | merged |
 | #29 | R1, the restart: VISION.md and RESTART_PLAN.md, old docs archived, this doc around the loop | merged |
-| R2a | 6j's parity gaps (with Exchange-Shell's R2a): each file in a dossier's detail carries `root` and `key`, its file ref, so the Workspace's drop menu can link one asset's files onto another | in review |
+| R2a | 6j's parity gaps (with Exchange-Shell's R2a): each file in a dossier's detail carries `root` and `key`, its file ref, so the Workspace's drop menu can link one asset's files onto another | merged (#30) |
+| R2c | 6j's end: the PySide6 window removed (its package and tests, the `ui` extra, the PySide6 and Qt test dependencies, the window's entry point) | in review |
 
 ## Phase 6: Service and Workspace
 
@@ -575,7 +576,7 @@ The formats and rules are in `docs/PROJECT_HOME.md` (*Gap claims*, *Triage*, *Fa
   ```bash
   .venv/Scripts/python -m pytest -q
   ```
-  - The app is `.venv/Scripts/exchange-app` and the CLI is `.venv/Scripts/exchange`.
+  - The CLI is `.venv/Scripts/exchange`.
   - `gh` is installed. In Git Bash it may need the PowerShell PATH; it works from PowerShell.
 - **Shell gotchas:**
   - PowerShell `Get-Content`/`Set-Content` mangle UTF-8 (they garbled PR descriptions once). Write files from Python.
@@ -595,7 +596,7 @@ Phase 1:
 
 Phase 2:
 - **Daz Studio:** one environment per PC, holding every content directory (including Daz Connect).
-- **Dependencies:** Pillow and numpy are core dependencies; PySide6 and watchdog (3c, the file watcher) are the optional `ui` extra.
+- **Dependencies:** Pillow and numpy are core dependencies; watchdog (3c, the file watcher) is optional, now in the `service` and `dev` extras (PySide6 was the `ui` extra until R2c).
 - **Mesh thumbnails:** a small numpy/Pillow renderer for glTF/GLB/OBJ. Other formats get an icon. The Blender bridge exists since 4b, but thumbnails don't use it yet.
 - **Inspector:** read-only in phase 2; editable since PR 3b.
 - **Exact duplicates:** merged automatically, with *unknown provenance*. Never for dossiers the user has edited.
@@ -688,16 +689,8 @@ src/exchange/            core, never imports Qt (a test enforces this)
   projects/              project homes: front matter, record schemas (schemas/*.yaml), finding and
                          creating homes, git checkpoints, validation (7a)
   cli.py cli_curation.py command line (also cli_service.py, cli_projects.py)
-src/exchange_ui/         PySide6 app: main_window, models (paged browser, sidebar with collections), delegates,
-                         views (grid and sidebar with drag and drop), inspector (editing, bulk edit),
-                         service (reads + edits via Curator, session undo/redo), wizard,
-                         desk (unattached-files and suggestions panels; counts on worker threads),
-                         settings (lexicon editor), settings_pipelines (Pipelines, Endpoints),
-                         requisition_dialog (Requisition to…), queue_view (the queue),
-                         pickers (asset search, split), watcher (watchdog),
-                         scanning (scans, the queue and `classify` run as `python -m exchange ...`)
 tests/                   pytest; fixtures in tests/fixtures/envs; builders.py makes GLB/uasset/PNG/Unreal/
-                         Daz Connect content and holds report helpers; tests/ui uses pytest-qt offscreen;
+                         Daz Connect content and holds report helpers;
                          fixtures/pipelines holds test packages (stamp_images, bridge_demo) and
                          fixtures/fake_apps stand-ins for blender.exe and DAZStudio.exe
 ```

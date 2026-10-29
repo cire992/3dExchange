@@ -22,8 +22,7 @@ convert assets between those environments as queued **requisitions**.
 src/exchange/      the core: scanner, db (SQLite, migrations), library, curation,
                    processes, requisitions, bridges, projects, service (FastAPI).
                    Never imports Qt (a test enforces it).
-src/exchange_ui/   the PySide6 window, being removed (R2c); the Workspace replaces it
-tests/             pytest; fake environments in tests/fixtures/envs; tests/ui uses pytest-qt
+tests/             pytest; fake environments in tests/fixtures/envs
 docs/              design, progress and the service's OpenAPI contract (docs/api/)
 factory/           the software factory (see below)
 ```

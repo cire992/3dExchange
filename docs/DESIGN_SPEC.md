@@ -442,7 +442,7 @@ A *drift review* process compares recent devlog entries and new claims against t
 
 The Workspace window is HTML in the Tauri shell. Its look is a **used-future command deck**: dark panels, phosphor amber and teal readouts, segmented gauges, the warmth of 70s–80s sci-fi computer displays. It is an original look inspired by that era, not a copy of any film's UI. Color is reserved for meaning (status, attention, selection), so the flavor never costs readability. It is an interface to be stared at all day.
 
-The PySide6 window stays as the working UI until the Workspace window reaches library parity, then it is retired.
+The PySide6 window was the working UI until the Workspace window reached library parity; it was removed in R2c.
 
 ### Views
 
@@ -729,8 +729,8 @@ It removes the voice coordinator, mobile access, the persona and its card regist
 - **A file watcher** for change detection in environments and project homes.
 - **Worker processes** for requisitions, with a lock per external app so only one Daz or Blender job runs at a time.
 - **Headless thumbnail rendering** for meshes without previews, via the small numpy/Pillow renderer or Blender for complex formats.
-- **Dependencies stay minimal.** The core needs Pillow and numpy. The service and MCP server are optional extras, as the PySide6 UI is today.
-- **PySide6** until the Workspace window reaches library parity, then removed.
+- **Dependencies stay minimal.** The core needs Pillow and numpy. The service and MCP server are optional extras.
+- **PySide6** was used until the Workspace window reached library parity; it was removed in R2c.
 - **Windows only.**
 
 ## Roadmap
