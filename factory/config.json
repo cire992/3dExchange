@@ -20,7 +20,10 @@
   "protected_paths": [
     "factory/checks.sh",
     "factory/config.json",
-    "tests/*"
+    "tests/test_*",
+    "tests/conftest.py",
+    "tests/builders.py",
+    "tests/fixtures/*"
   ],
   "ports": { "base": 5100, "step": 10 },
   "prices_usd_per_mtok": {
