@@ -24,7 +24,7 @@ from typing import Any
 from exchange.db import repository as repo
 from exchange.definitions.schema import DefinitionSet
 from exchange.errors import ExchangeError
-from exchange.paths import data_dir
+from exchange.paths import data_dir, is_within
 from exchange.processes.registry import ProcessPackage, Registry, check_prerequisites, ready, tool_paths, validate
 from exchange.projects import frontmatter
 from exchange.requisitions.endpoints import configured_folder
@@ -147,6 +147,29 @@ def _derive(conn: sqlite3.Connection, meta: dict[str, Any]) -> str:
     return MILESTONES[least]
 
 
+def _claim_folder(conn: sqlite3.Connection, folder: object, env_id: int, place_name: str) -> str | None:
+    """The folder a claim writes to: absolute as is, relative to the place's first online root; None
+    for the default (no folder, a blank one, or no online root). A relative folder that leaves the
+    root, or names a drive, is refused: an absolute one is the user's explicit choice."""
+    if not isinstance(folder, str) or not folder.strip():
+        return None
+    text = folder.strip()
+    if Path(text).is_absolute():
+        return str(Path(text))
+    refusal = ClaimError(f"the folder {folder} leaves {place_name}: a relative folder must stay inside the place;"
+                         " give an absolute one to write elsewhere")
+    if Path(text).drive:
+        raise refusal
+    roots = [r for r in repo.list_roots(conn, env_id) if r["status"] == "online"]
+    if not roots:
+        return None
+    root = Path(roots[0]["path"])
+    chosen = configured_folder(text, "", root, {})
+    if not is_within(chosen, root):
+        raise refusal
+    return str(chosen)
+
+
 def new(conn: sqlite3.Connection, uid: str, env_id: int, *, role: str | None = None,
         folder: str | None = None, note: str = "", today: dt.date | None = None) -> Claim:
     today = today or dt.date.today()
@@ -156,6 +179,7 @@ def new(conn: sqlite3.Connection, uid: str, env_id: int, *, role: str | None = N
     place = conn.execute("SELECT uid, name FROM environment WHERE id = ?", (env_id,)).fetchone()
     if place is None:
         raise ClaimError(f"no environment {env_id} in the library")
+    _claim_folder(conn, folder, env_id, place["name"])
     path = _new_path(today, thing["name"])
     meta = {"id": path.stem, "thing": thing["uid"], "thing_name": thing["name"], "as": role,
             "place": place["uid"], "place_name": place["name"], "folder": folder, "requisitions": [],
@@ -347,13 +371,9 @@ def describe(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Reg
 
 
 def _endpoint_folder(conn: sqlite3.Connection, meta: dict[str, Any], env_id: int) -> str | None:
-    """The claim's folder: absolute as is, relative to the place's first online root; None for the default."""
-    folder = meta.get("folder")
-    if not isinstance(folder, str):
-        return None
-    roots = [r for r in repo.list_roots(conn, env_id) if r["status"] == "online"]
-    chosen = configured_folder(folder, "", Path(roots[0]["path"]), {}) if roots else None
-    return str(chosen) if chosen else None
+    """The claim's folder (see ``_claim_folder``); None for the default."""
+    place = conn.execute("SELECT name FROM environment WHERE id = ?", (env_id,)).fetchone()
+    return _claim_folder(conn, meta.get("folder"), env_id, place["name"])
 
 
 def walk(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Registry, id: str,
