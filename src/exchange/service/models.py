@@ -950,12 +950,11 @@ class ClaimWalked(BaseModel):
     claim: ClaimDetail = Field(description="The claim after the walk")
     requisition: ClaimRequisition = Field(description="The requisition the walk queued")
     job: Job | None = Field(description="The job running it; null when `run` is false or `problem` is set")
-    problem: str | None = Field(description="Why no job started, though the requisition is queued; run it with "
-                                "`POST /jobs/requisitions`")
+    problem: str | None = Field(description="Why `run` started no job; the requisition is still queued")
 
 
 class ClaimChanges(BaseModel):
-    available: bool = Field(description="False without watchdog or with watching off: only the service's own "
-                            "changes are noticed")
+    available: bool = Field(description="False when the claim files are not watched (no watchdog, watching off, or "
+                            "the folder can't be watched): their changes are not noticed")
     version: int = Field(description="Grows when a claim may have changed; ask again with since=version to wait "
                          "for the next")

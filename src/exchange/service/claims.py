@@ -118,8 +118,8 @@ def register(app: FastAPI, library, jobs, api, errors: dict) -> None:
     def claim_changes(since: int | None = Query(None, description="The version you have: wait for a newer one"),
                       wait: float = Query(0, ge=0, le=MAX_WAIT, description="Seconds to wait for a change")) -> dict:
         """Whether claims may have changed since ``version`` ``since``: made, closed or walked through the
-        service, a job ended, or a claim file changed (``available`` is false without ``watchdog``: only
-        the first three are noticed). The first call starts watching the claims folder."""
+        service, a job ended, or a claim file changed (``available`` is false without ``watchdog``: changes
+        to the files themselves are not noticed). The first call starts watching the claims folder."""
         library.claim_watcher.start(claims.claims_dir())
         return library.claim_watcher.wait(since, wait)
 
@@ -148,7 +148,7 @@ def register(app: FastAPI, library, jobs, api, errors: dict) -> None:
     @app.post(prefix + "/claims/{id}/plan", response_model=models.PlanResult, dependencies=[api],
               responses=refused, tags=["claims"])
     def plan_claim(id: str, body: models.PlanChoices) -> dict:
-        """Plan the claim's path as ``POST /claims/{id}/walk`` would queue it. Nothing is written. Options
+        """Plan the claim's path as ``POST /claims/{id}/walk`` would queue it. Queues nothing; as on any read, a stale milestone may be saved. Options
         are chosen as for ``POST /requisitions/queue``."""
         registry = library.processes.registry()
         defaults = plan_defaults(registry, body.preset)

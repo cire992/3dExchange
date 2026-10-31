@@ -10,7 +10,7 @@ temporary file moved over the claim: a reader never sees half a file.
 
 Beyond the file, a claim has a **path** (the processes that take the thing to the place, as the role),
 **whose turn** it is (Luke's, Exchange's, or a process nobody has built yet), and it can be **walked**:
-the path planned (``plan_path``, which writes nothing) and queued as a requisition whose uid the claim
+the path planned (``plan_path``, which queues nothing) and queued as a requisition whose uid the claim
 records. Path and turn are derived on every read and never written.
 """
 
@@ -475,7 +475,7 @@ def plan_path(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Re
               tools: dict[str, str] | None = None, *, params: dict[str, Any] | None = None,
               defaults: dict[str, Any] | None = None, on_collision: str = "ask",
               excluded: Iterable[str] = ()) -> tuple[Claim, Plan]:
-    """The claim and the plan for its path, as ``walk`` queues it; writes nothing. Refuses a closed claim,
+    """The claim and the plan for its path, as ``walk`` queues it; queues nothing. Refuses a closed claim,
     a path that isn't ready and a requisition still waiting or running. ``params`` are typed option values
     (``process.option``), ``defaults`` the ones they fall back to; ``excluded`` are dossier uids left out."""
     claim = read_one(conn, id)

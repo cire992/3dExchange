@@ -6860,7 +6860,7 @@
           "claims"
         ],
         "summary": "Claim Changes",
-        "description": "Whether claims may have changed since ``version`` ``since``: made, closed or walked through the\nservice, a job ended, or a claim file changed (``available`` is false without ``watchdog``: only\nthe first three are noticed). The first call starts watching the claims folder.",
+        "description": "Whether claims may have changed since ``version`` ``since``: made, closed or walked through the\nservice, a job ended, or a claim file changed (``available`` is false without ``watchdog``: changes\nto the files themselves are not noticed). The first call starts watching the claims folder.",
         "operationId": "claim_changes_api_v1_claims_changes_get",
         "parameters": [
           {
@@ -7154,7 +7154,7 @@
           "claims"
         ],
         "summary": "Plan Claim",
-        "description": "Plan the claim's path as ``POST /claims/{id}/walk`` would queue it. Nothing is written. Options\nare chosen as for ``POST /requisitions/queue``.",
+        "description": "Plan the claim's path as ``POST /claims/{id}/walk`` would queue it. Queues nothing; as on any read, a stale milestone may be saved. Options\nare chosen as for ``POST /requisitions/queue``.",
         "operationId": "plan_claim_api_v1_claims__id__plan_post",
         "parameters": [
           {
@@ -7508,7 +7508,7 @@
           "available": {
             "type": "boolean",
             "title": "Available",
-            "description": "False without watchdog or with watching off: only the service's own changes are noticed"
+            "description": "False when the claim files are not watched (no watchdog, watching off, or the folder can't be watched): their changes are not noticed"
           },
           "version": {
             "type": "integer",
@@ -8240,7 +8240,7 @@
               }
             ],
             "title": "Problem",
-            "description": "Why no job started, though the requisition is queued; run it with `POST /jobs/requisitions`"
+            "description": "Why `run` started no job; the requisition is still queued"
           }
         },
         "type": "object",
