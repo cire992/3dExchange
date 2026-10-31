@@ -83,7 +83,10 @@ def register(app: FastAPI, library, api, errors: dict) -> None:
              tags=["claims"])
     def list_claims(
         all: bool = Query(False, description="Closed claims too"),
-        turn: Literal["you", "exchange", "build"] | None = Query(None, description="Only claims whose turn it is"),
+        turn: Literal["you", "exchange", "build"] | None = Query(
+            None, description="Only claims with this turn: you (the user's move), exchange (a requisition is "
+                              "queued or running), build (a process has to be built). A closed claim's turn is "
+                              "none, so it never matches"),
         thing: str | None = Query(None, description="Only claims for this dossier uid"),
     ) -> dict:
         """Claims newest first, and a line for each file that could not be read (never filtered)."""

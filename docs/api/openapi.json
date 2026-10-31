@@ -6761,10 +6761,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Only claims whose turn it is",
+              "description": "Only claims with this turn: you (the user's move), exchange (a requisition is queued or running), build (a process has to be built). A closed claim's turn is none, so it never matches",
               "title": "Turn"
             },
-            "description": "Only claims whose turn it is"
+            "description": "Only claims with this turn: you (the user's move), exchange (a requisition is queued or running), build (a process has to be built). A closed claim's turn is none, so it never matches"
           },
           {
             "name": "thing",
@@ -7242,7 +7242,8 @@
                 "type": "null"
               }
             ],
-            "title": "Thing Name"
+            "title": "Thing Name",
+            "description": "The dossier's name when the claim was made, as stored in the file; not refreshed on reads, so after a rename it differs from the dossier's name"
           },
           "as": {
             "anyOf": [
@@ -7254,7 +7255,7 @@
               }
             ],
             "title": "As",
-            "description": "What the thing is in the place, e.g. prop"
+            "description": "What the thing is in the place, e.g. prop; null for no role"
           },
           "place": {
             "anyOf": [
@@ -7277,7 +7278,8 @@
                 "type": "null"
               }
             ],
-            "title": "Place Name"
+            "title": "Place Name",
+            "description": "The environment's name when the claim was made, as stored in the file; not refreshed on reads, so after a rename it differs from the environment's"
           },
           "folder": {
             "anyOf": [
@@ -7289,7 +7291,7 @@
               }
             ],
             "title": "Folder",
-            "description": "Where the output should go; null is the place's default folder"
+            "description": "Where the output should go, as it was given: absolute, or relative to the place; null or blank is the place's default folder"
           },
           "milestone": {
             "anyOf": [
@@ -7301,7 +7303,7 @@
               }
             ],
             "title": "Milestone",
-            "description": "claimed, acquired, converted or installed"
+            "description": "claimed, acquired, converted or installed. An open claim's is derived from the library on every read; a closed claim keeps the one it had. A hand edit of a closed claim's file can make it any text"
           },
           "created": {
             "anyOf": [
@@ -7313,7 +7315,7 @@
               }
             ],
             "title": "Created",
-            "description": "An ISO date"
+            "description": "The day the claim was made, as an ISO date when the app wrote it; a hand edit can make it any text, and a value that is not text reads null"
           },
           "closed": {
             "anyOf": [
@@ -7325,7 +7327,7 @@
               }
             ],
             "title": "Closed",
-            "description": "An ISO date; null while open, and also for a closed claim whose file holds something that is not text: read `turn` (none once closed) for open or closed"
+            "description": "The day the claim was closed, as an ISO date when the app wrote it; a hand edit can make it any text. Null while open, and also for a closed claim whose file holds something that is not text: read `turn` (none once closed) for open or closed"
           },
           "turn": {
             "type": "string",
@@ -7336,12 +7338,12 @@
               "none"
             ],
             "title": "Turn",
-            "description": "Whose turn: none once closed"
+            "description": "Whose move it is. you: the user's (`turn_line` says what). exchange: a requisition of the claim is queued or running in Exchange. build: no process takes the thing to the place yet, so one has to be built. none: the claim is closed"
           },
           "turn_line": {
             "type": "string",
             "title": "Turn Line",
-            "description": "What the turn's owner has to do"
+            "description": "What the turn's owner has to do when it is `you` or `build`; empty for `exchange` and `none`"
           },
           "already_there": {
             "type": "boolean",
@@ -7350,11 +7352,12 @@
           },
           "path": {
             "$ref": "#/components/schemas/ClaimPath",
-            "description": "The processes that take the thing to the place, as the role: derived on every read, never written"
+            "description": "The processes that take the thing to the place in the claim's role (`as`); derived on every read, never written"
           },
           "notes": {
             "type": "string",
-            "title": "Notes"
+            "title": "Notes",
+            "description": "The claim file's body, under its front matter"
           },
           "requisitions": {
             "items": {
@@ -7393,7 +7396,8 @@
               "$ref": "#/components/schemas/ClaimView"
             },
             "type": "array",
-            "title": "Claims"
+            "title": "Claims",
+            "description": "Newest created first; a claim with no created date comes last"
           },
           "problems": {
             "items": {
@@ -7420,7 +7424,8 @@
               "not_ready",
               "none"
             ],
-            "title": "Status"
+            "title": "Status",
+            "description": "ready: a route can be walked now. not_ready: a chain exists and `process` names the first process that needs setup. none: no process takes the thing to the place; `problem` says why"
           },
           "route": {
             "anyOf": [
@@ -7437,7 +7442,7 @@
               }
             ],
             "title": "Route",
-            "description": "children means each child dossier takes its own route"
+            "description": "children means each child dossier takes its own route; null when status is none"
           },
           "processes": {
             "items": {
@@ -7505,7 +7510,7 @@
           "environment": {
             "type": "integer",
             "title": "Environment",
-            "description": "The place it should end up"
+            "description": "The id of the environment it should end up in"
           },
           "as": {
             "anyOf": [
@@ -7549,7 +7554,7 @@
           "environment": {
             "type": "integer",
             "title": "Environment",
-            "description": "The place it should end up"
+            "description": "The id of the environment it should end up in"
           },
           "as": {
             "anyOf": [
@@ -7649,7 +7654,7 @@
               }
             ],
             "title": "Message",
-            "description": "Null for a uid that no longer resolves"
+            "description": "Null when the requisition has no message, and for a uid that no longer resolves"
           }
         },
         "type": "object",
@@ -7689,7 +7694,8 @@
                 "type": "null"
               }
             ],
-            "title": "Thing Name"
+            "title": "Thing Name",
+            "description": "The dossier's name when the claim was made, as stored in the file; not refreshed on reads, so after a rename it differs from the dossier's name"
           },
           "as": {
             "anyOf": [
@@ -7701,7 +7707,7 @@
               }
             ],
             "title": "As",
-            "description": "What the thing is in the place, e.g. prop"
+            "description": "What the thing is in the place, e.g. prop; null for no role"
           },
           "place": {
             "anyOf": [
@@ -7724,7 +7730,8 @@
                 "type": "null"
               }
             ],
-            "title": "Place Name"
+            "title": "Place Name",
+            "description": "The environment's name when the claim was made, as stored in the file; not refreshed on reads, so after a rename it differs from the environment's"
           },
           "folder": {
             "anyOf": [
@@ -7736,7 +7743,7 @@
               }
             ],
             "title": "Folder",
-            "description": "Where the output should go; null is the place's default folder"
+            "description": "Where the output should go, as it was given: absolute, or relative to the place; null or blank is the place's default folder"
           },
           "milestone": {
             "anyOf": [
@@ -7748,7 +7755,7 @@
               }
             ],
             "title": "Milestone",
-            "description": "claimed, acquired, converted or installed"
+            "description": "claimed, acquired, converted or installed. An open claim's is derived from the library on every read; a closed claim keeps the one it had. A hand edit of a closed claim's file can make it any text"
           },
           "created": {
             "anyOf": [
@@ -7760,7 +7767,7 @@
               }
             ],
             "title": "Created",
-            "description": "An ISO date"
+            "description": "The day the claim was made, as an ISO date when the app wrote it; a hand edit can make it any text, and a value that is not text reads null"
           },
           "closed": {
             "anyOf": [
@@ -7772,7 +7779,7 @@
               }
             ],
             "title": "Closed",
-            "description": "An ISO date; null while open, and also for a closed claim whose file holds something that is not text: read `turn` (none once closed) for open or closed"
+            "description": "The day the claim was closed, as an ISO date when the app wrote it; a hand edit can make it any text. Null while open, and also for a closed claim whose file holds something that is not text: read `turn` (none once closed) for open or closed"
           },
           "turn": {
             "type": "string",
@@ -7783,12 +7790,12 @@
               "none"
             ],
             "title": "Turn",
-            "description": "Whose turn: none once closed"
+            "description": "Whose move it is. you: the user's (`turn_line` says what). exchange: a requisition of the claim is queued or running in Exchange. build: no process takes the thing to the place yet, so one has to be built. none: the claim is closed"
           },
           "turn_line": {
             "type": "string",
             "title": "Turn Line",
-            "description": "What the turn's owner has to do"
+            "description": "What the turn's owner has to do when it is `you` or `build`; empty for `exchange` and `none`"
           },
           "already_there": {
             "type": "boolean",
@@ -7797,7 +7804,7 @@
           },
           "path": {
             "$ref": "#/components/schemas/ClaimPath",
-            "description": "The processes that take the thing to the place, as the role: derived on every read, never written"
+            "description": "The processes that take the thing to the place in the claim's role (`as`); derived on every read, never written"
           }
         },
         "type": "object",
