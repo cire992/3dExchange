@@ -128,6 +128,7 @@ local HTTP API (FastAPI and uvicorn, the optional `service` extra):
   Undo and Redo cover the session's own edits, or any history entry. A library busy with a scan
   answers 503 at once.
 - **Claims (R4a, R4b):** the API reads, makes, previews, closes and walks claims, the same ones `exchange claim` works on, and tells a client when they move.
+- **What's new (R4c):** the API lists what a scan found since a marker you move yourself, and marks it all seen.
 - **Contract:** the schema is committed as [`docs/api/openapi.json`](docs/api/openapi.json);
   regenerate it with `exchange serve --openapi > docs/api/openapi.json` after changing the API
   (a test checks it).
