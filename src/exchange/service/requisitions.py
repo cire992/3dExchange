@@ -79,6 +79,41 @@ def _parameter(p) -> dict:
             "choices": list(p.choices), "min": p.min, "max": p.max}
 
 
+def plan_defaults(registry, preset: str | None) -> dict:
+    """The options a plan falls back to: the preset's, or those last used with each process."""
+    if preset:
+        found = load_presets(registry).get(preset)
+        if found is None:
+            raise HTTPException(404, f"no preset {preset!r}")
+        return found.params()
+    return last_used_params(sorted(registry.packages))
+
+
+def plan_result(plans: list, problems: list[str], registry) -> dict:
+    """The ``PlanResult``: the plans, the option forms of their included items, and what is included."""
+    names = {p: registry.get(p).manifest.name for plan in plans for i in plan.items for p in i.processes}
+    values: dict[str, dict] = {}
+    for p in plans:
+        for item in p.items:
+            if item.include:
+                for process, v in item.params.items():
+                    values.setdefault(process, v)
+    forms = [{"process": process, "name": names[process], "values": v,
+              "parameters": [_parameter(x) for x in registry.get(process).manifest.parameters]}
+             for process, v in values.items()]
+    return {"plans": [{"name": p.name, "environment_id": p.environment_id, "on_collision": p.on_collision,
+                       "endpoint": {"folder": p.endpoint.folder, "root": p.endpoint.root,
+                                    "visibility": p.endpoint.visibility, "label": p.endpoint.label},
+                       "warnings": p.warnings,
+                       "items": [{"dossier_uid": i.dossier_uid, "name": i.name, "type_id": i.type_id,
+                                  "source_entry_id": i.source_entry_id, "source": i.source, "route": i.route,
+                                  "processes": i.processes, "process_names": [names[x] for x in i.processes],
+                                  "params": i.params, "include": i.include, "problems": i.problems}
+                                 for i in p.items]} for p in plans],
+            "problems": problems, "forms": forms,
+            "included": sum(1 for p in plans for i in p.items if i.include)}
+
+
 def _preset_view(preset) -> dict:
     return {"name": preset.name, "description": preset.description, "environment": preset.environment,
             "shipped": preset.shipped, "processes": preset.processes, "options": preset.options}
@@ -237,13 +272,7 @@ def register(app: FastAPI, library, jobs, api, errors: dict) -> None:
         conn, registry = library.conn(), processes.registry()
         if repo.get_environment(conn, body.environment) is None:
             raise HTTPException(404, f"no environment {body.environment}")
-        if body.preset:
-            preset = load_presets(registry).get(body.preset)
-            if preset is None:
-                raise HTTPException(404, f"no preset {body.preset!r}")
-            defaults = preset.params()
-        else:
-            defaults = last_used_params(sorted(registry.packages))
+        defaults = plan_defaults(registry, body.preset)
         typed = {f"{p}.{k}": v for p, values in body.options.items() for k, v in values.items()}
         plans, problems = [], []
         for uid in body.uids:
@@ -269,28 +298,7 @@ def register(app: FastAPI, library, jobs, api, errors: dict) -> None:
         product's children too), each with its process chain, source and problems; the option forms
         for the processes in it; and warnings."""
         plans, problems = make_plans(body)
-        registry = processes.registry()
-        names = {p: registry.get(p).manifest.name for plan in plans for i in plan.items for p in i.processes}
-        values: dict[str, dict] = {}
-        for p in plans:
-            for item in p.items:
-                if item.include:
-                    for process, v in item.params.items():
-                        values.setdefault(process, v)
-        forms = [{"process": process, "name": names[process], "values": v,
-                  "parameters": [_parameter(x) for x in registry.get(process).manifest.parameters]}
-                 for process, v in values.items()]
-        return {"plans": [{"name": p.name, "environment_id": p.environment_id, "on_collision": p.on_collision,
-                           "endpoint": {"folder": p.endpoint.folder, "root": p.endpoint.root,
-                                        "visibility": p.endpoint.visibility, "label": p.endpoint.label},
-                           "warnings": p.warnings,
-                           "items": [{"dossier_uid": i.dossier_uid, "name": i.name, "type_id": i.type_id,
-                                      "source_entry_id": i.source_entry_id, "source": i.source, "route": i.route,
-                                      "processes": i.processes, "process_names": [names[x] for x in i.processes],
-                                      "params": i.params, "include": i.include, "problems": i.problems}
-                                     for i in p.items]} for p in plans],
-                "problems": problems, "forms": forms,
-                "included": sum(1 for p in plans for i in p.items if i.include)}
+        return plan_result(plans, problems, processes.registry())
 
     @app.post(prefix + "/requisitions/queue", response_model=models.Queued, dependencies=[api], responses=busy,
               tags=["requisitions"])
