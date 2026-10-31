@@ -4,7 +4,9 @@ A claim file is front matter plus free notes. Exchange writes a new file once (m
 rewrites only ``requisitions``, ``milestone`` and ``closed`` in place, so hand edits to the notes, to
 any other key and extra keys of your own survive. The milestone is derived from the library on
 every read of an open claim; a closed claim keeps the one it had. Claims are read from the folder
-each time; the database has no index of them.
+each time; the database has no index of them. The service reads on several threads and a read can
+save the milestone, so one lock covers reading and rewriting a file, and a rewrite goes through a
+temporary file moved over the claim: a reader never sees half a file.
 
 Beyond the file, a claim has a **path** (the processes that take the thing to the place, as the role),
 **whose turn** it is (Luke's, Exchange's, or a process nobody has built yet), and it can be **walked**:
@@ -14,10 +16,13 @@ every read and never written.
 
 from __future__ import annotations
 
+import contextlib
 import datetime as dt
 import json
+import os
 import re
 import sqlite3
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -43,10 +48,19 @@ from exchange.requisitions.plan import (
 
 MILESTONES = ("claimed", "acquired", "converted", "installed")  # in order, each derived from the library
 OWNED_KEYS = ("requisitions", "milestone", "closed")  # the only keys Exchange rewrites
+_lock = threading.RLock()  # reading and rewriting a claim file, in this process
 
 
 class ClaimError(ExchangeError):
     """A claim request that cannot be done as asked."""
+
+
+class ClaimNotFound(ClaimError):
+    """No such claim, dossier or environment."""
+
+
+class FolderLeavesPlace(ClaimError):
+    """A relative folder that does not stay inside the place."""
 
 
 @dataclass
@@ -56,6 +70,7 @@ class Claim:
     meta: dict[str, Any]
     notes: str = ""
     problems: list[str] = field(default_factory=list, repr=False)
+    already_there: bool = False  # set by ``describe``: the place already holds the thing
 
     @property
     def milestone(self) -> str | None:
@@ -66,7 +81,7 @@ class Claim:
         return self.meta.get("closed") is not None
 
     def to_json(self) -> dict:
-        return {**self.meta, "id": self.id, "notes": self.notes}
+        return {**self.meta, "already_there": self.already_there, "id": self.id, "notes": self.notes}
 
 
 def claims_dir() -> Path:
@@ -118,6 +133,18 @@ def _latest(conn: sqlite3.Connection, meta: dict[str, Any]) -> sqlite3.Row | Non
     return found[-1] if found else None
 
 
+def _placed(conn: sqlite3.Connection, dossier_uid: object, place_id: int,
+            requisition_ids: list[int] | None = None) -> bool:
+    """Whether the dossier has a live entry in the place on an online root (a place holds only what is
+    on one), written by one of these requisitions when they are given."""
+    only = "" if requisition_ids is None else f" AND e.requisition_id IN ({', '.join('?' * len(requisition_ids))})"
+    return conn.execute(
+        "SELECT 1 FROM entry e JOIN ledger l ON l.id = e.ledger_id JOIN dossier d ON d.id = l.dossier_id"
+        " JOIN container c ON c.id = e.container_id JOIN environment_root r ON r.id = c.root_id"
+        f" WHERE r.status = 'online' AND d.uid = ? AND e.status != 'retired' AND l.environment_id = ?{only} LIMIT 1",
+        (dossier_uid, place_id, *(requisition_ids or ()))).fetchone() is not None
+
+
 def _derive(conn: sqlite3.Connection, meta: dict[str, Any]) -> str:
     """The least advanced of the walked subjects (the thing, or a product's children), each
     ``installed`` (its entry sits in the place on an online root, written by one of the claim's
@@ -139,12 +166,7 @@ def _derive(conn: sqlite3.Connection, meta: dict[str, Any]) -> str:
     ids = [row["id"] for _, row in resolve_requisitions(conn, meta) if row is not None]
     least = len(MILESTONES)
     for subject in subjects:
-        installed = place is not None and conn.execute(
-            "SELECT 1 FROM entry e JOIN ledger l ON l.id = e.ledger_id JOIN dossier d ON d.id = l.dossier_id"
-            " JOIN container c ON c.id = e.container_id JOIN environment_root r ON r.id = c.root_id"
-            f" WHERE r.status = 'online' AND d.uid = ? AND e.status != 'retired' AND l.environment_id = ?"
-            f" AND e.requisition_id IN ({', '.join('?' * len(ids))}) LIMIT 1",
-            (subject["dossier_uid"], place["id"], *ids)).fetchone()
+        installed = place is not None and _placed(conn, subject["dossier_uid"], place["id"], ids)
         milestone = "installed" if installed else "converted" if subject["state"] == "done" else base
         least = min(least, MILESTONES.index(milestone))
     return MILESTONES[least]
@@ -160,7 +182,7 @@ def _claim_folder(conn: sqlite3.Connection, definitions: DefinitionSet | None, f
     text = folder.strip()
     if Path(text).is_absolute():
         return str(Path(text))
-    refusal = ClaimError(f"the folder {folder} leaves {place_name}: a relative folder must stay inside the place;"
+    refusal = FolderLeavesPlace(f"the folder {folder} leaves {place_name}: a relative folder must stay inside the place;"
                          " give an absolute one to write elsewhere")
     if Path(text).drive:
         raise refusal
@@ -173,25 +195,35 @@ def _claim_folder(conn: sqlite3.Connection, definitions: DefinitionSet | None, f
     return str(chosen)
 
 
-def new(conn: sqlite3.Connection, uid: str, env_id: int, *, role: str | None = None,
-        folder: str | None = None, note: str = "", today: dt.date | None = None,
-        definitions: DefinitionSet | None = None) -> Claim:
+def prepare(conn: sqlite3.Connection, uid: str, env_id: int, *, role: str | None = None,
+            folder: str | None = None, today: dt.date | None = None,
+            definitions: DefinitionSet | None = None) -> Claim:
+    """The claim ``new`` would make, unsaved, with the id and path its file would have. Checks what ``new``
+    checks and creates nothing."""
     today = today or dt.date.today()
     thing = conn.execute("SELECT uid, name FROM dossier_effective WHERE uid = ?", (uid,)).fetchone()
     if thing is None:
-        raise ClaimError(f"no dossier {uid!r} in the library")
+        raise ClaimNotFound(f"no dossier {uid!r} in the library")
     place = conn.execute("SELECT uid, name FROM environment WHERE id = ?", (env_id,)).fetchone()
     if place is None:
-        raise ClaimError(f"no environment {env_id} in the library")
+        raise ClaimNotFound(f"no environment {env_id} in the library")
     _claim_folder(conn, definitions, folder, env_id, place["name"])
     path = _new_path(today, thing["name"])
     meta = {"id": path.stem, "thing": thing["uid"], "thing_name": thing["name"], "as": role,
             "place": place["uid"], "place_name": place["name"], "folder": folder, "requisitions": [],
             "milestone": _derive(conn, {"thing": thing["uid"]}), "created": today, "closed": None}
+    return Claim(path.stem, path, meta)
+
+
+def new(conn: sqlite3.Connection, uid: str, env_id: int, *, role: str | None = None,
+        folder: str | None = None, note: str = "", today: dt.date | None = None,
+        definitions: DefinitionSet | None = None) -> Claim:
+    claim = prepare(conn, uid, env_id, role=role, folder=folder, today=today, definitions=definitions)
+    path = claim.path
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
         with open(path, "x", encoding="utf-8", newline="\n") as f:  # never over an existing file
-            f.write(frontmatter.dump(meta, note))
+            f.write(frontmatter.dump(claim.meta, note))
     except FileExistsError:
         raise ClaimError(f"{path.name} already exists; try again") from None
     return read_one(conn, path.stem)
@@ -203,17 +235,23 @@ def _files() -> list[Path]:
 
 
 def _read(conn: sqlite3.Connection, path: Path) -> Claim:
-    doc = frontmatter.read(path)
-    claim = Claim(path.stem, path, doc.meta, doc.body)
-    if not claim.closed:
-        derived = _derive(conn, doc.meta)
-        if derived != doc.meta.get("milestone"):
-            try:
-                update(claim, {"milestone": derived})
-            except (ClaimError, frontmatter.FrontMatterError, OSError) as exc:
-                claim.meta["milestone"] = derived
-                claim.problems.append(f"{path.name}: could not update the milestone: {exc}")
-    return claim
+    with _lock:  # on Windows a file being read blocks a rewrite's replace, so reads wait for rewrites
+        try:
+            doc = frontmatter.read(path)
+        except (frontmatter.FrontMatterError, UnicodeDecodeError, OSError):
+            raise
+        except (ValueError, TypeError) as exc:  # YAML the loader builds but Python refuses, e.g. 2026-02-30
+            raise frontmatter.FrontMatterError(str(exc)) from exc
+        claim = Claim(path.stem, path, doc.meta, doc.body)
+        if not claim.closed:
+            derived = _derive(conn, doc.meta)
+            if derived != doc.meta.get("milestone"):
+                try:
+                    update(claim, {"milestone": derived})
+                except (ClaimError, frontmatter.FrontMatterError, OSError) as exc:
+                    claim.meta["milestone"] = derived
+                    claim.problems.append(f"{path.name}: could not update the milestone: {exc}")
+        return claim
 
 
 def read_all(conn: sqlite3.Connection) -> tuple[list[Claim], list[str]]:
@@ -237,30 +275,40 @@ def read_one(conn: sqlite3.Connection, id: str) -> Claim:
                 return _read(conn, path)
             except (frontmatter.FrontMatterError, OSError, UnicodeDecodeError) as exc:
                 raise ClaimError(f"{path.name}: {exc}") from exc
-    raise ClaimError(f"no claim {id!r}")
+    raise ClaimNotFound(f"no claim {id!r}")
 
 
 def update(claim: Claim, updates: dict[str, Any], append: str = "") -> None:
-    """Rewrite ``requisitions``, ``milestone`` and ``closed`` in the claim's file, nothing else."""
+    """Rewrite ``requisitions``, ``milestone`` and ``closed`` in the claim's file, nothing else. The new
+    text goes to a temporary file beside the claim, then over it, so a failed write leaves the old file."""
     other = sorted(set(updates) - set(OWNED_KEYS))
     if other:
         raise ClaimError(f"Exchange only changes {', '.join(OWNED_KEYS)}, not {', '.join(other)}")
-    text = claim.path.read_text(encoding="utf-8")
-    claim.path.write_bytes(frontmatter.set_keys(text, updates, append=append).encode("utf-8"))
-    claim.meta.update(updates)
-    if append:
-        claim.notes = frontmatter.read(claim.path).body
+    with _lock:
+        text = frontmatter.set_keys(claim.path.read_text(encoding="utf-8"), updates, append=append)
+        temp = claim.path.with_name(f"{claim.path.name}.{os.getpid()}.tmp")  # never ends in .md
+        try:
+            temp.write_bytes(text.encode("utf-8"))
+            os.replace(temp, claim.path)
+        except BaseException:
+            with contextlib.suppress(OSError):
+                temp.unlink(missing_ok=True)
+            raise
+        claim.meta.update(updates)
+        if append:
+            claim.notes = frontmatter.parse(text).body
 
 
 def close(conn: sqlite3.Connection, id: str, reason: str = "", today: dt.date | None = None) -> Claim:
-    claim = read_one(conn, id)
-    if claim.closed:
-        raise ClaimError(f"claim {id} is already closed ({claim.meta['closed']})")
-    try:
-        update(claim, {"closed": today or dt.date.today()}, append=reason)
-    except (frontmatter.FrontMatterError, OSError) as exc:
-        raise ClaimError(f"{claim.path.name}: {exc}") from exc
-    return claim
+    with _lock:  # the check and the write together, so two closes can't both succeed
+        claim = read_one(conn, id)
+        if claim.closed:
+            raise ClaimError(f"claim {id} is already closed ({claim.meta['closed']})")
+        try:
+            update(claim, {"closed": today or dt.date.today()}, append=reason)
+        except (frontmatter.FrontMatterError, OSError) as exc:
+            raise ClaimError(f"{claim.path.name}: {exc}") from exc
+        return claim
 
 
 # Path, whose turn, walking -------------------------------------------------------------------
@@ -395,11 +443,23 @@ def whose_turn(conn: sqlite3.Connection, definitions: DefinitionSet, registry: R
 
 def describe(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Registry, claim: Claim,
              tools: dict[str, str] | None = None) -> dict:
-    """The claim's JSON object with its path and whose turn it is."""
+    """The claim's JSON object with its path, whose turn it is and whether the place already holds the
+    thing. The claim may be unsaved (see ``prepare``)."""
     tools = tool_paths() if tools is None else tools
     path = find_path(conn, definitions, registry, claim, tools)
     turn, line = whose_turn(conn, definitions, registry, claim, path, tools)
+    claim.already_there = _already_there(conn, claim.meta)
     return {**claim.to_json(), "path": path, "turn": turn, "turn_line": line}
+
+
+def _already_there(conn: sqlite3.Connection, meta: dict[str, Any]) -> bool:
+    """Whether a claim with no role, folder or requisitions asks for what the place already holds: the
+    thing has a live entry in it on an online root. It is only said; the path and the turn don't change."""
+    folder = meta.get("folder")
+    if _role(meta) is not None or (isinstance(folder, str) and folder.strip()) or resolve_requisitions(conn, meta):
+        return False
+    place = conn.execute("SELECT id FROM environment WHERE uid = ?", (str(meta.get("place")),)).fetchone()
+    return place is not None and _placed(conn, str(meta.get("thing")), place["id"])
 
 
 def _endpoint_folder(conn: sqlite3.Connection, definitions: DefinitionSet, meta: dict[str, Any],
