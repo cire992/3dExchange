@@ -20,7 +20,7 @@ from exchange.db import repository as repo
 from exchange.definitions.schema import DefinitionSet
 from exchange.errors import ExchangeError
 from exchange.processes.registry import Registry
-from exchange.requisitions.runner import _load_state, _save_state, _state_file, recycle, source_fingerprint
+from exchange.requisitions.runner import _load_state, _save_state, _state_file, recycle, source_fingerprint, work_dir
 
 STATES = ("queued", "held", "running", "needs_attention", "fulfilled", "partially_fulfilled", "failed",
           "stale", "removed", "replaced")
@@ -63,7 +63,9 @@ def detail(conn: sqlite3.Connection, ref: int | str) -> dict:
                       "outputs": json.loads(i["outputs"] or "[]")})
     writes = [dict(w) for w in conn.execute("SELECT * FROM requisition_write WHERE requisition_id = ? ORDER BY id",
                                             (req["id"],))]
-    return {**dict(req), "endpoint": json.loads(req["endpoint"]), "items": items, "writes": writes}
+    work = work_dir(req["uid"])
+    return {**dict(req), "endpoint": json.loads(req["endpoint"]), "items": items, "writes": writes,
+            "work_folder": str(work) if work.is_dir() else None}
 
 
 def resume(conn: sqlite3.Connection, ref: int | str, on_collision: str | None = None) -> None:

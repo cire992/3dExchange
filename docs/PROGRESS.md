@@ -90,7 +90,7 @@ R4 is done: everything the CLI does with a claim, a client can do through the AP
 
 ## Where we are
 
-**Phases 1-3, 4a-4c, phase 6 up to 6i, phase 7 part 1 and R1 are merged.** R2 (6j) is done: R2a (#30) closed the parity gaps `PARITY_CHECKLIST.md` lists, Luke signed the checklist off on 2026-10-29 (R2b), and the PySide6 window is removed in R2c. R3 (claims core) and R4 (claims API, `R4_PLAN.md`) are done; R5, claims in the Workspace, is next.
+**Phases 1-3, 4a-4c, phase 6 up to 6i, phase 7 part 1 and R1 are merged.** R2 (6j) is done: R2a (#30) closed the parity gaps `PARITY_CHECKLIST.md` lists, Luke signed the checklist off on 2026-10-29 (R2b), and the PySide6 window is removed in R2c. R3 (claims core) and R4 (claims API, `R4_PLAN.md`) are done; R5, claims in the Workspace (`R5_PLAN.md`), is in progress, built by hand: its decision 1 replaces RESTART_PLAN's decision 9, so the shell has no factory.
 
 - **Stacked PRs:** after merging one, change the next PR's base to `main` before merging it (or delete the merged branch, and GitHub moves it). This has gone wrong three times: #11 and #12 needed #13 to reach `main`, #26 needed #27, and the shell's #14 needed its #16. Turning on *Automatically delete head branches* (Settings › General › Pull Requests, in both repositories) makes GitHub retarget them by itself; until then, prefer branching from `main`.
 
@@ -140,7 +140,8 @@ R4 is done: everything the CLI does with a claim, a client can do through the AP
 | R4a | Claims in the service API: read, make, close, preview, `already_there`, `ProcessView.roles`, safe claim writes (#52) | merged (#53) |
 | R4b | Walk a claim through the API: `plan` and `walk` with options, `excluded` and `on_collision`; `GET /claims/changes` change notices (#54) | merged (#55) |
 | R4c | What's new, with a marker you move yourself: `GET /dossiers?new=true`, `POST /dossiers/new/seen` (#56) | merged (#57) |
-| R4d | The claims API by hand on the sample library; a claim that can't record its requisition queues nothing, `remember` writes safely, deleting dossiers brings the new marker down; `R4_PLAN.md` | in review |
+| R4d | The claims API by hand on the sample library; a claim that can't record its requisition queues nothing, `remember` writes safely, deleting dossiers brings the new marker down; `R4_PLAN.md` | merged (#58) |
+| R5a | A requisition's `work_folder`, for R5's Show the work folder; `R5_PLAN.md` | in review |
 
 ## Phase 6: Service and Workspace
 
