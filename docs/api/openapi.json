@@ -7231,7 +7231,7 @@
               }
             ],
             "title": "Thing",
-            "description": "The dossier's uid; null when the file's value is a list or map"
+            "description": "The dossier's uid"
           },
           "thing_name": {
             "anyOf": [
@@ -7255,7 +7255,7 @@
               }
             ],
             "title": "As",
-            "description": "What the thing is in the place, e.g. prop; null or blank for no role"
+            "description": "What the thing is in the place, e.g. prop; null for no role"
           },
           "place": {
             "anyOf": [
@@ -7267,7 +7267,7 @@
               }
             ],
             "title": "Place",
-            "description": "The environment's uid; null when the file's value is a list or map"
+            "description": "The environment's uid"
           },
           "place_name": {
             "anyOf": [
@@ -7291,7 +7291,7 @@
               }
             ],
             "title": "Folder",
-            "description": "Where the output should go, as it was given: absolute, or relative to the place; null or blank is the place's default folder, which a walk also uses when the place's root is offline"
+            "description": "Where the output should go: absolute, or relative to the place; null is the place's default folder, which a walk also uses when the place's root is offline"
           },
           "milestone": {
             "anyOf": [
@@ -7303,7 +7303,7 @@
               }
             ],
             "title": "Milestone",
-            "description": "claimed, acquired, converted or installed. An open claim's is derived from the library on every read; a closed claim keeps the one it had. A hand edit of a closed claim's file can make it any text"
+            "description": "claimed, acquired, converted or installed. An open claim's is derived from the library on every read; a closed claim keeps the one it had"
           },
           "created": {
             "anyOf": [
@@ -7315,7 +7315,7 @@
               }
             ],
             "title": "Created",
-            "description": "The day the claim was made, as an ISO date when the app wrote it; a hand edit can make it any text (a number or bool reads as its text), and a list or map reads null"
+            "description": "The day the claim was made, as an ISO date"
           },
           "closed": {
             "anyOf": [
@@ -7327,7 +7327,7 @@
               }
             ],
             "title": "Closed",
-            "description": "The day the claim was closed, as an ISO date when the app wrote it; a hand edit can make it any text (a number or bool reads as its text). Null while open, and also for a closed claim whose file holds a list or map: read `turn` (none once closed) for open or closed"
+            "description": "The day the claim was closed, as an ISO date; null while open"
           },
           "turn": {
             "type": "string",
@@ -7348,7 +7348,7 @@
           "already_there": {
             "type": "boolean",
             "title": "Already There",
-            "description": "No role or folder (null or blank) and no requisitions, and the place already holds the thing: it has a live entry there on an online root"
+            "description": "No role or folder and no requisitions, and the place already holds the thing: it has a live entry there on an online root"
           },
           "path": {
             "$ref": "#/components/schemas/ClaimPath",
@@ -7365,7 +7365,7 @@
             },
             "type": "array",
             "title": "Requisitions",
-            "description": "One per entry the file's requisitions list holds, in its order; none when it is not a list. A null `id` is an entry that does not resolve to a requisition: a uid that no longer exists, or an entry that is not text (see `uid`)"
+            "description": "The requisitions the claim has walked, in the order its file lists them"
           }
         },
         "type": "object",
@@ -7397,7 +7397,7 @@
             },
             "type": "array",
             "title": "Claims",
-            "description": "Newest created first (a hand-written non-date `created` sorts as text); a claim with no created date comes last"
+            "description": "Newest created first; a claim with no created date comes last"
           },
           "problems": {
             "items": {
@@ -7522,7 +7522,7 @@
               }
             ],
             "title": "As",
-            "description": "What it is there, e.g. prop; null or blank for no role"
+            "description": "What it is there, e.g. prop; null for no role"
           },
           "folder": {
             "anyOf": [
@@ -7566,7 +7566,7 @@
               }
             ],
             "title": "As",
-            "description": "What it is there, e.g. prop; null or blank for no role"
+            "description": "What it is there, e.g. prop; null for no role"
           },
           "folder": {
             "anyOf": [
@@ -7606,7 +7606,7 @@
               }
             ],
             "title": "Uid",
-            "description": "The file's entry as text; null when it is empty, a list or map. A date, number or bool reads as its text, but is not a uid, so `id` is null"
+            "description": "The requisition's uid as the file lists it"
           },
           "id": {
             "anyOf": [
@@ -7618,7 +7618,7 @@
               }
             ],
             "title": "Id",
-            "description": "Null when the entry does not resolve to a requisition: a uid that no longer exists, or an entry that is not text (see `uid`)"
+            "description": "Null when the uid no longer resolves to a requisition"
           },
           "state": {
             "anyOf": [
@@ -7642,7 +7642,7 @@
               }
             ],
             "title": "State",
-            "description": "Null when the entry does not resolve to a requisition (see `id`)"
+            "description": "Null when `id` is"
           },
           "message": {
             "anyOf": [
@@ -7654,7 +7654,7 @@
               }
             ],
             "title": "Message",
-            "description": "Null when the entry does not resolve to a requisition (see `id`), and when the requisition has no message"
+            "description": "Null when `id` is, and when the requisition has no message"
           }
         },
         "type": "object",
@@ -7664,7 +7664,8 @@
           "state",
           "message"
         ],
-        "title": "ClaimRequisition"
+        "title": "ClaimRequisition",
+        "description": "One requisition a claim has walked. See `ClaimView` on hand-edited files."
       },
       "ClaimView": {
         "properties": {
@@ -7683,7 +7684,7 @@
               }
             ],
             "title": "Thing",
-            "description": "The dossier's uid; null when the file's value is a list or map"
+            "description": "The dossier's uid"
           },
           "thing_name": {
             "anyOf": [
@@ -7707,7 +7708,7 @@
               }
             ],
             "title": "As",
-            "description": "What the thing is in the place, e.g. prop; null or blank for no role"
+            "description": "What the thing is in the place, e.g. prop; null for no role"
           },
           "place": {
             "anyOf": [
@@ -7719,7 +7720,7 @@
               }
             ],
             "title": "Place",
-            "description": "The environment's uid; null when the file's value is a list or map"
+            "description": "The environment's uid"
           },
           "place_name": {
             "anyOf": [
@@ -7743,7 +7744,7 @@
               }
             ],
             "title": "Folder",
-            "description": "Where the output should go, as it was given: absolute, or relative to the place; null or blank is the place's default folder, which a walk also uses when the place's root is offline"
+            "description": "Where the output should go: absolute, or relative to the place; null is the place's default folder, which a walk also uses when the place's root is offline"
           },
           "milestone": {
             "anyOf": [
@@ -7755,7 +7756,7 @@
               }
             ],
             "title": "Milestone",
-            "description": "claimed, acquired, converted or installed. An open claim's is derived from the library on every read; a closed claim keeps the one it had. A hand edit of a closed claim's file can make it any text"
+            "description": "claimed, acquired, converted or installed. An open claim's is derived from the library on every read; a closed claim keeps the one it had"
           },
           "created": {
             "anyOf": [
@@ -7767,7 +7768,7 @@
               }
             ],
             "title": "Created",
-            "description": "The day the claim was made, as an ISO date when the app wrote it; a hand edit can make it any text (a number or bool reads as its text), and a list or map reads null"
+            "description": "The day the claim was made, as an ISO date"
           },
           "closed": {
             "anyOf": [
@@ -7779,7 +7780,7 @@
               }
             ],
             "title": "Closed",
-            "description": "The day the claim was closed, as an ISO date when the app wrote it; a hand edit can make it any text (a number or bool reads as its text). Null while open, and also for a closed claim whose file holds a list or map: read `turn` (none once closed) for open or closed"
+            "description": "The day the claim was closed, as an ISO date; null while open"
           },
           "turn": {
             "type": "string",
@@ -7800,7 +7801,7 @@
           "already_there": {
             "type": "boolean",
             "title": "Already There",
-            "description": "No role or folder (null or blank) and no requisitions, and the place already holds the thing: it has a live entry there on an online root"
+            "description": "No role or folder and no requisitions, and the place already holds the thing: it has a live entry there on an online root"
           },
           "path": {
             "$ref": "#/components/schemas/ClaimPath",
@@ -7825,7 +7826,7 @@
           "path"
         ],
         "title": "ClaimView",
-        "description": "A claim as the list shows it. A hand-edited file may hold any YAML, so the text fields read a\nstring as it is, a date as ISO, a number or bool as its text, and a list or map as null."
+        "description": "A claim as the list shows it. A claim file may be hand-edited and then hold anything, so any field may\nread as its text or as null; these descriptions cover a file the API wrote."
       },
       "ClassifyJob": {
         "properties": {

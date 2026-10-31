@@ -871,30 +871,23 @@ class ClaimPath(BaseModel):
 
 
 class ClaimView(BaseModel):
-    """A claim as the list shows it. A hand-edited file may hold any YAML, so the text fields read a
-    string as it is, a date as ISO, a number or bool as its text, and a list or map as null."""
+    """A claim as the list shows it. A claim file may be hand-edited and then hold anything, so any field may
+    read as its text or as null; these descriptions cover a file the API wrote."""
     id: str = Field(description="The file's name without .md")
-    thing: str | None = Field(description="The dossier's uid; null when the file's value is a list or map")
+    thing: str | None = Field(description="The dossier's uid")
     thing_name: str | None = Field(description="The dossier's name when the claim was made, as stored in the file; "
                                    "not refreshed on reads, so after a rename it differs from the dossier's name")
-    as_: str | None = Field(alias="as", description="What the thing is in the place, e.g. prop; null or blank "
-                            "for no role")
-    place: str | None = Field(description="The environment's uid; null when the file's value is a list or map")
+    as_: str | None = Field(alias="as", description="What the thing is in the place, e.g. prop; null for no role")
+    place: str | None = Field(description="The environment's uid")
     place_name: str | None = Field(description="The environment's name when the claim was made, as stored in the "
                                    "file; not refreshed on reads, so after a rename it differs from the environment's")
-    folder: str | None = Field(description="Where the output should go, as it was given: absolute, or relative to "
-                               "the place; null or blank is the place's default folder, which a walk also uses when "
-                               "the place's root is offline")
+    folder: str | None = Field(description="Where the output should go: absolute, or relative to the place; null "
+                               "is the place's default folder, which a walk also uses when the place's root is "
+                               "offline")
     milestone: str | None = Field(description="claimed, acquired, converted or installed. An open claim's is derived "
-                                  "from the library on every read; a closed claim keeps the one it had. A hand edit "
-                                  "of a closed claim's file can make it any text")
-    created: str | None = Field(description="The day the claim was made, as an ISO date when the app wrote it; a "
-                                "hand edit can make it any text (a number or bool reads as its text), and a list "
-                                "or map reads null")
-    closed: str | None = Field(description="The day the claim was closed, as an ISO date when the app wrote it; a "
-                               "hand edit can make it any text (a number or bool reads as its text). Null while "
-                               "open, and also for a closed claim whose file holds a list or map: read `turn` "
-                               "(none once closed) for open or closed")
+                                  "from the library on every read; a closed claim keeps the one it had")
+    created: str | None = Field(description="The day the claim was made, as an ISO date")
+    closed: str | None = Field(description="The day the claim was closed, as an ISO date; null while open")
     turn: Literal["you", "exchange", "build", "none"] = Field(
         description="Whose move it is. you: the user's (`turn_line` says what). exchange: a requisition of the "
                     "claim is queued or running in Exchange. build: no process takes the thing to the place yet, "
@@ -902,42 +895,35 @@ class ClaimView(BaseModel):
                     "so). none: the claim is closed")
     turn_line: str = Field(description="What the turn's owner has to do when it is `you` or `build`; empty for "
                            "`exchange` and `none`")
-    already_there: bool = Field(description="No role or folder (null or blank) and no requisitions, and the place "
-                                "already holds the thing: it has a live entry there on an online root")
+    already_there: bool = Field(description="No role or folder and no requisitions, and the place already holds "
+                                "the thing: it has a live entry there on an online root")
     path: ClaimPath = Field(description="The processes that take the thing to the place in the claim's role (`as`); "
                             "derived on every read, never written")
 
 
 class ClaimRequisition(BaseModel):
-    uid: str | None = Field(description="The file's entry as text; null when it is empty, a list or map. A date, "
-                            "number or bool reads as its text, but is not a uid, so `id` is null")
-    id: int | None = Field(description="Null when the entry does not resolve to a requisition: a uid that no longer "
-                           "exists, or an entry that is not text (see `uid`)")
-    state: RequisitionState | None = Field(description="Null when the entry does not resolve to a requisition (see "
-                                           "`id`)")
-    message: str | None = Field(description="Null when the entry does not resolve to a requisition (see `id`), and "
-                                "when the requisition has no message")
+    """One requisition a claim has walked. See `ClaimView` on hand-edited files."""
+    uid: str | None = Field(description="The requisition's uid as the file lists it")
+    id: int | None = Field(description="Null when the uid no longer resolves to a requisition")
+    state: RequisitionState | None = Field(description="Null when `id` is")
+    message: str | None = Field(description="Null when `id` is, and when the requisition has no message")
 
 
 class ClaimDetail(ClaimView):
     notes: str = Field(description="The claim file's body, under its front matter")
     requisitions: list[ClaimRequisition] = Field(
-        description="One per entry the file's requisitions list holds, in its order; none when it is not a list. "
-                    "A null `id` is an entry that does not resolve to a requisition: a uid that no longer exists, "
-                    "or an entry that is not text (see `uid`)")
+        description="The requisitions the claim has walked, in the order its file lists them")
 
 
 class ClaimList(BaseModel):
-    claims: list[ClaimView] = Field(
-        description="Newest created first (a hand-written non-date `created` sorts as text); a claim with no "
-                    "created date comes last")
+    claims: list[ClaimView] = Field(description="Newest created first; a claim with no created date comes last")
     problems: list[str] = Field(description="A line for each claim file that could not be read")
 
 
 class ClaimPreviewRequest(BaseModel):
     uid: str = Field(description="The dossier to claim")
     environment: int = Field(description="The id of the environment it should end up in")
-    as_: str | None = Field(None, alias="as", description="What it is there, e.g. prop; null or blank for no role")
+    as_: str | None = Field(None, alias="as", description="What it is there, e.g. prop; null for no role")
     folder: str | None = Field(None, description="Absolute, or relative to the place; it may not leave the place")
 
 
