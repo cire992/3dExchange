@@ -1,0 +1,22 @@
+# Second of the chain: from the stage, reading a type no source holds.
+
+[process]
+id = "stage_to_loose"
+name = "Stage to loose files"
+version = "1.0.0"
+author = "Tests"
+format_version = 1
+
+[input]
+dossier_types = ["mesh"]
+environments = ["stage"]
+extensions = [".zzz"]
+artifact = "Files"
+
+[output]
+environment = "loose_files"
+folder = "Read/{name}"
+
+[[step]]
+id = "pass"
+operation = "core.copy"

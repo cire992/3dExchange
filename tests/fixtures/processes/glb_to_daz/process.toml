@@ -1,0 +1,21 @@
+# A test process that takes .glb files to Daz Studio.
+
+[process]
+id = "glb_to_daz"
+name = "GLB to Daz"
+version = "1.0.0"
+author = "Tests"
+format_version = 1
+
+[input]
+dossier_types = ["mesh"]
+extensions = [".glb"]
+artifact = "Files"
+
+[output]
+environment = "daz_studio"
+folder = "Read/{name}"
+
+[[step]]
+id = "pass"
+operation = "core.copy"
