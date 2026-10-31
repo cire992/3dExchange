@@ -7255,7 +7255,7 @@
               }
             ],
             "title": "As",
-            "description": "What the thing is in the place, e.g. prop; null for no role"
+            "description": "What the thing is in the place, e.g. prop; blank or null for no role"
           },
           "place": {
             "anyOf": [
@@ -7291,7 +7291,7 @@
               }
             ],
             "title": "Folder",
-            "description": "Where the output should go: absolute, or relative to the place; null is the place's default folder, which a walk also uses when the place's root is offline"
+            "description": "Where the output should go: absolute, or relative to the place; blank or null is the place's default folder"
           },
           "milestone": {
             "anyOf": [
@@ -7450,7 +7450,7 @@
             },
             "type": "array",
             "title": "Processes",
-            "description": "The chain in order (for route children, the processes of all the children's chains, each once); empty when there is none"
+            "description": "The chain in order; empty when there is none"
           },
           "process": {
             "anyOf": [
@@ -7522,7 +7522,7 @@
               }
             ],
             "title": "As",
-            "description": "What it is there, e.g. prop; null for no role"
+            "description": "What it is there, e.g. prop; blank or null for no role"
           },
           "folder": {
             "anyOf": [
@@ -7566,7 +7566,7 @@
               }
             ],
             "title": "As",
-            "description": "What it is there, e.g. prop; null for no role"
+            "description": "What it is there, e.g. prop; blank or null for no role"
           },
           "folder": {
             "anyOf": [
@@ -7708,7 +7708,7 @@
               }
             ],
             "title": "As",
-            "description": "What the thing is in the place, e.g. prop; null for no role"
+            "description": "What the thing is in the place, e.g. prop; blank or null for no role"
           },
           "place": {
             "anyOf": [
@@ -7744,7 +7744,7 @@
               }
             ],
             "title": "Folder",
-            "description": "Where the output should go: absolute, or relative to the place; null is the place's default folder, which a walk also uses when the place's root is offline"
+            "description": "Where the output should go: absolute, or relative to the place; blank or null is the place's default folder"
           },
           "milestone": {
             "anyOf": [

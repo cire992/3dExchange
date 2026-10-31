@@ -863,8 +863,7 @@ class ClaimPath(BaseModel):
     route: Literal["convert", "copy", "children"] | None = Field(
         description="children means each child dossier takes its own route; null when status is none")
     processes: list[str] = Field(
-        description="The chain in order (for route children, the processes of all the children's chains, each "
-                    "once); empty when there is none")
+        description="The chain in order; empty when there is none")
     process: str | None = Field(description="The first process that is not ready, when status is not_ready")
     problem: str | None = Field(description="Why the path can't be walked yet; null when it can")
     source_entry_id: int | None = Field(description="The ledger entry the route reads from; null when there is none")
@@ -877,13 +876,13 @@ class ClaimView(BaseModel):
     thing: str | None = Field(description="The dossier's uid")
     thing_name: str | None = Field(description="The dossier's name when the claim was made, as stored in the file; "
                                    "not refreshed on reads, so after a rename it differs from the dossier's name")
-    as_: str | None = Field(alias="as", description="What the thing is in the place, e.g. prop; null for no role")
+    as_: str | None = Field(alias="as", description="What the thing is in the place, e.g. prop; blank or null "
+                            "for no role")
     place: str | None = Field(description="The environment's uid")
     place_name: str | None = Field(description="The environment's name when the claim was made, as stored in the "
                                    "file; not refreshed on reads, so after a rename it differs from the environment's")
-    folder: str | None = Field(description="Where the output should go: absolute, or relative to the place; null "
-                               "is the place's default folder, which a walk also uses when the place's root is "
-                               "offline")
+    folder: str | None = Field(description="Where the output should go: absolute, or relative to the place; blank "
+                               "or null is the place's default folder")
     milestone: str | None = Field(description="claimed, acquired, converted or installed. An open claim's is derived "
                                   "from the library on every read; a closed claim keeps the one it had")
     created: str | None = Field(description="The day the claim was made, as an ISO date")
@@ -923,7 +922,7 @@ class ClaimList(BaseModel):
 class ClaimPreviewRequest(BaseModel):
     uid: str = Field(description="The dossier to claim")
     environment: int = Field(description="The id of the environment it should end up in")
-    as_: str | None = Field(None, alias="as", description="What it is there, e.g. prop; null for no role")
+    as_: str | None = Field(None, alias="as", description="What it is there, e.g. prop; blank or null for no role")
     folder: str | None = Field(None, description="Absolute, or relative to the place; it may not leave the place")
 
 
