@@ -874,12 +874,12 @@ class ClaimView(BaseModel):
     """A claim as the list shows it. A hand-edited file may hold any YAML, so the text fields read a
     string as it is, a date as ISO, a number or bool as its text, and a list or map as null."""
     id: str = Field(description="The file's name without .md")
-    thing: str | None = Field(description="The dossier's uid")
+    thing: str | None = Field(description="The dossier's uid; null when the file's value is a list or map")
     thing_name: str | None = Field(description="The dossier's name when the claim was made, as stored in the file; "
                                    "not refreshed on reads, so after a rename it differs from the dossier's name")
     as_: str | None = Field(alias="as", description="What the thing is in the place, e.g. prop; null or blank "
                             "for no role")
-    place: str | None = Field(description="The environment's uid")
+    place: str | None = Field(description="The environment's uid; null when the file's value is a list or map")
     place_name: str | None = Field(description="The environment's name when the claim was made, as stored in the "
                                    "file; not refreshed on reads, so after a rename it differs from the environment's")
     folder: str | None = Field(description="Where the output should go, as it was given: absolute, or relative to "
@@ -902,25 +902,29 @@ class ClaimView(BaseModel):
                     "so). none: the claim is closed")
     turn_line: str = Field(description="What the turn's owner has to do when it is `you` or `build`; empty for "
                            "`exchange` and `none`")
-    already_there: bool = Field(description="No role, folder or requisitions, and the place already holds the "
-                                "thing: it has a live entry there on an online root")
+    already_there: bool = Field(description="No role or folder (null or blank) and no requisitions, and the place "
+                                "already holds the thing: it has a live entry there on an online root")
     path: ClaimPath = Field(description="The processes that take the thing to the place in the claim's role (`as`); "
                             "derived on every read, never written")
 
 
 class ClaimRequisition(BaseModel):
-    uid: str | None = Field(description="Null when the file's entry is a list or map; a number or bool reads as "
-                            "its text, and then `id` is null")
-    id: int | None = Field(description="Null for a uid that no longer resolves")
-    state: RequisitionState | None = Field(description="Null for a uid that no longer resolves")
-    message: str | None = Field(description="Null when the requisition has no message, and for a uid that no "
-                                "longer resolves")
+    uid: str | None = Field(description="The file's entry as text; null when it is empty, a list or map. A date, "
+                            "number or bool reads as its text, but is not a uid, so `id` is null")
+    id: int | None = Field(description="Null when the entry does not resolve to a requisition: a uid that no longer "
+                           "exists, or an entry that is not text (see `uid`)")
+    state: RequisitionState | None = Field(description="Null when the entry does not resolve to a requisition (see "
+                                           "`id`)")
+    message: str | None = Field(description="Null when the entry does not resolve to a requisition (see `id`), and "
+                                "when the requisition has no message")
 
 
 class ClaimDetail(ClaimView):
     notes: str = Field(description="The claim file's body, under its front matter")
     requisitions: list[ClaimRequisition] = Field(
-        description="One per uid the file lists, in its order; an entry with a null `id` no longer resolves")
+        description="One per entry the file's requisitions list holds, in its order; none when it is not a list. "
+                    "A null `id` is an entry that does not resolve to a requisition: a uid that no longer exists, "
+                    "or an entry that is not text (see `uid`)")
 
 
 class ClaimList(BaseModel):
@@ -933,7 +937,7 @@ class ClaimList(BaseModel):
 class ClaimPreviewRequest(BaseModel):
     uid: str = Field(description="The dossier to claim")
     environment: int = Field(description="The id of the environment it should end up in")
-    as_: str | None = Field(None, alias="as", description="What it is there, e.g. prop")
+    as_: str | None = Field(None, alias="as", description="What it is there, e.g. prop; null or blank for no role")
     folder: str | None = Field(None, description="Absolute, or relative to the place; it may not leave the place")
 
 

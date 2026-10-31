@@ -7231,7 +7231,7 @@
               }
             ],
             "title": "Thing",
-            "description": "The dossier's uid"
+            "description": "The dossier's uid; null when the file's value is a list or map"
           },
           "thing_name": {
             "anyOf": [
@@ -7267,7 +7267,7 @@
               }
             ],
             "title": "Place",
-            "description": "The environment's uid"
+            "description": "The environment's uid; null when the file's value is a list or map"
           },
           "place_name": {
             "anyOf": [
@@ -7348,7 +7348,7 @@
           "already_there": {
             "type": "boolean",
             "title": "Already There",
-            "description": "No role, folder or requisitions, and the place already holds the thing: it has a live entry there on an online root"
+            "description": "No role or folder (null or blank) and no requisitions, and the place already holds the thing: it has a live entry there on an online root"
           },
           "path": {
             "$ref": "#/components/schemas/ClaimPath",
@@ -7365,7 +7365,7 @@
             },
             "type": "array",
             "title": "Requisitions",
-            "description": "One per uid the file lists, in its order; an entry with a null `id` no longer resolves"
+            "description": "One per entry the file's requisitions list holds, in its order; none when it is not a list. A null `id` is an entry that does not resolve to a requisition: a uid that no longer exists, or an entry that is not text (see `uid`)"
           }
         },
         "type": "object",
@@ -7522,7 +7522,7 @@
               }
             ],
             "title": "As",
-            "description": "What it is there, e.g. prop"
+            "description": "What it is there, e.g. prop; null or blank for no role"
           },
           "folder": {
             "anyOf": [
@@ -7566,7 +7566,7 @@
               }
             ],
             "title": "As",
-            "description": "What it is there, e.g. prop"
+            "description": "What it is there, e.g. prop; null or blank for no role"
           },
           "folder": {
             "anyOf": [
@@ -7606,7 +7606,7 @@
               }
             ],
             "title": "Uid",
-            "description": "Null when the file's entry is a list or map; a number or bool reads as its text, and then `id` is null"
+            "description": "The file's entry as text; null when it is empty, a list or map. A date, number or bool reads as its text, but is not a uid, so `id` is null"
           },
           "id": {
             "anyOf": [
@@ -7618,7 +7618,7 @@
               }
             ],
             "title": "Id",
-            "description": "Null for a uid that no longer resolves"
+            "description": "Null when the entry does not resolve to a requisition: a uid that no longer exists, or an entry that is not text (see `uid`)"
           },
           "state": {
             "anyOf": [
@@ -7642,7 +7642,7 @@
               }
             ],
             "title": "State",
-            "description": "Null for a uid that no longer resolves"
+            "description": "Null when the entry does not resolve to a requisition (see `id`)"
           },
           "message": {
             "anyOf": [
@@ -7654,7 +7654,7 @@
               }
             ],
             "title": "Message",
-            "description": "Null when the requisition has no message, and for a uid that no longer resolves"
+            "description": "Null when the entry does not resolve to a requisition (see `id`), and when the requisition has no message"
           }
         },
         "type": "object",
@@ -7683,7 +7683,7 @@
               }
             ],
             "title": "Thing",
-            "description": "The dossier's uid"
+            "description": "The dossier's uid; null when the file's value is a list or map"
           },
           "thing_name": {
             "anyOf": [
@@ -7719,7 +7719,7 @@
               }
             ],
             "title": "Place",
-            "description": "The environment's uid"
+            "description": "The environment's uid; null when the file's value is a list or map"
           },
           "place_name": {
             "anyOf": [
@@ -7800,7 +7800,7 @@
           "already_there": {
             "type": "boolean",
             "title": "Already There",
-            "description": "No role, folder or requisitions, and the place already holds the thing: it has a live entry there on an online root"
+            "description": "No role or folder (null or blank) and no requisitions, and the place already holds the thing: it has a live entry there on an online root"
           },
           "path": {
             "$ref": "#/components/schemas/ClaimPath",
