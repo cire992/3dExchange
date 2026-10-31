@@ -36,7 +36,10 @@ def register_root(
 ) -> int:
     """Register ``path`` as a root of an environment of ``type_id``; returns the environment id.
 
-    A root already known keeps its environment (whose type changes if the user chose another).
+    A root already known keeps its environment. The user's type replaces the place's only for its
+    first root or a ``multi_root`` place; another root of a single-root place can't retype it (a
+    ``ScanError`` names the place, and nothing is written). The place's own type, and anything else
+    registered as before, behave as they always did.
     For multi-root types (Daz Studio) a new root joins the existing environment of that type.
     With ``environment_id``, a new root joins that environment whatever its type; without it
     nothing differs, for every caller.
@@ -55,6 +58,7 @@ def register_root(
     if known is not None:
         env_id = known["environment_id"]
         if known["type_id"] != type_id:
+            _check_retype(conn, definitions, known)
             conn.execute("UPDATE environment SET type_id = ? WHERE id = ?", (type_id, env_id))
     else:
         if environment_id is not None:
@@ -77,6 +81,29 @@ def register_root(
         repo.set_user_config(conn, env_id, merged)
     set_excluded(conn, path, False)
     return env_id
+
+
+def _is_multi_root(definitions: DefinitionSet, type_id: str) -> bool:
+    definition = definitions.environments.get(type_id)
+    return bool(definition and definition.multi_root)
+
+
+def _check_retype(conn: sqlite3.Connection, definitions: DefinitionSet, known: sqlite3.Row) -> None:
+    """Refuse retyping a place from a root that joined it, unless the place is ``multi_root``."""
+    env_id = known["environment_id"]
+    if known["id"] == repo.list_roots(conn, env_id)[0]["id"] or _is_multi_root(definitions, known["type_id"]):
+        return
+    raise ScanError(
+        f"{known['path']} is a folder of {repo.get_environment(conn, env_id)['name']}, which is a "
+        f"{known['type_id']} place: only its first folder can change the place's type")
+
+
+def can_forget_root(conn: sqlite3.Connection, definitions: DefinitionSet, root: sqlite3.Row) -> bool:
+    """Whether ``root`` (a row from ``list_roots`` or ``find_root``) can be forgotten on its own: its
+    place has other roots, and it is not the first root of a single-root place (as ``place_root`` and
+    ``scan`` read "first")."""
+    roots = repo.list_roots(conn, root["environment_id"])
+    return len(roots) > 1 and (roots[0]["id"] != root["id"] or _is_multi_root(definitions, root["type_id"]))
 
 
 def excluded_roots(conn: sqlite3.Connection) -> list[str]:
