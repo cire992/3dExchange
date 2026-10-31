@@ -830,6 +830,8 @@ class RequisitionDetail(BaseModel):
     created_at: str
     started_at: str | None = None
     finished_at: str | None = None
+    work_folder: str | None = Field(None, description="Where its steps keep their files, to look at a paused "
+                                    "step; null when there is none")
     items: list[RequisitionItem]
     writes: list[RequisitionWrite]
 

@@ -11417,6 +11417,18 @@
             ],
             "title": "Finished At"
           },
+          "work_folder": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Folder",
+            "description": "Where its steps keep their files, to look at a paused step; null when there is none"
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/RequisitionItem"
