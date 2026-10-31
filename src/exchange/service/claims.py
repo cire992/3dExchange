@@ -1,9 +1,14 @@
-"""The service's claims API (R4a): read, make, preview and close the loop's claims.
+"""The service's claims API (R4a, R4b): read, make, preview, close and walk the loop's claims.
 
-A claim is a markdown file (``exchange.claims``); the routes only read the library and the files. A
-preview goes through ``claims.prepare``, the code a real claim goes through, and writes nothing. A
-file is hand-editable, so every response is built key by key from what the file holds: a scalar of
-the wrong type reads as text, anything else as null, and extra keys are never returned.
+A claim is a markdown file (``exchange.claims``). Reading, previewing and planning only read the
+library and the files; making and closing write the file, and walking queues a requisition on the
+editor's write connection (``claims.walk``), then starts it as a job unless told not to. A preview goes
+through ``claims.prepare``, the code a real claim goes through, and writes nothing. A file is
+hand-editable, so every response is built key by key from what the file holds: a scalar of the wrong
+type reads as text, anything else as null, and extra keys are never returned.
+
+``GET /claims/changes`` tells a client when to list again: a version that grows with every claim made,
+closed or walked, every job that ends, and every claim file that changes (``ClaimWatcher``).
 """
 
 from __future__ import annotations
@@ -14,8 +19,13 @@ from typing import Literal
 from fastapi import FastAPI, HTTPException, Query
 
 from exchange import claims
+from exchange.errors import ExchangeError
 from exchange.processes.registry import tool_paths
+from exchange.requisitions import lifecycle
+from exchange.requisitions.presets import remember
 from exchange.service import models
+from exchange.service.jobs import MAX_WAIT
+from exchange.service.requisitions import plan_defaults, plan_result
 
 TEXT_KEYS = ("thing", "thing_name", "as", "place", "place_name", "folder", "milestone", "created", "closed")
 
@@ -31,7 +41,7 @@ def _text(value: object) -> str | None:
     return None
 
 
-def _failure(exc: claims.ClaimError) -> HTTPException:
+def _failure(exc: ExchangeError) -> HTTPException:
     code = 404 if isinstance(exc, claims.ClaimNotFound) else 400 if isinstance(exc, claims.FolderLeavesPlace) else 409
     return HTTPException(code, str(exc))
 
@@ -42,9 +52,13 @@ def _view(data: dict) -> dict:
             "turn_line": data["turn_line"], "already_there": data["already_there"], "path": data["path"]}
 
 
-def register(app: FastAPI, library, api, errors: dict) -> None:
+def register(app: FastAPI, library, jobs, api, errors: dict) -> None:
     prefix = app.state.prefix
     refused = {**errors, 409: {"model": models.Problem}}
+
+    def typed(body: models.PlanChoices) -> dict:
+        """The options as ``plan_requisition``'s ``params``: ``{"process.option": value}``."""
+        return {f"{p}.{k}": v for p, values in body.options.items() for k, v in values.items()}
 
     def describe(conn, claim: claims.Claim) -> dict:
         return _view(claims.describe(conn, library.definitions, library.processes.registry(), claim, tool_paths()))
@@ -77,6 +91,7 @@ def register(app: FastAPI, library, api, errors: dict) -> None:
                                definitions=library.definitions)
         except claims.ClaimError as exc:
             raise _failure(exc) from exc
+        library.claim_watcher.bump()
         return detail(conn, claim)
 
     @app.get(prefix + "/claims", response_model=models.ClaimList, dependencies=[api], responses=refused,
@@ -98,6 +113,16 @@ def register(app: FastAPI, library, api, errors: dict) -> None:
         views.sort(key=lambda v: (v["created"] is not None, v["created"] or ""), reverse=True)
         return {"claims": views, "problems": problems}
 
+    @app.get(prefix + "/claims/changes", response_model=models.ClaimChanges, dependencies=[api], responses=errors,
+             tags=["claims"])
+    def claim_changes(since: int | None = Query(None, description="The version you have: wait for a newer one"),
+                      wait: float = Query(0, ge=0, le=MAX_WAIT, description="Seconds to wait for a change")) -> dict:
+        """Whether claims may have changed since ``version`` ``since``: made, closed or walked through the
+        service, a job ended, or a claim file changed (``available`` is false without ``watchdog``: only
+        the first three are noticed). The first call starts watching the claims folder."""
+        library.claim_watcher.start(claims.claims_dir())
+        return library.claim_watcher.wait(since, wait)
+
     @app.get(prefix + "/claims/{id}", response_model=models.ClaimDetail, dependencies=[api], responses=refused,
              tags=["claims"])
     def get_claim(id: str) -> dict:
@@ -114,6 +139,55 @@ def register(app: FastAPI, library, api, errors: dict) -> None:
         """Close a claim; it keeps its milestone. The reason is added to its notes."""
         conn = library.conn()
         try:
-            return detail(conn, claims.close(conn, id, (body.reason or "") if body else ""))
+            closed = claims.close(conn, id, (body.reason or "") if body else "")
         except claims.ClaimError as exc:
             raise _failure(exc) from exc
+        library.claim_watcher.bump()
+        return detail(conn, closed)
+
+    @app.post(prefix + "/claims/{id}/plan", response_model=models.PlanResult, dependencies=[api],
+              responses=refused, tags=["claims"])
+    def plan_claim(id: str, body: models.PlanChoices) -> dict:
+        """Plan the claim's path as ``POST /claims/{id}/walk`` would queue it. Nothing is written. Options
+        are chosen as for ``POST /requisitions/queue``."""
+        registry = library.processes.registry()
+        defaults = plan_defaults(registry, body.preset)
+        try:
+            _, plan = claims.plan_path(library.conn(), library.definitions, registry, id, tool_paths(),
+                                       params=typed(body), defaults=defaults, on_collision=body.on_collision,
+                                       excluded=body.excluded)
+        except ExchangeError as exc:
+            raise _failure(exc) from exc
+        return plan_result([plan], list(dict.fromkeys(plan.warnings)), registry)
+
+    @app.post(prefix + "/claims/{id}/walk", response_model=models.ClaimWalked, dependencies=[api],
+              responses={**refused, 503: {"model": models.Problem}}, tags=["claims"])
+    def walk_claim(id: str, body: models.ClaimWalkRequest) -> dict:
+        """Queue the claim's path as a requisition, remember its options as last used, and (with ``run``)
+        start it as a job. If the job could not start, the requisition stays queued and ``problem`` says why."""
+        registry = library.processes.registry()
+        defaults = plan_defaults(registry, body.preset)
+        jobs.refuse_while_writing()
+
+        def queue(curator):
+            try:
+                return claims.walk(curator.conn, library.definitions, registry, id, tool_paths(), params=typed(body),
+                                   defaults=defaults, on_collision=body.on_collision, excluded=body.excluded)
+            except ExchangeError as exc:  # the editor's 404s don't know "no claim", and a PlanError is a 409
+                raise _failure(exc) from exc
+
+        claim, requisition_id = library.editor.run(queue)
+        library.claim_watcher.bump()
+        conn = library.conn()
+        remember({process: values for item in lifecycle.detail(conn, requisition_id)["items"] if item["include"]
+                  for process, values in item["params"].items()})
+        job, problem = None, None
+        if body.run:
+            try:
+                job = jobs.start("requisitions", f"Running requisition {requisition_id}",
+                                 ["requisition", "run", str(requisition_id)], writes=True).view()
+            except HTTPException as exc:
+                problem = str(exc.detail)
+        shown = detail(conn, claim)
+        return {"claim": shown, "job": job, "problem": problem,
+                "requisition": next(r for r in shown["requisitions"] if r["id"] == requisition_id)}
