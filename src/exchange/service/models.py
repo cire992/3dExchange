@@ -863,8 +863,7 @@ class ClaimPath(BaseModel):
     route: Literal["convert", "copy", "children"] | None = Field(
         description="children means each child dossier takes its own route; null when status is none")
     processes: list[str] = Field(
-        description="The processes in order; for route children, those of all the children's chains, "
-                    "each once; empty when there is none")
+        description="The processes in order; empty when there is none")
     process: str | None = Field(description="The first process that is not ready, when status is not_ready")
     problem: str | None = Field(description="Why the path can't be walked yet; null when it can")
     source_entry_id: int | None = Field(description="The ledger entry the route reads from; null when there is none")

@@ -7450,7 +7450,7 @@
             },
             "type": "array",
             "title": "Processes",
-            "description": "The processes in order; for route children, those of all the children's chains, each once; empty when there is none"
+            "description": "The processes in order; empty when there is none"
           },
           "process": {
             "anyOf": [
