@@ -264,21 +264,25 @@ def _warnings(conn: sqlite3.Connection, plan: Plan, uids: list[str]) -> None:
 
 def queue_plan(conn: sqlite3.Connection, plan: Plan, registry: Registry) -> int:
     """Add a plan to the queue; returns the requisition id."""
-    included = [i for i in plan.items if i.include]
-    if not included:
-        raise PlanError("nothing in this plan is included")
     with repo.transaction(conn):
-        position = conn.execute("SELECT COALESCE(max(position), 0) + 1 FROM requisition").fetchone()[0]
-        cur = conn.execute(
-            "INSERT INTO requisition (uid, name, state, position, environment_id, endpoint, on_collision, created_at)"
-            " VALUES (?, ?, 'queued', ?, ?, ?, ?, ?)",
-            (repo.new_uid(), plan.name, position, plan.environment_id, plan.endpoint.to_json(), plan.on_collision,
-             repo.now()))
-        requisition_id = cur.lastrowid
-        conn.executemany(
-            "INSERT INTO requisition_item (requisition_id, dossier_uid, source_entry_id, processes, params, include, state)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?)",
-            [(requisition_id, i.dossier_uid, i.source_entry_id,
-              json.dumps([{"id": p, "version": registry.get(p).manifest.version} for p in i.processes]),
-              json.dumps(i.params), int(i.include), "queued" if i.include else "skipped") for i in plan.items])
+        return insert_plan(conn, plan, registry)
+
+
+def insert_plan(conn: sqlite3.Connection, plan: Plan, registry: Registry) -> int:
+    """``queue_plan`` inside the caller's transaction, for a caller that must undo it."""
+    if not any(i.include for i in plan.items):
+        raise PlanError("nothing in this plan is included")
+    position = conn.execute("SELECT COALESCE(max(position), 0) + 1 FROM requisition").fetchone()[0]
+    cur = conn.execute(
+        "INSERT INTO requisition (uid, name, state, position, environment_id, endpoint, on_collision, created_at)"
+        " VALUES (?, ?, 'queued', ?, ?, ?, ?, ?)",
+        (repo.new_uid(), plan.name, position, plan.environment_id, plan.endpoint.to_json(), plan.on_collision,
+         repo.now()))
+    requisition_id = cur.lastrowid
+    conn.executemany(
+        "INSERT INTO requisition_item (requisition_id, dossier_uid, source_entry_id, processes, params, include, state)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [(requisition_id, i.dossier_uid, i.source_entry_id,
+          json.dumps([{"id": p, "version": registry.get(p).manifest.version} for p in i.processes]),
+          json.dumps(i.params), int(i.include), "queued" if i.include else "skipped") for i in plan.items])
     return requisition_id

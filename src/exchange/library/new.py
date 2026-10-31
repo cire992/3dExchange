@@ -2,7 +2,8 @@
 
 The marker is the highest ``dossier.id`` at the end of the library's first scan, kept in
 ``library_setting``; "Mark all seen" moves it to the highest id now. A dossier is new when its
-id is above the marker. Ids are only reused after a deletion, which is an accepted limit.
+id is above the marker. SQLite reuses the ids above the highest one left, so deleting dossiers
+brings the marker down with them (``after_deleting``).
 """
 
 from __future__ import annotations
@@ -39,4 +40,17 @@ def mark_seen(conn: sqlite3.Connection) -> None:
     """Move an existing marker to the highest dossier id; with no marker (or no dossiers), nothing."""
     highest = _highest(conn)
     if highest is not None and marker(conn) is not None:
+        _set(conn, highest)
+
+
+def after_deleting(conn: sqlite3.Connection) -> None:
+    """Bring the marker down to the highest id left, or forget it with the last dossier: the next
+    scan of an empty library is a first scan again."""
+    current = marker(conn)
+    if current is None:
+        return
+    highest = _highest(conn)
+    if highest is None:
+        conn.execute("DELETE FROM library_setting WHERE key = ?", (MARKER,))
+    elif highest < current:
         _set(conn, highest)

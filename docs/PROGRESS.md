@@ -58,9 +58,39 @@ Claims work on real content: a real product walked from Claimed to Installed, an
 4. **`ready` doesn't mean a process can run.** Convert mesh's input is matched by dossier type, and a `daz_prop` matches, but its entry holds a `.cr2`: the OBJ is a support file of the product. So R3_PLAN's check, Convert mesh on a Daz product, can't be done, which is why the OBJ was walked loose. R6's path goes through the Daz Studio bridge, so it doesn't depend on this. Fixed in R3d-3: a process can declare the file types it reads, and `ready` checks them. With no role, a prop claimed for the place that already holds it reads `ready` by copy, which writes a second copy: nothing needs building there. Checked on real files on 2026-10-31: the truck's prop reads `build` as a role and for a place that doesn't hold it, and Krow HD and a saved character read `build` as `g8f_character`.
 5. **A product claim said "build" when only its children can travel** (`claims.py`, `find_path`), though the planner plans them. Found while planning the fixes. Fixed in R3d-1: a product with no route of its own takes its children's (route `children`), and with a role, only those that grant it.
 
+## R4d: the claims API by hand (2026-10-31)
+
+R4 is done: everything the CLI does with a claim, a client can do through the API, on real files. R5 can build the Workspace on it with no other core change.
+
+**How:** on the R3c sample library, through a real `exchange serve` on a scratch database, with the data folder and endpoints in scratch. The library and the loose folder were hashed before and after, and neither changed.
+
+| Step | Result |
+| --- | --- |
+| Scan the sample, then the loose folder, through `/jobs/scan` | 26.7 s for the sample. Nothing was new after the first scan, and the loose mesh was after the second |
+| A saved character, previewed and claimed `as g8f_character` for Daz Studio | `build`, "No path yet: a process has to be built". `plan` and `walk` are 409s saying the same |
+| The mesh, previewed for its own place | `ready`, and `already_there` true with no folder, false with one. Previews left no file |
+| `plan`, with `format` changed to `gltf` | The option form came back, and the chosen value in the item's params |
+| `walk` with that option, following `/claims/changes` | Queued and running at once, **Installed** in 4.5 s on the second poll, a `.gltf` and `.bin` in the folder, `gltf` remembered as last used |
+| After the walk | `?new=true` unchanged, so Exchange's own output doesn't count. The version stayed still after one more list |
+| A hand edit of the claim file | `/claims/changes` answered within a second, through `watchdog` |
+| A wrong id, a folder leaving the place, closing twice | 404, 400, 409 |
+| `close` with a reason, then Mark all seen | The reason in the notes, and the hand edit kept. `seen` 1, then nothing new |
+
+**A hundred claims:** 102 claims, a mix of Daz Studio and loose, list in about 233 ms, 2.3 ms a claim, down from the 6 ms R4's plan started from. Making one takes 38 ms. So no index (R4's decision 9). This is on the sample's database; the real library is far larger, so measure again if the Claims view feels slow there.
+
+**Fixed by hand here, from the reviews of R4b and R4c:**
+
+1. **A claim that couldn't record its requisition left it queued.** With the file held open, `walk` answered 409 and a retry queued a second one. Now the requisition and the claim file are written together: if the file can't be written, nothing is queued.
+2. **A failed `remember` lost the options and answered 500.** It wrote in place, so a value with no UTF-8 emptied `last_options.json`, and `walk` then started no job. It now goes through a temporary file, and a failure is dropped: last used options are a convenience, and the requisition is already queued.
+3. **Forgetting an environment hid the next scan from "new".** R4c's marker is a dossier id, and SQLite reuses ids above the highest one left, so the next environment scanned could stay under the marker. Deleting dossiers now brings the marker down with them, and deleting the last one forgets it. This also removes the limit #56 accepted.
+
+**For R5:** `seen` counts every new dossier, while the default list's `total` counts the outermost ones, so they aren't one number. "No marker yet" and "nothing new" look the same. A claim moved by a requisition run from the CLI gets no notice until something next touches the file.
+
+**Left open, set aside by Luke:** the 500s R4a's approver found (a hex integer past 4,300 digits in a claim file, lone surrogates in `note` and `reason`, a NUL in a relative `folder`, an `environment` of `10**30`), and how hand-edited `as` and `folder` behave.
+
 ## Where we are
 
-**Phases 1-3, 4a-4c, phase 6 up to 6i, phase 7 part 1 and R1 are merged.** R2 (6j) is done: R2a (#30) closed the parity gaps `PARITY_CHECKLIST.md` lists, Luke signed the checklist off on 2026-10-29 (R2b), and the PySide6 window is removed in R2c. R3a, R3b and R3c are merged; R3d (`R3D_PLAN.md`), the fixes from R3c, is next.
+**Phases 1-3, 4a-4c, phase 6 up to 6i, phase 7 part 1 and R1 are merged.** R2 (6j) is done: R2a (#30) closed the parity gaps `PARITY_CHECKLIST.md` lists, Luke signed the checklist off on 2026-10-29 (R2b), and the PySide6 window is removed in R2c. R3 (claims core) and R4 (claims API, `R4_PLAN.md`) are done; R5, claims in the Workspace, is next.
 
 - **Stacked PRs:** after merging one, change the next PR's base to `main` before merging it (or delete the merged branch, and GitHub moves it). This has gone wrong three times: #11 and #12 needed #13 to reach `main`, #26 needed #27, and the shell's #14 needed its #16. Turning on *Automatically delete head branches* (Settings › General › Pull Requests, in both repositories) makes GitHub retarget them by itself; until then, prefer branching from `main`.
 
@@ -106,10 +136,11 @@ Claims work on real content: a real product walked from Claimed to Installed, an
 | R3d-3 | `ready` means a process has a file it can read: an optional `[input] extensions` in process manifests (#43) | merged (#44) |
 | R3d-4 | Endpoints stay in their place: a folder outside a place joins it as a root, and a claim's relative folder can't leave it (#45) | merged (#47) |
 | R3d-5 | A joined folder can be forgotten on its own (`env forget --root`), and can't retype its place (#48) | merged (#50) |
-| R3d-6 | A place holds only what's on an online root: output on an offline or deleted root reads Converted, and Installed again when the root is back (#49) | in review |
-| R4a | Claims in the service API: read, make, close, preview, `already_there`, `ProcessView.roles`, safe claim writes (#52) | in review |
-| R4b | Walk a claim through the API: `plan` and `walk` with options, `excluded` and `on_collision`; `GET /claims/changes` change notices (#54) | in review |
-| R4c | What's new, with a marker you move yourself: `GET /dossiers?new=true`, `POST /dossiers/new/seen` (#56) | in review |
+| R3d-6 | A place holds only what's on an online root: output on an offline or deleted root reads Converted, and Installed again when the root is back (#49) | merged (#51) |
+| R4a | Claims in the service API: read, make, close, preview, `already_there`, `ProcessView.roles`, safe claim writes (#52) | merged (#53) |
+| R4b | Walk a claim through the API: `plan` and `walk` with options, `excluded` and `on_collision`; `GET /claims/changes` change notices (#54) | merged (#55) |
+| R4c | What's new, with a marker you move yourself: `GET /dossiers?new=true`, `POST /dossiers/new/seen` (#56) | merged (#57) |
+| R4d | The claims API by hand on the sample library; a claim that can't record its requisition queues nothing, `remember` writes safely, deleting dossiers brings the new marker down; `R4_PLAN.md` | in review |
 
 ## Phase 6: Service and Workspace
 

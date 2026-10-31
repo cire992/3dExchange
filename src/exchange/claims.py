@@ -43,8 +43,8 @@ from exchange.requisitions.plan import (
     find_chains,
     for_role,
     grants,
+    insert_plan,
     plan_requisition,
-    queue_plan,
     routes,
 )
 
@@ -513,11 +513,12 @@ def walk(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Registr
                             on_collision=on_collision, excluded=excluded)
     if not any(item.include for item in plan.items):
         raise ClaimError("nothing in this plan is included")
-    requisition_id = queue_plan(conn, plan, registry)
-    uid = conn.execute("SELECT uid FROM requisition WHERE id = ?", (requisition_id,)).fetchone()[0]
     existing = claim.meta.get("requisitions")
     try:
-        update(claim, {"requisitions": [*(existing if isinstance(existing, list) else []), uid]})
+        with repo.transaction(conn):  # one the claim can't record is undone, so walking again can't queue a second
+            requisition_id = insert_plan(conn, plan, registry)
+            uid = conn.execute("SELECT uid FROM requisition WHERE id = ?", (requisition_id,)).fetchone()[0]
+            update(claim, {"requisitions": [*(existing if isinstance(existing, list) else []), uid]})
     except (frontmatter.FrontMatterError, OSError) as exc:
-        raise ClaimError(f"{claim.path.name}: {exc} (requisition {requisition_id} is queued, not recorded)") from exc
+        raise ClaimError(f"{claim.path.name}: {exc} (nothing was queued)") from exc
     return read_one(conn, id), requisition_id
