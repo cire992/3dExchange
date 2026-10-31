@@ -89,7 +89,7 @@ The window is the Workspace in cire992/Exchange-Shell, which starts `exchange se
 | --- | --- |
 | `scan FOLDER` | Detect environments in a folder and index them. `--dry-run` only detects; `--no-enrich` stops after identification. |
 | `rescan`, `enrich` | Rescan known environments (only changes are reprocessed); re-run enrichment. |
-| `env list / show / add / config / exclude / forget` | Manage environments, their settings and excluded folders. |
+| `env list / show / add / config / exclude / forget` | Manage environments, their settings and excluded folders. `env forget ID --root FOLDER` forgets one folder of a place and keeps the place (not its first folder, or its only one, unless the place is Daz Studio); `env add` is refused for a folder a place joined with another type. |
 | `discover` | List environments found on this PC. |
 | `search QUERY`, `show UID` | Search the library; show one dossier with its ledgers, files and dependencies. |
 | `classify`, `lexicon …` | Re-run classification (`--regroup` also regroups files into products, after editing theme or author lexicons); show and edit lexicons. |
