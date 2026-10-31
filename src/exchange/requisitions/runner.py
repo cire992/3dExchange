@@ -506,5 +506,5 @@ def _rescan(conn, db_path: Path, definitions: DefinitionSet, roots: list[tuple[i
         if repo.find_root(conn, fold(str(Path(root).resolve()))) is None:
             env = repo.get_environment(conn, environment_id)
             with repo.transaction(conn):
-                register_root(conn, definitions, Path(root), env["type_id"])
+                register_root(conn, definitions, Path(root), env["type_id"], environment_id=environment_id)
         run_scan(Path(root), db_path=db_path, definitions=definitions)

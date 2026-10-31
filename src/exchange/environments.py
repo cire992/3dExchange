@@ -32,11 +32,14 @@ def register_root(
     config: Mapping[str, Any] | None = None,
     confidence: float = 0.0,
     signals: list[str] | None = None,
+    environment_id: int | None = None,
 ) -> int:
     """Register ``path`` as a root of an environment of ``type_id``; returns the environment id.
 
     A root already known keeps its environment (whose type changes if the user chose another).
     For multi-root types (Daz Studio) a new root joins the existing environment of that type.
+    With ``environment_id``, a new root joins that environment whatever its type; without it
+    nothing differs, for every caller.
     ``config`` is merged into the environment's user settings.
     """
     definition = definitions.environments.get(type_id)
@@ -54,14 +57,17 @@ def register_root(
         if known["type_id"] != type_id:
             conn.execute("UPDATE environment SET type_id = ? WHERE id = ?", (type_id, env_id))
     else:
-        existing = conn.execute("SELECT id FROM environment WHERE type_id = ? ORDER BY id LIMIT 1",
-                                (type_id,)).fetchone() if definition.multi_root else None
-        if existing is not None:
-            env_id = existing[0]
+        if environment_id is not None:
+            env_id = environment_id
         else:
-            from exchange.scanner.scan import environment_name
+            existing = conn.execute("SELECT id FROM environment WHERE type_id = ? ORDER BY id LIMIT 1",
+                                    (type_id,)).fetchone() if definition.multi_root else None
+            if existing is not None:
+                env_id = existing[0]
+            else:
+                from exchange.scanner.scan import environment_name
 
-            env_id = repo.create_environment(conn, type_id=type_id, name=environment_name(definition, path))
+                env_id = repo.create_environment(conn, type_id=type_id, name=environment_name(definition, path))
         repo.upsert_root(conn, env_id, path=str(path), root_key=key, variant=None,
                          confidence=confidence, signals=signals or ["added by the user"])
     if name:
