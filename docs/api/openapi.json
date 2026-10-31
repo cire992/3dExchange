@@ -7324,7 +7324,7 @@
               }
             ],
             "title": "Closed",
-            "description": "An ISO date; null while open"
+            "description": "An ISO date; null while open, and also for a closed claim whose file holds something that is not text: read `turn` (none once closed) for open or closed"
           },
           "turn": {
             "type": "string",
@@ -7345,7 +7345,7 @@
           "already_there": {
             "type": "boolean",
             "title": "Already There",
-            "description": "No role, folder or requisitions, and the place already holds the thing"
+            "description": "No role, folder or requisitions, and the place already holds the thing: it has a live entry there on an online root"
           },
           "path": {
             "$ref": "#/components/schemas/ClaimPath"
@@ -7605,13 +7605,26 @@
           "state": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "enum": [
+                  "queued",
+                  "held",
+                  "running",
+                  "needs_attention",
+                  "fulfilled",
+                  "partially_fulfilled",
+                  "failed",
+                  "stale",
+                  "removed",
+                  "replaced"
+                ]
               },
               {
                 "type": "null"
               }
             ],
-            "title": "State"
+            "title": "State",
+            "description": "Null for a uid that no longer resolves"
           },
           "message": {
             "anyOf": [
@@ -7622,7 +7635,8 @@
                 "type": "null"
               }
             ],
-            "title": "Message"
+            "title": "Message",
+            "description": "Null for a uid that no longer resolves"
           }
         },
         "type": "object",
@@ -7744,7 +7758,7 @@
               }
             ],
             "title": "Closed",
-            "description": "An ISO date; null while open"
+            "description": "An ISO date; null while open, and also for a closed claim whose file holds something that is not text: read `turn` (none once closed) for open or closed"
           },
           "turn": {
             "type": "string",
@@ -7765,7 +7779,7 @@
           "already_there": {
             "type": "boolean",
             "title": "Already There",
-            "description": "No role, folder or requisitions, and the place already holds the thing"
+            "description": "No role, folder or requisitions, and the place already holds the thing: it has a live entry there on an online root"
           },
           "path": {
             "$ref": "#/components/schemas/ClaimPath"
@@ -10481,7 +10495,7 @@
             },
             "type": "array",
             "title": "Roles",
-            "description": "What its output is in a place (the manifest's [output] roles)"
+            "description": "What its output can be in a place, e.g. prop (the manifest's [output] roles); empty for built-ins"
           }
         },
         "type": "object",

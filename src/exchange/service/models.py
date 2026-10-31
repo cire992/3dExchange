@@ -647,7 +647,8 @@ class ProcessView(BaseModel):
     problems: list[str] = Field(description="What is wrong with a trusted package's chain")
     trust: list[str] = Field(description="What trusting it lets it do, to show before asking")
     parameters: list[ParameterView]
-    roles: list[str] = Field(description="What its output is in a place (the manifest's [output] roles)")
+    roles: list[str] = Field(description="What its output can be in a place, e.g. prop (the manifest's [output] roles); "
+                       "empty for built-ins")
 
 
 class ProcessList(BaseModel):
@@ -758,13 +759,16 @@ class Queued(BaseModel):
     ids: list[int]
 
 
+RequisitionState = Literal["queued", "held", "running", "needs_attention", "fulfilled", "partially_fulfilled",
+                           "failed", "stale", "removed", "replaced"]
+
+
 class RequisitionRow(BaseModel):
     model_config = {"extra": "allow"}
     id: int
     uid: str
     name: str
-    state: Literal["queued", "held", "running", "needs_attention", "fulfilled", "partially_fulfilled", "failed",
-                   "stale", "removed", "replaced"]
+    state: RequisitionState
     position: int
     environment_id: int
     environment: str
@@ -872,18 +876,20 @@ class ClaimView(BaseModel):
     folder: str | None
     milestone: str | None = Field(description="claimed, acquired, converted or installed")
     created: str | None = Field(description="An ISO date")
-    closed: str | None = Field(description="An ISO date; null while open")
+    closed: str | None = Field(description="An ISO date; null while open, and also for a closed claim whose file "
+                               "holds something that is not text: read `turn` (none once closed) for open or closed")
     turn: Literal["you", "exchange", "build", "none"] = Field(description="Whose turn: none once closed")
     turn_line: str = Field(description="What the turn's owner has to do")
-    already_there: bool = Field(description="No role, folder or requisitions, and the place already holds the thing")
+    already_there: bool = Field(description="No role, folder or requisitions, and the place already holds the "
+                                "thing: it has a live entry there on an online root")
     path: ClaimPath
 
 
 class ClaimRequisition(BaseModel):
     uid: str | None
     id: int | None = Field(description="Null for a uid that no longer resolves")
-    state: str | None
-    message: str | None
+    state: RequisitionState | None = Field(description="Null for a uid that no longer resolves")
+    message: str | None = Field(description="Null for a uid that no longer resolves")
 
 
 class ClaimDetail(ClaimView):
