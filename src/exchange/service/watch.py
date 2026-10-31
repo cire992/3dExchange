@@ -5,6 +5,9 @@ user decides when to rescan). The PySide6 window's ``ChangeWatcher`` without Qt.
 Uses ``watchdog`` (the OS's own change notifications: one recursive watch per root on Windows,
 however many files it holds). Watching only reads; nothing is written to the roots. Without
 ``watchdog`` installed the watcher is simply off (``available`` is false).
+
+``ClaimWatcher`` does the same for the claims folder (R4b): its ``version`` grows when a claim file
+changes, and the service bumps it too when it makes, closes or walks a claim or a job ends.
 """
 
 from __future__ import annotations
@@ -101,3 +104,62 @@ class Watcher:
                 self._noticed.add(environment_id)
                 self.version += 1
                 self._changed.notify_all()
+
+
+class _ClaimHandler(FileSystemEventHandler):
+    def __init__(self, watcher: ClaimWatcher) -> None:
+        super().__init__()
+        self.watcher = watcher
+
+    def on_any_event(self, event: FileSystemEvent) -> None:
+        if event.is_directory or event.event_type in ("opened", "closed", "closed_no_write"):
+            return  # a claim is a file; reads are not changes
+        if any(str(p).casefold().endswith(".md") for p in (event.src_path, getattr(event, "dest_path", ""))):
+            self.watcher.bump()  # not <name>.md.<pid>.tmp alone: its move onto the .md is the change
+
+
+class ClaimWatcher:
+    """A version that grows whenever a claim may have changed, so a client can wait for the next
+    change (``wait``). The folder is watched only once ``start`` is called."""
+
+    def __init__(self, watch: bool = True) -> None:
+        self.available = watch and Observer is not None
+        self.version = 0
+        self._observer = None
+        self._changed = threading.Condition()
+        self._starting = threading.Lock()
+
+    def bump(self) -> None:
+        with self._changed:
+            self.version += 1
+            self._changed.notify_all()
+
+    def start(self, folder: Path) -> None:
+        """Watch the claims folder (made if missing), once; harmless when watching is off."""
+        with self._starting:
+            if not self.available or self._observer is not None:
+                return
+            try:
+                folder.mkdir(parents=True, exist_ok=True)
+                observer = Observer()
+                observer.schedule(_ClaimHandler(self), str(folder), recursive=False)
+                observer.daemon = True
+                observer.start()
+            except OSError:
+                self.available = False  # nothing to watch; the service's own bumps still count
+                return
+            self._observer = observer
+
+    def wait(self, since: int | None, timeout: float) -> dict:
+        """``available`` and ``version``, once ``version`` differs from ``since`` (or after ``timeout``)."""
+        with self._changed:
+            if since is not None:
+                self._changed.wait_for(lambda: self.version != since, timeout)
+            return {"available": self.available, "version": self.version}
+
+    def stop(self) -> None:
+        with self._starting:
+            observer = self._observer
+        if observer is not None:
+            observer.stop()
+            observer.join(timeout=5)

@@ -6854,6 +6854,107 @@
         ]
       }
     },
+    "/api/v1/claims/changes": {
+      "get": {
+        "tags": [
+          "claims"
+        ],
+        "summary": "Claim Changes",
+        "description": "Whether claims may have changed since ``version`` ``since``: made, closed or walked through the\nservice, a job ended, or a claim file changed (``available`` is false without ``watchdog``: changes\nto the files themselves are not noticed). The first call starts watching the claims folder.",
+        "operationId": "claim_changes_api_v1_claims_changes_get",
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The version you have: wait for a newer one",
+              "title": "Since"
+            },
+            "description": "The version you have: wait for a newer one"
+          },
+          {
+            "name": "wait",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 25,
+              "minimum": 0,
+              "description": "Seconds to wait for a change",
+              "default": 0,
+              "title": "Wait"
+            },
+            "description": "Seconds to wait for a change"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimChanges"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ]
+      }
+    },
     "/api/v1/claims/{id}": {
       "get": {
         "tags": [
@@ -7046,6 +7147,212 @@
           }
         ]
       }
+    },
+    "/api/v1/claims/{id}/plan": {
+      "post": {
+        "tags": [
+          "claims"
+        ],
+        "summary": "Plan Claim",
+        "description": "Plan the claim's path as ``POST /claims/{id}/walk`` would queue it. Queues nothing; as on any read, a stale milestone may be saved. Options\nare chosen as for ``POST /requisitions/queue``.",
+        "operationId": "plan_claim_api_v1_claims__id__plan_post",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanChoices"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/claims/{id}/walk": {
+      "post": {
+        "tags": [
+          "claims"
+        ],
+        "summary": "Walk Claim",
+        "description": "Queue the claim's path as a requisition, remember its options as last used, and (with ``run``)\nstart it as a job. If the job could not start, the requisition stays queued and ``problem`` says why.",
+        "operationId": "walk_claim_api_v1_claims__id__walk_post",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimWalkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimWalked"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -7195,6 +7502,26 @@
           "fields"
         ],
         "title": "Choices"
+      },
+      "ClaimChanges": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available",
+            "description": "False when the claim files are not watched (no watchdog, watching off, or the folder can't be watched): their changes are not noticed"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "description": "Grows when a claim may have changed; ask again with since=version to wait for the next"
+          }
+        },
+        "type": "object",
+        "required": [
+          "available",
+          "version"
+        ],
+        "title": "ClaimChanges"
       },
       "ClaimClose": {
         "properties": {
@@ -7827,6 +8154,103 @@
         ],
         "title": "ClaimView",
         "description": "A claim as the list shows it. A claim file may be hand-edited and then hold anything, so the fields read\nfrom it may read as their text or as null; these descriptions cover a file the API wrote."
+      },
+      "ClaimWalkRequest": {
+        "properties": {
+          "options": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Options",
+            "description": "Option values by process; they win over the preset's",
+            "default": {}
+          },
+          "preset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset",
+            "description": "Start from a preset; null is the options last used with each process"
+          },
+          "on_collision": {
+            "type": "string",
+            "enum": [
+              "ask",
+              "overwrite",
+              "rename",
+              "skip"
+            ],
+            "title": "On Collision",
+            "default": "ask"
+          },
+          "excluded": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Excluded",
+            "description": "Items (asset uids) left out",
+            "default": []
+          },
+          "run": {
+            "type": "boolean",
+            "title": "Run",
+            "description": "Start a job that runs the requisition once it is queued",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "ClaimWalkRequest"
+      },
+      "ClaimWalked": {
+        "properties": {
+          "claim": {
+            "$ref": "#/components/schemas/ClaimDetail",
+            "description": "The claim after the walk"
+          },
+          "requisition": {
+            "$ref": "#/components/schemas/ClaimRequisition",
+            "description": "The requisition the walk queued"
+          },
+          "job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Job"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The job running it; null when `run` is false or `problem` is set"
+          },
+          "problem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Problem",
+            "description": "Why `run` started no job; the requisition is still queued"
+          }
+        },
+        "type": "object",
+        "required": [
+          "claim",
+          "requisition",
+          "job",
+          "problem"
+        ],
+        "title": "ClaimWalked"
       },
       "ClassifyJob": {
         "properties": {
@@ -9970,6 +10394,55 @@
         ],
         "title": "ParentRevert"
       },
+      "PlanChoices": {
+        "properties": {
+          "options": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Options",
+            "description": "Option values by process; they win over the preset's",
+            "default": {}
+          },
+          "preset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset",
+            "description": "Start from a preset; null is the options last used with each process"
+          },
+          "on_collision": {
+            "type": "string",
+            "enum": [
+              "ask",
+              "overwrite",
+              "rename",
+              "skip"
+            ],
+            "title": "On Collision",
+            "default": "ask"
+          },
+          "excluded": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Excluded",
+            "description": "Items (asset uids) left out",
+            "default": []
+          }
+        },
+        "type": "object",
+        "title": "PlanChoices",
+        "description": "What a plan lets the client choose, for a requisition and for a claim's path."
+      },
       "PlanItemView": {
         "properties": {
           "dossier_uid": {
@@ -10060,6 +10533,48 @@
       },
       "PlanRequest": {
         "properties": {
+          "options": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Options",
+            "description": "Option values by process; they win over the preset's",
+            "default": {}
+          },
+          "preset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset",
+            "description": "Start from a preset; null is the options last used with each process"
+          },
+          "on_collision": {
+            "type": "string",
+            "enum": [
+              "ask",
+              "overwrite",
+              "rename",
+              "skip"
+            ],
+            "title": "On Collision",
+            "default": "ask"
+          },
+          "excluded": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Excluded",
+            "description": "Items (asset uids) left out",
+            "default": []
+          },
           "uids": {
             "items": {
               "type": "string"
@@ -10089,28 +10604,6 @@
             "title": "Processes",
             "description": "A chain from /requisitions/routes; null is automatic"
           },
-          "options": {
-            "additionalProperties": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "object",
-            "title": "Options",
-            "description": "Option values by process; they win over the preset's",
-            "default": {}
-          },
-          "preset": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Preset",
-            "description": "Start from a preset; null is the options last used with each process"
-          },
           "endpoint_folder": {
             "anyOf": [
               {
@@ -10122,26 +10615,6 @@
             ],
             "title": "Endpoint Folder",
             "description": "Write here instead of the environment's endpoint"
-          },
-          "on_collision": {
-            "type": "string",
-            "enum": [
-              "ask",
-              "overwrite",
-              "rename",
-              "skip"
-            ],
-            "title": "On Collision",
-            "default": "ask"
-          },
-          "excluded": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Excluded",
-            "description": "Items (asset uids) left out",
-            "default": []
           },
           "name": {
             "anyOf": [

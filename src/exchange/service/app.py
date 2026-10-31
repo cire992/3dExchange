@@ -55,6 +55,7 @@ class Library:
         self.editor = None  # set by create_app; closed with the library
         self.jobs = None
         self.watcher = None
+        self.claim_watcher = None
         self.processes = None
 
     def conn(self) -> sqlite3.Connection:
@@ -71,6 +72,8 @@ class Library:
             self.jobs.close()
         if self.watcher is not None:
             self.watcher.stop()
+        if self.claim_watcher is not None:
+            self.claim_watcher.stop()
         if self.editor is not None:
             self.editor.close()
         with self._lock:
@@ -208,10 +211,18 @@ def create_app(db_path: Path, *, token: str, definitions: DefinitionSet | None =
     register(app, library, library.editor, api, errors)
 
     from exchange.service import jobs
-    from exchange.service.watch import Watcher
+    from exchange.service.watch import ClaimWatcher, Watcher
 
     library.watcher = Watcher()
-    library.jobs = jobs.Jobs(library, on_finished=lambda job: jobs.after_job(library, library.watcher, job))
+    library.claim_watcher = ClaimWatcher(watch)
+
+    def on_finished(job) -> None:
+        try:
+            jobs.after_job(library, library.watcher, job)
+        finally:
+            library.claim_watcher.bump()  # a requisition's run moves its claim
+
+    library.jobs = jobs.Jobs(library, on_finished=on_finished)
     jobs.register(app, library, library.jobs, library.watcher, api, errors)
 
     from exchange.service import requisitions
@@ -220,7 +231,7 @@ def create_app(db_path: Path, *, token: str, definitions: DefinitionSet | None =
 
     from exchange.service import claims
 
-    claims.register(app, library, api, errors)
+    claims.register(app, library, library.jobs, api, errors)
     if watch:
         jobs.watch_roots(library, library.watcher)
     return app

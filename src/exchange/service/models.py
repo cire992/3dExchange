@@ -699,15 +699,19 @@ class RouteChoice(BaseModel):
     label: str
 
 
-class PlanRequest(BaseModel):
+class PlanChoices(BaseModel):
+    """What a plan lets the client choose, for a requisition and for a claim's path."""
+    options: dict[str, dict[str, Any]] = Field({}, description="Option values by process; they win over the preset's")
+    preset: str | None = Field(None, description="Start from a preset; null is the options last used with each process")
+    on_collision: Literal["ask", "overwrite", "rename", "skip"] = "ask"
+    excluded: list[str] = Field([], description="Items (asset uids) left out")
+
+
+class PlanRequest(PlanChoices):
     uids: list[str] = Field(min_length=1, description="Assets or products; several are planned with the same options")
     environment: int = Field(description="The target environment")
     processes: list[str] | None = Field(None, description="A chain from /requisitions/routes; null is automatic")
-    options: dict[str, dict[str, Any]] = Field({}, description="Option values by process; they win over the preset's")
-    preset: str | None = Field(None, description="Start from a preset; null is the options last used with each process")
     endpoint_folder: str | None = Field(None, description="Write here instead of the environment's endpoint")
-    on_collision: Literal["ask", "overwrite", "rename", "skip"] = "ask"
-    excluded: list[str] = Field([], description="Items (asset uids) left out")
     name: str | None = Field(None, description="The requisition's name, for one asset")
 
 
@@ -936,3 +940,21 @@ class ClaimRequest(ClaimPreviewRequest):
 
 class ClaimClose(BaseModel):
     reason: str | None = Field(None, description="Added to the claim's notes")
+
+
+class ClaimWalkRequest(PlanChoices):
+    run: bool = Field(True, description="Start a job that runs the requisition once it is queued")
+
+
+class ClaimWalked(BaseModel):
+    claim: ClaimDetail = Field(description="The claim after the walk")
+    requisition: ClaimRequisition = Field(description="The requisition the walk queued")
+    job: Job | None = Field(description="The job running it; null when `run` is false or `problem` is set")
+    problem: str | None = Field(description="Why `run` started no job; the requisition is still queued")
+
+
+class ClaimChanges(BaseModel):
+    available: bool = Field(description="False when the claim files are not watched (no watchdog, watching off, or "
+                            "the folder can't be watched): their changes are not noticed")
+    version: int = Field(description="Grows when a claim may have changed; ask again with since=version to wait "
+                         "for the next")

@@ -10,8 +10,8 @@ temporary file moved over the claim: a reader never sees half a file.
 
 Beyond the file, a claim has a **path** (the processes that take the thing to the place, as the role),
 **whose turn** it is (Luke's, Exchange's, or a process nobody has built yet), and it can be **walked**:
-the path planned and queued as a requisition whose uid the claim records. Path and turn are derived on
-every read and never written.
+the path planned (``plan_path``, which queues nothing) and queued as a requisition whose uid the claim
+records. Path and turn are derived on every read and never written.
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ import os
 import re
 import sqlite3
 import threading
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -35,6 +36,7 @@ from exchange.processes.registry import ProcessPackage, Registry, check_prerequi
 from exchange.projects import frontmatter
 from exchange.requisitions.endpoints import configured_folder, place_root
 from exchange.requisitions.plan import (
+    Plan,
     PlanError,
     _entries,
     can_read,
@@ -469,10 +471,13 @@ def _endpoint_folder(conn: sqlite3.Connection, definitions: DefinitionSet, meta:
     return _claim_folder(conn, definitions, meta.get("folder"), env_id, place["name"])
 
 
-def walk(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Registry, id: str,
-         tools: dict[str, str] | None = None) -> tuple[Claim, int]:
-    """Plan and queue the claim's path as a requisition and record its uid; returns the claim and the
-    requisition's id. Running it is the caller's."""
+def plan_path(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Registry, id: str,
+              tools: dict[str, str] | None = None, *, params: dict[str, Any] | None = None,
+              defaults: dict[str, Any] | None = None, on_collision: str = "ask",
+              excluded: Iterable[str] = ()) -> tuple[Claim, Plan]:
+    """The claim and the plan for its path, as ``walk`` queues it; queues nothing. Refuses a closed claim,
+    a path that isn't ready and a requisition still waiting or running. ``params`` are typed option values
+    (``process.option``), ``defaults`` the ones they fall back to; ``excluded`` are dossier uids left out."""
     claim = read_one(conn, id)
     if claim.closed:
         raise ClaimError(f"claim {id} is closed")
@@ -488,8 +493,26 @@ def walk(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Registr
     env_id = conn.execute("SELECT id FROM environment WHERE uid = ?", (str(claim.meta.get("place")),)).fetchone()[0]
     processes = None if path["route"] == "children" else path["processes"]  # each child takes its own route
     plan = plan_requisition(conn, definitions, registry, str(claim.meta["thing"]), env_id, processes=processes,
+                            params=params, defaults=defaults, on_collision=on_collision,
                             source_entry_id=path["source_entry_id"], role=_role(claim.meta),
                             endpoint_folder=_endpoint_folder(conn, definitions, claim.meta, env_id), tools=tools)
+    left_out = set(excluded)
+    for item in plan.items:
+        if item.dossier_uid in left_out:
+            item.include = False
+    return claim, plan
+
+
+def walk(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Registry, id: str,
+         tools: dict[str, str] | None = None, *, params: dict[str, Any] | None = None,
+         defaults: dict[str, Any] | None = None, on_collision: str = "ask",
+         excluded: Iterable[str] = ()) -> tuple[Claim, int]:
+    """Plan and queue the claim's path as a requisition and record its uid; returns the claim and the
+    requisition's id. Running it is the caller's."""
+    claim, plan = plan_path(conn, definitions, registry, id, tools, params=params, defaults=defaults,
+                            on_collision=on_collision, excluded=excluded)
+    if not any(item.include for item in plan.items):
+        raise ClaimError("nothing in this plan is included")
     requisition_id = queue_plan(conn, plan, registry)
     uid = conn.execute("SELECT uid FROM requisition WHERE id = ?", (requisition_id,)).fetchone()[0]
     existing = claim.meta.get("requisitions")
