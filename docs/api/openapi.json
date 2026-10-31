@@ -7255,7 +7255,7 @@
               }
             ],
             "title": "As",
-            "description": "What the thing is in the place, e.g. prop; null for no role"
+            "description": "What the thing is in the place, e.g. prop; null or blank for no role"
           },
           "place": {
             "anyOf": [
@@ -7291,7 +7291,7 @@
               }
             ],
             "title": "Folder",
-            "description": "Where the output should go, as it was given: absolute, or relative to the place; null or blank is the place's default folder"
+            "description": "Where the output should go, as it was given: absolute, or relative to the place; null or blank is the place's default folder, which a walk also uses when the place's root is offline"
           },
           "milestone": {
             "anyOf": [
@@ -7315,7 +7315,7 @@
               }
             ],
             "title": "Created",
-            "description": "The day the claim was made, as an ISO date when the app wrote it; a hand edit can make it any text, and a value that is not text reads null"
+            "description": "The day the claim was made, as an ISO date when the app wrote it; a hand edit can make it any text (a number or bool reads as its text), and a list or map reads null"
           },
           "closed": {
             "anyOf": [
@@ -7327,7 +7327,7 @@
               }
             ],
             "title": "Closed",
-            "description": "The day the claim was closed, as an ISO date when the app wrote it; a hand edit can make it any text. Null while open, and also for a closed claim whose file holds something that is not text: read `turn` (none once closed) for open or closed"
+            "description": "The day the claim was closed, as an ISO date when the app wrote it; a hand edit can make it any text (a number or bool reads as its text). Null while open, and also for a closed claim whose file holds a list or map: read `turn` (none once closed) for open or closed"
           },
           "turn": {
             "type": "string",
@@ -7338,7 +7338,7 @@
               "none"
             ],
             "title": "Turn",
-            "description": "Whose move it is. you: the user's (`turn_line` says what). exchange: a requisition of the claim is queued or running in Exchange. build: no process takes the thing to the place yet, so one has to be built. none: the claim is closed"
+            "description": "Whose move it is. you: the user's (`turn_line` says what). exchange: a requisition of the claim is queued or running in Exchange. build: no process takes the thing to the place yet, so one has to be built (also when the place is not in the library: `path.problem` says so). none: the claim is closed"
           },
           "turn_line": {
             "type": "string",
@@ -7365,7 +7365,7 @@
             },
             "type": "array",
             "title": "Requisitions",
-            "description": "The requisitions the claim has walked, in the order its file lists them"
+            "description": "One per uid the file lists, in its order; an entry with a null `id` no longer resolves"
           }
         },
         "type": "object",
@@ -7397,7 +7397,7 @@
             },
             "type": "array",
             "title": "Claims",
-            "description": "Newest created first; a claim with no created date comes last"
+            "description": "Newest created first (a hand-written non-date `created` sorts as text); a claim with no created date comes last"
           },
           "problems": {
             "items": {
@@ -7425,7 +7425,7 @@
               "none"
             ],
             "title": "Status",
-            "description": "ready: a route can be walked now. not_ready: a chain exists and `process` names the first process that needs setup. none: no process takes the thing to the place; `problem` says why"
+            "description": "ready: a route can be walked now. not_ready: a chain exists and `process` names the first process that needs setup. none: no process takes the thing to the place, or the dossier or place is not in the library; `problem` says which"
           },
           "route": {
             "anyOf": [
@@ -7450,7 +7450,7 @@
             },
             "type": "array",
             "title": "Processes",
-            "description": "The chain in order; empty when there is none"
+            "description": "The chain in order (for route children, the processes of all the children's chains, each once); empty when there is none"
           },
           "process": {
             "anyOf": [
@@ -7606,7 +7606,7 @@
               }
             ],
             "title": "Uid",
-            "description": "Null when the file's entry is not text"
+            "description": "Null when the file's entry is a list or map; a number or bool reads as its text, and then `id` is null"
           },
           "id": {
             "anyOf": [
@@ -7707,7 +7707,7 @@
               }
             ],
             "title": "As",
-            "description": "What the thing is in the place, e.g. prop; null for no role"
+            "description": "What the thing is in the place, e.g. prop; null or blank for no role"
           },
           "place": {
             "anyOf": [
@@ -7743,7 +7743,7 @@
               }
             ],
             "title": "Folder",
-            "description": "Where the output should go, as it was given: absolute, or relative to the place; null or blank is the place's default folder"
+            "description": "Where the output should go, as it was given: absolute, or relative to the place; null or blank is the place's default folder, which a walk also uses when the place's root is offline"
           },
           "milestone": {
             "anyOf": [
@@ -7767,7 +7767,7 @@
               }
             ],
             "title": "Created",
-            "description": "The day the claim was made, as an ISO date when the app wrote it; a hand edit can make it any text, and a value that is not text reads null"
+            "description": "The day the claim was made, as an ISO date when the app wrote it; a hand edit can make it any text (a number or bool reads as its text), and a list or map reads null"
           },
           "closed": {
             "anyOf": [
@@ -7779,7 +7779,7 @@
               }
             ],
             "title": "Closed",
-            "description": "The day the claim was closed, as an ISO date when the app wrote it; a hand edit can make it any text. Null while open, and also for a closed claim whose file holds something that is not text: read `turn` (none once closed) for open or closed"
+            "description": "The day the claim was closed, as an ISO date when the app wrote it; a hand edit can make it any text (a number or bool reads as its text). Null while open, and also for a closed claim whose file holds a list or map: read `turn` (none once closed) for open or closed"
           },
           "turn": {
             "type": "string",
@@ -7790,7 +7790,7 @@
               "none"
             ],
             "title": "Turn",
-            "description": "Whose move it is. you: the user's (`turn_line` says what). exchange: a requisition of the claim is queued or running in Exchange. build: no process takes the thing to the place yet, so one has to be built. none: the claim is closed"
+            "description": "Whose move it is. you: the user's (`turn_line` says what). exchange: a requisition of the claim is queued or running in Exchange. build: no process takes the thing to the place yet, so one has to be built (also when the place is not in the library: `path.problem` says so). none: the claim is closed"
           },
           "turn_line": {
             "type": "string",
@@ -7825,7 +7825,7 @@
           "path"
         ],
         "title": "ClaimView",
-        "description": "A claim as the list shows it. A hand-edited file may hold any YAML, so the text fields read a\nscalar as its text and anything else as null."
+        "description": "A claim as the list shows it. A hand-edited file may hold any YAML, so the text fields read a\nstring as it is, a date as ISO, a number or bool as its text, and a list or map as null."
       },
       "ClassifyJob": {
         "properties": {
