@@ -74,7 +74,7 @@ In that order, one PR each: the blockers first. Each factory issue is filed once
 5. **Reading files during identification.** Reading 8,948 heads took 57 s on a cold disk, and it would run on every full scan. *Recommended:* accept it for the smaller set decision 4 leaves, about a third of them, and measure in the real-data check. Add a cache only if the measurement says so.
 6. **Luke's Exchange copies become things.** They're process files, and they'd show in the library like anything else. *Recommended:* accept it. They're real assets, and `exchange env config --ignore-add` hides them if they get in the way.
 7. **A folder outside a single-root place.** *Recommended:* the output joins the place, as above. The alternative, refusing such folders, would also have to catch an environment's own endpoint setting, and leaves the stray environment problem.
-8. **The factory's `job merge` refusal.** Auto mode refused it once in three jobs. *Recommended:* leave it. The permission is yours to change, and a refused job waits with its PR open for you to merge, which `job queue` now notices.
+8. **The factory's `job merge` refusal.** Auto mode refused it on two of the first four jobs. *Recommended:* leave it. The permission is yours to change, and a refused job waits with its PR open for you to merge, which `job queue` now notices.
 
 ## Not in this
 
