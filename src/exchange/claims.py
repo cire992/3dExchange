@@ -31,6 +31,7 @@ from exchange.requisitions.endpoints import configured_folder
 from exchange.requisitions.plan import (
     PlanError,
     _entries,
+    can_read,
     find_chains,
     for_role,
     grants,
@@ -257,7 +258,9 @@ def find_path(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Re
     """The claim's path: ``ready`` (a route that can be walked now), ``not_ready`` (a chain whose first
     non-ready process is named, with why) or ``none``. A product with no route of its own takes the
     routes of its children (route ``children``), as a requisition plans them. A copy never satisfies
-    a role. Never imports an untrusted package's code."""
+    a role. A chain is only offered from an entry its first process can read (see ``plan.py``), also in
+    the look past readiness, so a process that couldn't read the source is never named. Never imports
+    an untrusted package's code."""
     tools = tool_paths() if tools is None else tools
     meta = claim.meta
     role = _role(meta)
@@ -291,7 +294,8 @@ def find_path(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Re
         tags = repo.effective_tags(conn, uid)
         for entry in _entries(conn, uid):
             for chain in find_chains(registry, definitions, type_id, tags, entry["env_type"], env["type_id"],
-                                     tools, ready_only=False):
+                                     tools, ready_only=False,
+                                     first=lambda p, entry_id=entry["id"]: can_read(conn, p, entry_id)):
                 if role is not None and not grants(registry, chain, role):
                     continue
                 unready = next((p for p in chain if not ready(registry.packages[p], tools)), None)

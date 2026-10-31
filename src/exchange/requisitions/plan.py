@@ -7,7 +7,9 @@ from which of its entries, and the plan of a whole product.
 * **Routes:** if the target environment already holds the asset, it can be *copied* from that
   entry (the ``copy_entry`` process) instead of *converted* from another one.
 * **Chains:** with no direct process, processes are chained (up to three) when one's output
-  (dossier type, environment) is the next one's input, e.g. G2 → G8 → Skyrim.
+  (dossier type, environment) is the next one's input, e.g. G2 → G8 → Skyrim. A chain is only
+  offered from an entry its first process can read: the entry holds a live file of one of the
+  extensions the process declares (none declared: any). Copies and later processes aren't checked.
 * A **product** plans each of its children; children with no process are listed, unchecked.
 """
 
@@ -15,6 +17,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -79,11 +82,24 @@ def matches(package: ProcessPackage, definitions: DefinitionSet, type_id: str, t
     return target_env_type is None or out_env == target_env_type
 
 
+def can_read(conn: sqlite3.Connection, package: ProcessPackage, entry_id: int) -> bool:
+    """Whether the entry holds a live file (any role) with one of the extensions the package declares;
+    declaring none, any entry. From the manifest and the database alone: no package code runs."""
+    extensions = {e.casefold() for e in package.manifest.input_extensions}
+    if not extensions:
+        return True
+    rows = conn.execute("SELECT f.ext FROM entry_file ef JOIN file f ON f.id = ef.file_id"
+                        " WHERE ef.entry_id = ? AND f.state = 'present'", (entry_id,))
+    return any((ext or "").casefold() in extensions for ext, in rows)
+
+
 def find_chains(registry: Registry, definitions: DefinitionSet, type_id: str, tags: set[str],
                 source_env_type: str, target_env_type: str, tools: dict[str, str] | None = None,
-                *, ready_only: bool = True) -> list[list[str]]:
+                *, ready_only: bool = True, first: Callable[[ProcessPackage], bool] | None = None) -> list[list[str]]:
     """Ready process chains from (type, environment) to the target environment, shortest first.
-    ``ready_only=False`` searches every package, ready or not (from manifests alone)."""
+    ``ready_only=False`` searches every package, ready or not (from manifests alone). ``first`` says
+    whether a package can start a chain (it can read the source entry); a package it refuses is
+    skipped, so a longer chain is still found."""
     usable = [p for p in registry.packages.values()
               if p.id != COPY_PROCESS and (not ready_only or ready(p, tools))]
     found: list[list[str]] = []
@@ -94,6 +110,8 @@ def find_chains(registry: Registry, definitions: DefinitionSet, type_id: str, ta
             for package in usable:
                 if package.id in chain or not matches(package, definitions, current_type, tags, current_env, None,
                                                       check_tags=not chain):
+                    continue
+                if not chain and first is not None and not first(package):
                     continue
                 m = package.manifest
                 out_env = current_env if m.output_environment == "same" else m.output_environment
@@ -129,7 +147,8 @@ def routes(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Regis
                 out.append({"route": "copy", "processes": [COPY_PROCESS], "source_entry_id": entry["id"],
                             "source": label})
         for chain in find_chains(registry, definitions, dossier["type_id"], tags, entry["env_type"],
-                                 target["type_id"], tools):
+                                 target["type_id"], tools,
+                                 first=lambda p, entry_id=entry["id"]: can_read(conn, p, entry_id)):
             out.append({"route": "convert", "processes": chain, "source_entry_id": entry["id"], "source": label})
     return out
 

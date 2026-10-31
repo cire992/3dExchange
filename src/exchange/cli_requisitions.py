@@ -137,7 +137,7 @@ def _processes(args, definitions) -> int:
         status = check_prerequisites(package)
         data = {"id": m.id, "name": m.name, "version": m.version, "author": m.author, "trusted": package.trusted,
                 "input": {"dossier_types": m.input_types, "tags": m.input_tags, "environments": m.input_environments,
-                          "artifact": m.input_artifact},
+                          "artifact": m.input_artifact, "extensions": m.input_extensions},
                 "output": {"environment": m.output_environment, "dossier_type": m.output_dossier_type,
                            "folder": m.output_folder},
                 "parameters": [{"id": p.id, "type": p.type, "default": p.default} for p in m.parameters],
@@ -146,6 +146,7 @@ def _processes(args, definitions) -> int:
         lines = [f"{m.name} {m.version} ({m.id}) by {m.author or '?'}{'' if package.trusted else '  [not trusted]'}",
                  f"  takes {', '.join(m.input_types) or 'any asset'} ({m.input_artifact})"
                  f"{' tagged ' + ', '.join(m.input_tags) if m.input_tags else ''}"
+                 f"{' reading ' + ', '.join(m.input_extensions) if m.input_extensions else ''}"
                  f" → {m.output_environment} {m.output_dossier_type}".rstrip(),
                  "  steps: " + " → ".join(s.operation for s in m.steps)]
         lines += [f"  option {p.id} ({p.type}) = {p.default!r}" for p in m.parameters]
