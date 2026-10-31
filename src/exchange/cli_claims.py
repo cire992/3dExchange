@@ -53,7 +53,8 @@ def _line(claim: claims.Claim, turn: str) -> str:
 
 
 def _add(args, conn, definitions, registry) -> int:
-    claim = claims.new(conn, _uid(conn, args.uid), args.env, role=args.role, folder=args.folder, note=args.note)
+    claim = claims.new(conn, _uid(conn, args.uid), args.env, role=args.role, folder=args.folder, note=args.note,
+                       definitions=definitions)
     _emit(args, claims.describe(conn, definitions, registry, claim),
           f"Claimed {claim.meta['thing_name']} for {claim.meta['place_name']}: {claim.id} ({claim.milestone})"
           f"\nFile: {claim.path}")
