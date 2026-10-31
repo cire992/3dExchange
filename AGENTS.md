@@ -91,6 +91,24 @@ its contract, `docs/api/openapi.json`) and the CLI. To exercise a change:
   e.g. `.venv/Scripts/python -m exchange scan tests/fixtures/envs/loose_files --db "$TMP/look.db"`
   (with `PYTHONPATH=src`, from the worktree), then the command being changed.
 
+## Checks on real data
+
+These are done by hand, never by the factory: its agents don't touch real libraries. Don't scan
+the whole real Daz library unless the change is to scanning at that scale (3.56M files: about 10
+minutes without enrichment, hours with it). Build a sample library in scratch instead: a few real
+products with their DIM manifests, scanned in seconds by the same code.
+
+```bash
+PYTHONPATH=src .venv/Scripts/python scripts/sample_library.py "<library>" --list "genesis 9"
+PYTHONPATH=src .venv/Scripts/python scripts/sample_library.py "<library>" "$TMP/sample" \
+    --product "<name>" --random 5 --file "People/Genesis 9/<saved file>.duf"
+EXCHANGE_DATA_DIR="$TMP/data" .venv/Scripts/exchange scan "$TMP/sample" --db "$TMP/data/library.db"
+```
+
+It says how many of each product's files it found: `--product` takes what's still at the listed
+paths, `--random` only whole products, and `--file` adds files that moved or that no manifest lists.
+Set `EXCHANGE_DATA_DIR` to scratch too, so claims don't reach the real data folder.
+
 ## Software factory
 
 `/factory run` builds every open GitHub issue labeled `factory` through

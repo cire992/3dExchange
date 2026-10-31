@@ -34,6 +34,29 @@ Exchange is refocused on one loop: **Exchange notices a thing → Luke claims it
 
 **Between the repositories:** this repository owns the service API and the Exchange MCP; the shell consumes them. The API's schema (`docs/api/openapi.json`) is the contract between the two, and changes to it are noted in both handoff docs.
 
+## R3c: claims on real data (2026-10-31)
+
+Claims work on real content: a real product walked from Claimed to Installed, and so did a real mesh through Blender. The check also found four problems, two of them in the way of the first proof. None is fixed yet.
+
+**How:** on a sample library, built by `scripts/sample_library.py` (see `AGENTS.md`), not a scan of the real one. A full scan with enrichment ran 1 h 43 min without finishing and was stopped. The sample was three real products with their DIM manifests, a hand-installed character and three files Luke saved: 353 files, 369 MB, scanned with enrichment in 27 s. Claims, database and endpoints all lived in scratch, and the real library and data folder were not touched.
+
+| Claim | Path | Result |
+| --- | --- | --- |
+| *Pickup Truck 1930* (product) → Daz Studio, a scratch folder | copy | **Installed** in 1.3 s: 6 of 6 items, 39 files, 19 MB |
+| Its OBJ, loose → a folder inside the place | Convert mesh | **Installed** in 4.0 s (a 12 MB GLB) |
+| Its OBJ, loose → a folder outside the place | Convert mesh | The GLB is right, but the claim stops at Converted (problem 3) |
+| *PickUpFAA* (its `daz_prop`) → Daz Studio | Convert mesh | Failed: said `ready`, then "no mesh file" (problem 4) |
+| *Krow HD for Genesis 9* as `g8f_character` → Daz Studio | copy | Says "Walk it" (problem 1) |
+
+`claim add`, `list` and `show` each take about 0.6 s, nearly all of it Python starting. A failed run did what the design says: the failure came back as the claim's turn line.
+
+**The problems:**
+
+1. **A role is ignored on a copy route** (`claims.py`, `find_path`). A claim "as `g8f_character`" on a G9 character reads `ready` by copy instead of `build`: walking it would copy a G9 character and call it Installed. This is the first proof's own claim. The issue asked for it ("a copy route is a path too") and `test_the_role_filter_keeps_one_chain_and_drops_another` pins it, so the fix changes that test.
+2. **Saved files aren't noticed** (`scanner/layers/daz.py`, `_folder_products`). RESTART_PLAN's decision 8 asked this. An installed G9 character is noticed (*Krow*: a product and 11 children), and so is a saved subset in a folder of its own (*TFD Dia*), but anything under `People/` shallower than four folders is "too shallow to be one product". The Exchange copies Luke saved (`People/Genesis 9/Genesis 9 Exchange.duf`, a `character`, and the G8 ones, `scene_subset`) are unattached files. So is anything saved to `People/<figure>/Characters/`. Across the library that rule skips 1,380 `.duf` files no manifest lists: 277 `character` and 133 `scene_subset` among them, so a fix adds hundreds of dossiers, not thousands.
+3. **A folder outside a single-root place never reaches Installed** (`runner.py`, `_rescan`). The endpoint becomes a new environment, so the claim's place never holds the output, and its turn line wrongly says "the place no longer holds what requisition 3 wrote". Daz Studio gathers roots, so it doesn't happen there.
+4. **`ready` doesn't mean a process can run.** Convert mesh's input is matched by dossier type, and a `daz_prop` matches, but its entry holds a `.cr2`: the OBJ is a support file of the product. So R3_PLAN's check, Convert mesh on a Daz product, can't be done, which is why the OBJ was walked loose. R6's path goes through the Daz Studio bridge, so it doesn't depend on this.
+
 ## Where we are
 
 **Phases 1-3, 4a-4c, phase 6 up to 6i, phase 7 part 1 and R1 are merged.** R2 (6j) is done: R2a (#30) closed the parity gaps `PARITY_CHECKLIST.md` lists, Luke signed the checklist off on 2026-10-29 (R2b), and the PySide6 window is removed in R2c. R3a and R3b are merged; R3c, the check on real data, is next.
@@ -563,7 +586,7 @@ The formats and rules are in `docs/PROJECT_HOME.md` (*Gap claims*, *Triage*, *Fa
 
     Nothing in a real environment is written to.
   - **Apps with windows:** Blender runs headless and can be checked any time. Daz Studio opens a window and may stop on a prompt, so it is only launched while the user is at the computer.
-  - **A full real scan takes about 10 minutes;** the 3a slowdowns only showed at that size, so run one before a PR that touches scanning.
+  - **A full real scan takes about 10 minutes without enrichment, and hours with it** (R3c: stopped after 1 h 43 min); the 3a slowdowns only showed at that size, so run one (`--no-enrich`) before a PR that touches scanning. For anything else, use a sample library (`AGENTS.md`).
 - **Constraints from the kickoff:**
   - Windows and Python 3.11+, using `pathlib`.
   - Scanning is strictly read-only.
