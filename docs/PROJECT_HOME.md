@@ -233,9 +233,9 @@ stops resolving, its hint finds candidates among the live dossiers, by:
 
 ## Triage
 
-`exchange claims list [--status S] [--source S] [--target ID] [--new] [--json]` lists claims;
-`*` marks those waiting in triage (`triage: new`). `exchange claims ack ID…` (or `--all`) sets
-`triage: seen`.
+`exchange project claims list [--status S] [--source S] [--target ID] [--new] [--json]` lists
+claims; `*` marks those waiting in triage (`triage: new`). `exchange project claims ack ID…` (or
+`--all`) sets `triage: seen`.
 
 ## Fast capture
 

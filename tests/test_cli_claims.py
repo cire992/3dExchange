@@ -113,9 +113,13 @@ def test_close(capsys, lib):
     assert path.read_bytes() == before
 
 
-def test_the_frozen_claims_command_still_parses(capsys):
-    for command in ("claims", "claim"):
+def test_the_frozen_claims_commands_live_under_project(capsys):
+    for command in (["project", "claims"], ["claim"]):
         with pytest.raises(SystemExit) as exit_:
-            main([command, "--help"])
+            main([*command, "--help"])
         assert exit_.value.code == 0
         capsys.readouterr()
+    with pytest.raises(SystemExit) as exit_:
+        main(["claims", "list"])
+    assert exit_.value.code == 2
+    assert "invalid choice" in capsys.readouterr().err

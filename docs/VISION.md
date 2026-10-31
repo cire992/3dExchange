@@ -102,7 +102,7 @@ Checked 2026-10-28 against GitHub: core `main` at #27, shell `main` at #13, with
 | Build the path | The Chats window | Hand to agent, the Exchange MCP |
 | Landed | Requisitioned ledger entries, sidecars | Nothing |
 
-**Off the loop and frozen:** `exchange.projects` (about 1,900 lines: project home formats, record schemas, validation, gap claims, `exchange capture`, `exchange claims`) and the shell's checkpoint before bypassed chats (7c). They keep their tests and keep working; nothing new is built on them.
+**Off the loop and frozen:** `exchange.projects` (about 1,900 lines: project home formats, record schemas, validation, gap claims, `exchange capture`, `exchange project claims`) and the shell's checkpoint before bypassed chats (7c). They keep their tests and keep working; nothing new is built on them.
 
 ## Decisions
 

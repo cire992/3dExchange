@@ -53,7 +53,7 @@ TRANSITIONS = {
     "build": {"gate", "needs-human"},
     "gate": {"review", "build", "needs-human"},
     "review": {"approve", "build", "needs-human"},
-    "approve": {"merging", "needs-human"},
+    "approve": {"merging", "merged", "needs-human"},
     "merging": {"merged", "needs-human"},
     "needs-human": {"build", "merged"},
 }
@@ -463,6 +463,9 @@ def advance(job, stage):
             else:
                 next_round(job)
 
+    elif old == "approve" and stage == "merged":  # merged by hand
+        require(job["pr"] and pr_state(job) == "MERGED", "the PR isn't merged")
+
     elif old == "approve":
         want = "APPROVE" if stage == "merging" else "ESCALATE"
         line = first_line(d / "decision.md")
@@ -539,9 +542,9 @@ def cmd_create(number):
 def cmd_queue():
     jobs = {j["issue"]: j for j in all_jobs()}
     rows = []
-    # A needs-human job is done once its PR is merged on GitHub, which also closes the issue.
+    # A job waiting on a merge is done once its PR is merged on GitHub, which also closes the issue.
     for j in jobs.values():
-        if j["stage"] == "needs-human" and j["pr"] and pr_state(j) == "MERGED":
+        if j["stage"] in {"approve", "needs-human"} and j["pr"] and pr_state(j) == "MERGED":
             save(advance(sync(j), "merged"))
     issues = gh_json("issue", "list", "--label", LABELS["queue"], "--state", "open",
                      "--limit", "200", "--json", "number,title")
