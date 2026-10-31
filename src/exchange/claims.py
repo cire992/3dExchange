@@ -120,9 +120,10 @@ def _latest(conn: sqlite3.Connection, meta: dict[str, Any]) -> sqlite3.Row | Non
 
 def _derive(conn: sqlite3.Connection, meta: dict[str, Any]) -> str:
     """The least advanced of the walked subjects (the thing, or a product's children), each
-    ``installed`` (its entry sits in the place, written by one of the claim's requisitions),
-    ``converted`` (the latest requisition's item is done) or ``acquired``/``claimed`` (the
-    dossier has an entry that is not retired, or not)."""
+    ``installed`` (its entry sits in the place on an online root, written by one of the claim's
+    requisitions: a place holds only what is on an online root), ``converted`` (the latest
+    requisition's item is done) or ``acquired``/``claimed`` (the dossier has an entry that is not
+    retired, or not)."""
     thing = str(meta.get("thing"))
     base = "acquired" if _live(conn, thing) else "claimed"
     latest = _latest(conn, meta)
@@ -140,7 +141,8 @@ def _derive(conn: sqlite3.Connection, meta: dict[str, Any]) -> str:
     for subject in subjects:
         installed = place is not None and conn.execute(
             "SELECT 1 FROM entry e JOIN ledger l ON l.id = e.ledger_id JOIN dossier d ON d.id = l.dossier_id"
-            f" WHERE d.uid = ? AND e.status != 'retired' AND l.environment_id = ?"
+            " JOIN container c ON c.id = e.container_id JOIN environment_root r ON r.id = c.root_id"
+            f" WHERE r.status = 'online' AND d.uid = ? AND e.status != 'retired' AND l.environment_id = ?"
             f" AND e.requisition_id IN ({', '.join('?' * len(ids))}) LIMIT 1",
             (subject["dossier_uid"], place["id"], *ids)).fetchone()
         milestone = "installed" if installed else "converted" if subject["state"] == "done" else base
@@ -335,8 +337,9 @@ def find_path(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Re
 
 def _unread_folder(conn: sqlite3.Connection, meta: dict[str, Any], latest: sqlite3.Row) -> tuple[str, str] | None:
     """``(folder, place name)`` when a fulfilled requisition's output was seen by a scan of the place and
-    is still there, yet no entry in the place carries the requisition: the place's layer doesn't read
-    that folder. None otherwise (not scanned since, or the output is gone)."""
+    is still there on an online root, yet no entry in the place carries the requisition: the place's
+    layer doesn't read that folder. None otherwise (not scanned since, or the output is gone or on an
+    offline root)."""
     place = conn.execute("SELECT id, name FROM environment WHERE uid = ?", (str(meta.get("place")),)).fetchone()
     if place is None or latest["state"] != "fulfilled":
         return None
@@ -348,7 +351,7 @@ def _unread_folder(conn: sqlite3.Connection, meta: dict[str, Any], latest: sqlit
                               " AND removed_at IS NULL", (latest["id"],)):
         path = Path(write["path"]).resolve()
         for root in roots:
-            if is_within(path, Path(root["path"])) and conn.execute(
+            if root["status"] == "online" and is_within(path, Path(root["path"])) and conn.execute(
                     "SELECT 1 FROM file WHERE root_id = ? AND rel_key = ? AND state != 'gone'",
                     (root["id"], fold(path.relative_to(Path(root["path"]).resolve()).as_posix()))).fetchone():
                 endpoint = conn.execute("SELECT endpoint FROM requisition WHERE id = ?", (latest["id"],)).fetchone()

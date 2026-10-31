@@ -105,7 +105,8 @@ Claims work on real content: a real product walked from Claimed to Installed, an
 | R3d-2 | Saved characters, subsets and wearables become things: their file says what they are (#41) | merged (#42) |
 | R3d-3 | `ready` means a process has a file it can read: an optional `[input] extensions` in process manifests (#43) | merged (#44) |
 | R3d-4 | Endpoints stay in their place: a folder outside a place joins it as a root, and a claim's relative folder can't leave it (#45) | merged (#47) |
-| R3d-5 | A joined folder can be forgotten on its own (`env forget --root`), and can't retype its place (#48) | in review |
+| R3d-5 | A joined folder can be forgotten on its own (`env forget --root`), and can't retype its place (#48) | merged (#50) |
+| R3d-6 | A place holds only what's on an online root: output on an offline or deleted root reads Converted, and Installed again when the root is back (#49) | in review |
 
 ## Phase 6: Service and Workspace
 
