@@ -1,5 +1,5 @@
 """Project homes on the command line (Roadmap phase 7): ``exchange project`` (create, validate,
-checkpoint, config), ``exchange capture`` and ``exchange claims``."""
+checkpoint, config, claims) and ``exchange capture``."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from exchange.projects.home import KINDS, find_home, init_home, load_home, read_
 from exchange.projects.schema import maturity_value
 from exchange.projects.validate import CLAIM_SOURCES, CLAIM_STATUSES, validate_home, write_hints
 
-COMMANDS = ("project", "capture", "claims")
+COMMANDS = ("project", "capture")
 
 
 def _chosen(p: argparse.ArgumentParser) -> None:
@@ -72,8 +72,8 @@ def add_parsers(commands, common: argparse.ArgumentParser) -> None:
     grab.add_argument("--goal", metavar="G1", help="the goal an idea claim serves")
     grab.add_argument("--maturity", default="sketch", help="a new record's maturity (default: sketch)")
 
-    claims = commands.add_parser("claims", help="list claims, or acknowledge new ones")
-    claim_actions = claims.add_subparsers(dest="action", required=True)
+    claims = actions.add_parser("claims", help="list the project's claims, or acknowledge new ones")
+    claim_actions = claims.add_subparsers(dest="claims_action", required=True)
     listing = claim_actions.add_parser("list", parents=[common], help="list the project's claims")
     _chosen(listing)
     listing.add_argument("--status", choices=CLAIM_STATUSES, action="append")
@@ -93,9 +93,9 @@ def _emit(args, data, text: str) -> None:
 def run(args, definitions) -> int:
     if args.command == "capture":
         return _capture(args)
-    if args.command == "claims":
-        return _claims(args)
     action = args.action
+    if action == "claims":
+        return _claims(args)
     if action == "init":
         home, warnings = init_home(args.path, name=args.name, kind=args.kind, git=not args.no_git)
         text = f"Created the project home {home.name} ({home.kind}) in {home.path}"
@@ -185,7 +185,7 @@ def _capture(args) -> int:
 def _claims(args) -> int:
     home = resolve_project(args.project)
     report = validate_home(home, db_path=None, processes=set())
-    if args.action == "ack":
+    if args.claims_action == "ack":
         if not args.ids and not args.all:
             raise ExchangeError("name the claims to acknowledge, or pass --all")
         done = acknowledge(home, report, None if args.all and not args.ids else args.ids)

@@ -10,7 +10,7 @@ Exchange is refocused on one loop: **Exchange notices a thing → Luke claims it
 
 **What changes:**
 - **The UI.** The shell's Workspace carries the loop. The PySide6 window gets no new features and is removed at 6j.
-- **Game data is frozen.** `exchange.projects` (7a, 7b) and the shell's checkpoint (7c) stay as they are, with their tests; nothing new is built on them. Phase 7 part 2 and the benchmark (phase 9) are cancelled. In R3, `exchange claims list/ack` move to `exchange project claims list/ack`.
+- **Game data is frozen.** `exchange.projects` (7a, 7b) and the shell's checkpoint (7c) stay as they are, with their tests; nothing new is built on them. Phase 7 part 2 and the benchmark (phase 9) are cancelled. Its `exchange claims list/ack` moved to `exchange project claims list/ack` in R3.
 - **Claims** now mean the loop's claims: intent for one asset, with milestones (Claimed → Acquired → Converted → Installed → In play). They are new work (R3-R5).
 - **Agents.** The Chats window stays as it is. Phase 8 shrinks to the second proof: Hand to agent (a brief opened in a chat) and a small Exchange MCP.
 - **Vocabulary.** A *process* is one automated chain; a *path* is a claim's whole route.
@@ -36,7 +36,7 @@ Exchange is refocused on one loop: **Exchange notices a thing → Luke claims it
 
 ## Where we are
 
-**Phases 1-3, 4a-4c, phase 6 up to 6i, phase 7 part 1 and R1 are merged.** R2 (6j) is done: R2a (#30) closed the parity gaps `PARITY_CHECKLIST.md` lists, Luke signed the checklist off on 2026-10-29 (R2b), and the PySide6 window is removed in R2c. R3 is next.
+**Phases 1-3, 4a-4c, phase 6 up to 6i, phase 7 part 1 and R1 are merged.** R2 (6j) is done: R2a (#30) closed the parity gaps `PARITY_CHECKLIST.md` lists, Luke signed the checklist off on 2026-10-29 (R2b), and the PySide6 window is removed in R2c. R3a and R3b are merged; R3c, the check on real data, is next.
 
 - **Stacked PRs:** after merging one, change the next PR's base to `main` before merging it (or delete the merged branch, and GitHub moves it). This has gone wrong three times: #11 and #12 needed #13 to reach `main`, #26 needed #27, and the shell's #14 needed its #16. Turning on *Automatically delete head branches* (Settings › General › Pull Requests, in both repositories) makes GitHub retarget them by itself; until then, prefer branching from `main`.
 
@@ -72,9 +72,10 @@ Exchange is refocused on one loop: **Exchange notices a thing → Luke claims it
 | #28 | This doc after 6g | merged |
 | #29 | R1, the restart: VISION.md and RESTART_PLAN.md, old docs archived, this doc around the loop | merged |
 | R2a | 6j's parity gaps (with Exchange-Shell's R2a): each file in a dossier's detail carries `root` and `key`, its file ref, so the Workspace's drop menu can link one asset's files onto another | merged (#30) |
-| R2c | 6j's end: the PySide6 window removed (its package and tests, the `ui` extra, the PySide6 and Qt test dependencies, the window's entry point) | in review |
-| R3a | Claims core, part 1: claim files in `<data>/claims/`, Claimed and Acquired, `exchange claim add / list / show / close` (#34) | in review |
-| R3b | Claims core, part 2: claim paths by role and place, whose turn, `exchange claim walk [--run]`, Converted and Installed (#36) | in review |
+| R2c | 6j's end: the PySide6 window removed (its package and tests, the `ui` extra, the PySide6 and Qt test dependencies, the window's entry point) | merged (#33) |
+| R3a | Claims core, part 1: claim files in `<data>/claims/`, Claimed and Acquired, `exchange claim add / list / show / close` (#34) | merged (#35) |
+| R3b | Claims core, part 2: claim paths by role and place, whose turn, `exchange claim walk [--run]`, Converted and Installed (#36) | merged (#37) |
+| R3 | The frozen slice's `exchange claims list/ack` moved to `exchange project claims list/ack`, no alias; the R3 plan committed | in review |
 
 ## Phase 6: Service and Workspace
 
@@ -457,7 +458,7 @@ Decisions:
    - a dropped gap claim is never reopened
    - a gap that returns after its claim was done opens a new claim linked to the old one
 8. **Gaps that get fixed:** validation moves the claim to `review` with a dated note, never to done.
-9. **Triage:** gap claims carry `triage: new` until `exchange claims ack` clears it (until the
+9. **Triage:** gap claims carry `triage: new` until `exchange project claims ack` clears it (until the
    triage inbox view exists).
 10. **Fast capture:** `exchange capture "<line>"`. A line starting with an editor ID
     (`NPC_DockMaster: gruff harbormaster…`) creates a Sketch record; any other line creates an
@@ -532,7 +533,7 @@ The formats and rules are in `docs/PROJECT_HOME.md` (*Gap claims*, *Triage*, *Fa
   - relink claims, when there is no library to check against
 - **Relink candidates** come from the hint, by the same file hash, product key, or name and type,
   among live dossiers that are not merge aliases.
-- **`exchange capture`** (`projects/capture.py`) and **`exchange claims list` / `ack`**.
+- **`exchange capture`** (`projects/capture.py`) and **`exchange project claims list` / `ack`**.
 - **Fixed on the way:** `frontmatter.dump` wrote a mapping holding only plain values as one flow
   line (`{id: NPC_A, maturity: 0}`). It now writes a line per key.
 - **Tests:** `tests/test_gap_claims.py` (11). The suite is at 265.

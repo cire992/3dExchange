@@ -226,13 +226,13 @@ def test_capture_claims_and_ack_on_the_command_line(docks, capsys, monkeypatch):
     assert frontmatter.read(docks.records_dir / "LOT_" / "LOT_Office.md").meta["maturity"] == 1
     assert main(["project", "validate"]) == 1  # LOT_Office is Spec without its 'within'
     capsys.readouterr()
-    assert main(["claims", "list", "--new", "--json"]) == 0
+    assert main(["project", "claims", "list", "--new", "--json"]) == 0
     rows = json.loads(capsys.readouterr().out)
     assert [r["id"] for r in rows] == ["%s-spec-lot-salt-row-cantina" % dt.date.today().isoformat()]
-    assert main(["claims", "ack"]) == 2
+    assert main(["project", "claims", "ack"]) == 2
     assert "pass --all" in capsys.readouterr().err
-    assert main(["claims", "ack", "--all"]) == 0
+    assert main(["project", "claims", "ack", "--all"]) == 0
     assert "Acknowledged 1 claims" in capsys.readouterr().out
-    assert main(["claims", "list", "--new"]) == 0
+    assert main(["project", "claims", "list", "--new"]) == 0
     assert capsys.readouterr().out.strip() == "No claims."
     assert main(["capture", "x", "--maturity", "final"]) == 2
