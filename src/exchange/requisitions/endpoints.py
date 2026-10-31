@@ -74,20 +74,32 @@ def configured_folder(setting, handler: str, first: Path, layer: dict) -> Path |
     return folder if folder.is_absolute() else first.joinpath(*folder.as_posix().split("/"))
 
 
+def place_root(conn: sqlite3.Connection, definitions: DefinitionSet | None, env: sqlite3.Row) -> Path | None:
+    """The root a place writes through, or None when it isn't online. A single-root type writes through
+    its first root (as ``scan`` treats it) whatever its status: a folder that joined the place is never a
+    fallback for it. A ``multi_root`` type (Daz content directories) uses its first online root."""
+    definition = definitions.environments.get(env["type_id"]) if definitions is not None else None
+    roots = repo.list_roots(conn, env["id"])
+    if not (definition and definition.multi_root):
+        roots = roots[:1]
+    online = [r for r in roots if r["status"] == "online"]
+    return Path(online[0]["path"]) if online else None
+
+
 def default_endpoint(conn: sqlite3.Connection, definitions: DefinitionSet, environment_id: int,
                      name: str, folder: str | Path | None = None) -> Endpoint:
     """The endpoint a requisition named ``name`` writes to in an environment (or ``folder``)."""
     env = repo.get_environment(conn, environment_id)
     if env is None:
         raise EndpointError(f"no environment {environment_id}")
-    roots = [r for r in repo.list_roots(conn, environment_id) if r["status"] == "online"]
-    if not roots:
+    first = place_root(conn, definitions, env)
+    if first is None:
         raise EndpointError(f"{env['name']} has no online folder to write to")
+    roots = [r for r in repo.list_roots(conn, environment_id) if r["status"] == "online"]
     config = json.loads(env["user_config"] or "{}")
     visibility = config.get("visibility", "personal")
     definition = definitions.environments.get(env["type_id"])
     handler = definition.handler if definition else "folder"
-    first = Path(roots[0]["path"])
 
     layer = json.loads(env["layer_config"] or "{}")
     chosen = Path(folder) if folder else configured_folder(config.get("endpoint"), handler, first, layer)

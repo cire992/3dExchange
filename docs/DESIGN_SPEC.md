@@ -127,6 +127,8 @@ Every writable environment has at least one endpoint. Endpoints carry a **visibi
 
 A **target** is an endpoint registered by a project: the Unreal project it builds, or the MO2 mod folders it ships. A target is also an environment (or a container inside one), so it is scanned like any other. That means a project's asset list needs no separate file: it is the ledger entries in its targets plus the needs of its claims.
 
+An endpoint folder outside the environment's roots (a requisition's chosen folder, a claim's absolute folder, or the environment's `endpoint` setting) joins that requisition's environment as a root, whatever its type, instead of becoming a new environment; a folder that is already a root keeps the environment it has. Entries appear only for what that environment's layer indexes, so output outside MO2's `mods/` or Unreal's `Content/` stays on disk with no entry. A claim walked to such a folder, absolute or inside the root, stops at Converted, and its turn line says that the place doesn't read that folder and to choose one it reads. A place of a single-root type writes only through its first root, whatever its status: when that root is offline, writing to the place is refused, and a folder that joined it is never a fallback (a `multi_root` type uses any online root).
+
 ## Scanning and indexing
 
 Scanning runs in three phases so product bricks appear within minutes and detail fills in afterward in the background.

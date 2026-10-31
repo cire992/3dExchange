@@ -81,3 +81,4 @@ In that order, one PR each: the blockers first. Each factory issue is filed once
 - Claiming the outfit out of a saved character (anecdote 3 in VISION.md): that needs a subset split into its parts, and a process to do it. R3d-2 only makes the subset a thing.
 - `claim show` printing `path:` as a raw dict: R4's API is where this gets its real shape.
 - The first-time scan of the real library into Exchange's default database, which is empty today. That's Luke's to run, before R7.
+- What a claim says when its place already holds the thing. With no role and no folder, a claim reads `ready` by copy, and walking it writes a duplicate and says Installed. The honest answer is "it's already there". That belongs with how claims read in R4 and R5.

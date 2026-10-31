@@ -111,9 +111,13 @@ def set_root_offline(conn: sqlite3.Connection, root_id: int) -> str:
 
 
 def finish_root_scan(conn: sqlite3.Connection, root_id: int, environment_id: int,
-                     layer_config: Mapping[str, Any]) -> None:
+                     layer_config: Mapping[str, Any] | None) -> None:
+    """Stamp the scan; ``layer_config`` None leaves the environment's as it is."""
     stamp = now()
     conn.execute("UPDATE environment_root SET last_scanned_at = ? WHERE id = ?", (stamp, root_id))
+    if layer_config is None:
+        conn.execute("UPDATE environment SET last_scanned_at = ? WHERE id = ?", (stamp, environment_id))
+        return
     conn.execute(
         "UPDATE environment SET layer_config = ?, last_scanned_at = ? WHERE id = ?",
         (to_json(dict(layer_config)), stamp, environment_id),

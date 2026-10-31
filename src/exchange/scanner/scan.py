@@ -341,7 +341,9 @@ class _Session:
                 user_ignore=tuple(config.get("ignore", ())), threshold=self.threshold,
             )
             report.identification = stats
-            repo.finish_root_scan(conn, root_id, env["id"], stats.layer_config)
+            # a root that joined a single-root environment (an endpoint outside it) leaves its settings alone
+            first = definition.multi_root or root_id == repo.list_roots(conn, env["id"])[0]["id"]
+            repo.finish_root_scan(conn, root_id, env["id"], stats.layer_config if first else None)
             repo.finish_scan(conn, scan_id, phase=2, seen=len(present), new=report.new,
                              changed=report.changed, gone=report.gone,
                              unattached=stats.unattached_files)

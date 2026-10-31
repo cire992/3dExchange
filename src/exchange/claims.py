@@ -15,6 +15,7 @@ every read and never written.
 from __future__ import annotations
 
 import datetime as dt
+import json
 import re
 import sqlite3
 from dataclasses import dataclass, field
@@ -24,10 +25,10 @@ from typing import Any
 from exchange.db import repository as repo
 from exchange.definitions.schema import DefinitionSet
 from exchange.errors import ExchangeError
-from exchange.paths import data_dir
+from exchange.paths import data_dir, fold, is_within
 from exchange.processes.registry import ProcessPackage, Registry, check_prerequisites, ready, tool_paths, validate
 from exchange.projects import frontmatter
-from exchange.requisitions.endpoints import configured_folder
+from exchange.requisitions.endpoints import configured_folder, place_root
 from exchange.requisitions.plan import (
     PlanError,
     _entries,
@@ -147,8 +148,32 @@ def _derive(conn: sqlite3.Connection, meta: dict[str, Any]) -> str:
     return MILESTONES[least]
 
 
+def _claim_folder(conn: sqlite3.Connection, definitions: DefinitionSet | None, folder: object, env_id: int,
+                  place_name: str) -> str | None:
+    """The folder a claim writes to: absolute as is, relative to the root the place writes through
+    (``place_root``); None for the default (no folder, a blank one, or that root not online). A relative folder that leaves the
+    root, or names a drive, is refused: an absolute one is the user's explicit choice."""
+    if not isinstance(folder, str) or not folder.strip():
+        return None
+    text = folder.strip()
+    if Path(text).is_absolute():
+        return str(Path(text))
+    refusal = ClaimError(f"the folder {folder} leaves {place_name}: a relative folder must stay inside the place;"
+                         " give an absolute one to write elsewhere")
+    if Path(text).drive:
+        raise refusal
+    root = place_root(conn, definitions, repo.get_environment(conn, env_id))
+    if root is None:
+        return None
+    chosen = configured_folder(text, "", root, {})
+    if not is_within(chosen, root):
+        raise refusal
+    return str(chosen)
+
+
 def new(conn: sqlite3.Connection, uid: str, env_id: int, *, role: str | None = None,
-        folder: str | None = None, note: str = "", today: dt.date | None = None) -> Claim:
+        folder: str | None = None, note: str = "", today: dt.date | None = None,
+        definitions: DefinitionSet | None = None) -> Claim:
     today = today or dt.date.today()
     thing = conn.execute("SELECT uid, name FROM dossier_effective WHERE uid = ?", (uid,)).fetchone()
     if thing is None:
@@ -156,6 +181,7 @@ def new(conn: sqlite3.Connection, uid: str, env_id: int, *, role: str | None = N
     place = conn.execute("SELECT uid, name FROM environment WHERE id = ?", (env_id,)).fetchone()
     if place is None:
         raise ClaimError(f"no environment {env_id} in the library")
+    _claim_folder(conn, definitions, folder, env_id, place["name"])
     path = _new_path(today, thing["name"])
     meta = {"id": path.stem, "thing": thing["uid"], "thing_name": thing["name"], "as": role,
             "place": place["uid"], "place_name": place["name"], "folder": folder, "requisitions": [],
@@ -307,6 +333,29 @@ def find_path(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Re
     return result("none", problem=f"no process takes it to {env['name']}" + (f" as {meta['as']}" if role else ""))
 
 
+def _unread_folder(conn: sqlite3.Connection, meta: dict[str, Any], latest: sqlite3.Row) -> tuple[str, str] | None:
+    """``(folder, place name)`` when a fulfilled requisition's output was seen by a scan of the place and
+    is still there, yet no entry in the place carries the requisition: the place's layer doesn't read
+    that folder. None otherwise (not scanned since, or the output is gone)."""
+    place = conn.execute("SELECT id, name FROM environment WHERE uid = ?", (str(meta.get("place")),)).fetchone()
+    if place is None or latest["state"] != "fulfilled":
+        return None
+    if conn.execute("SELECT 1 FROM entry e JOIN ledger l ON l.id = e.ledger_id WHERE l.environment_id = ?"
+                    " AND e.requisition_id = ? AND e.status != 'retired' LIMIT 1", (place["id"], latest["id"])).fetchone():
+        return None
+    roots = repo.list_roots(conn, place["id"])
+    for write in conn.execute("SELECT path FROM requisition_write WHERE requisition_id = ? AND action != 'sidecar'"
+                              " AND removed_at IS NULL", (latest["id"],)):
+        path = Path(write["path"]).resolve()
+        for root in roots:
+            if is_within(path, Path(root["path"])) and conn.execute(
+                    "SELECT 1 FROM file WHERE root_id = ? AND rel_key = ? AND state != 'gone'",
+                    (root["id"], fold(path.relative_to(Path(root["path"]).resolve()).as_posix()))).fetchone():
+                endpoint = conn.execute("SELECT endpoint FROM requisition WHERE id = ?", (latest["id"],)).fetchone()
+                return json.loads(endpoint["endpoint"])["folder"], place["name"]
+    return None
+
+
 def whose_turn(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Registry, claim: Claim,
                path: dict | None = None, tools: dict[str, str] | None = None) -> tuple[str, str]:
     """``(turn, line)`` for an open claim: ``you``, ``exchange``, ``build`` (or ``none`` when closed)."""
@@ -334,6 +383,10 @@ def whose_turn(conn: sqlite3.Connection, definitions: DefinitionSet, registry: R
         return "you", one_line(latest["message"], rid) or f"Requisition {rid} failed"
     if claim.milestone == "installed":
         return "you", "Close it, or take it into play"
+    unread = _unread_folder(conn, claim.meta, latest)
+    if unread is not None:
+        return "you", (f"Requisition {rid} wrote to {unread[0]}, but {unread[1]} doesn't read that folder:"
+                       " choose a folder it reads, then walk it again")
     return "you", f"Walk it again: the place no longer holds what requisition {rid} wrote"
 
 
@@ -346,14 +399,11 @@ def describe(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Reg
     return {**claim.to_json(), "path": path, "turn": turn, "turn_line": line}
 
 
-def _endpoint_folder(conn: sqlite3.Connection, meta: dict[str, Any], env_id: int) -> str | None:
-    """The claim's folder: absolute as is, relative to the place's first online root; None for the default."""
-    folder = meta.get("folder")
-    if not isinstance(folder, str):
-        return None
-    roots = [r for r in repo.list_roots(conn, env_id) if r["status"] == "online"]
-    chosen = configured_folder(folder, "", Path(roots[0]["path"]), {}) if roots else None
-    return str(chosen) if chosen else None
+def _endpoint_folder(conn: sqlite3.Connection, definitions: DefinitionSet, meta: dict[str, Any],
+                     env_id: int) -> str | None:
+    """The claim's folder (see ``_claim_folder``); None for the default."""
+    place = conn.execute("SELECT name FROM environment WHERE id = ?", (env_id,)).fetchone()
+    return _claim_folder(conn, definitions, meta.get("folder"), env_id, place["name"])
 
 
 def walk(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Registry, id: str,
@@ -376,7 +426,7 @@ def walk(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Registr
     processes = None if path["route"] == "children" else path["processes"]  # each child takes its own route
     plan = plan_requisition(conn, definitions, registry, str(claim.meta["thing"]), env_id, processes=processes,
                             source_entry_id=path["source_entry_id"], role=_role(claim.meta),
-                            endpoint_folder=_endpoint_folder(conn, claim.meta, env_id), tools=tools)
+                            endpoint_folder=_endpoint_folder(conn, definitions, claim.meta, env_id), tools=tools)
     requisition_id = queue_plan(conn, plan, registry)
     uid = conn.execute("SELECT uid FROM requisition WHERE id = ?", (requisition_id,)).fetchone()[0]
     existing = claim.meta.get("requisitions")
