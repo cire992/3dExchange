@@ -6761,10 +6761,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Only claims with this turn: you (the user's move), exchange (a requisition is queued or running), build (a process has to be built). A closed claim's turn is none, so it never matches",
+              "description": "Only claims with this turn: you (the user's move), exchange (the latest requisition is queued or running), build (a process has to be built). A closed claim's turn is none, so it never matches",
               "title": "Turn"
             },
-            "description": "Only claims with this turn: you (the user's move), exchange (a requisition is queued or running), build (a process has to be built). A closed claim's turn is none, so it never matches"
+            "description": "Only claims with this turn: you (the user's move), exchange (the latest requisition is queued or running), build (a process has to be built). A closed claim's turn is none, so it never matches"
           },
           {
             "name": "thing",
@@ -7255,7 +7255,7 @@
               }
             ],
             "title": "As",
-            "description": "What the thing is in the place, e.g. prop; blank or null for no role"
+            "description": "What the thing is in the place, e.g. prop; null or an empty string for no role"
           },
           "place": {
             "anyOf": [
@@ -7338,7 +7338,7 @@
               "none"
             ],
             "title": "Turn",
-            "description": "Whose move it is. you: the user's (`turn_line` says what). exchange: a requisition of the claim is queued or running in Exchange. build: no process takes the thing to the place yet, so one has to be built (also when the place is not in the library: `path.problem` says so). none: the claim is closed"
+            "description": "Whose move it is. you: the user's (`turn_line` says what). exchange: the claim's latest requisition is queued or running in Exchange. build: no process takes the thing to the place yet, so one has to be built (also when the place is not in the library: `path.problem` says so). none: the claim is closed"
           },
           "turn_line": {
             "type": "string",
@@ -7352,7 +7352,7 @@
           },
           "path": {
             "$ref": "#/components/schemas/ClaimPath",
-            "description": "The processes that take the thing to the place in the claim's role (`as`); derived on every read, never written"
+            "description": "How the thing gets to the place in the claim's role (`as`); derived on every read, never written"
           },
           "notes": {
             "type": "string",
@@ -7397,7 +7397,7 @@
             },
             "type": "array",
             "title": "Claims",
-            "description": "Newest created first; a claim with no created date comes last"
+            "description": "Newest created first"
           },
           "problems": {
             "items": {
@@ -7405,7 +7405,7 @@
             },
             "type": "array",
             "title": "Problems",
-            "description": "A line for each claim file that could not be read"
+            "description": "A line for each claim file that could not be read, and for each whose milestone could not be saved (the claim is still listed then)"
           }
         },
         "type": "object",
@@ -7450,7 +7450,7 @@
             },
             "type": "array",
             "title": "Processes",
-            "description": "The chain in order; empty when there is none"
+            "description": "The processes in order; for route children, those of all the children's chains, each once; empty when there is none"
           },
           "process": {
             "anyOf": [
@@ -7522,7 +7522,7 @@
               }
             ],
             "title": "As",
-            "description": "What it is there, e.g. prop; blank or null for no role"
+            "description": "What it is there, e.g. prop; null or an empty string for no role"
           },
           "folder": {
             "anyOf": [
@@ -7534,7 +7534,7 @@
               }
             ],
             "title": "Folder",
-            "description": "Absolute, or relative to the place; it may not leave the place"
+            "description": "Absolute (anywhere), or relative to the place; a relative one may not leave it"
           }
         },
         "type": "object",
@@ -7566,7 +7566,7 @@
               }
             ],
             "title": "As",
-            "description": "What it is there, e.g. prop; blank or null for no role"
+            "description": "What it is there, e.g. prop; null or an empty string for no role"
           },
           "folder": {
             "anyOf": [
@@ -7578,7 +7578,7 @@
               }
             ],
             "title": "Folder",
-            "description": "Absolute, or relative to the place; it may not leave the place"
+            "description": "Absolute (anywhere), or relative to the place; a relative one may not leave it"
           },
           "note": {
             "type": "string",
@@ -7708,7 +7708,7 @@
               }
             ],
             "title": "As",
-            "description": "What the thing is in the place, e.g. prop; blank or null for no role"
+            "description": "What the thing is in the place, e.g. prop; null or an empty string for no role"
           },
           "place": {
             "anyOf": [
@@ -7791,7 +7791,7 @@
               "none"
             ],
             "title": "Turn",
-            "description": "Whose move it is. you: the user's (`turn_line` says what). exchange: a requisition of the claim is queued or running in Exchange. build: no process takes the thing to the place yet, so one has to be built (also when the place is not in the library: `path.problem` says so). none: the claim is closed"
+            "description": "Whose move it is. you: the user's (`turn_line` says what). exchange: the claim's latest requisition is queued or running in Exchange. build: no process takes the thing to the place yet, so one has to be built (also when the place is not in the library: `path.problem` says so). none: the claim is closed"
           },
           "turn_line": {
             "type": "string",
@@ -7805,7 +7805,7 @@
           },
           "path": {
             "$ref": "#/components/schemas/ClaimPath",
-            "description": "The processes that take the thing to the place in the claim's role (`as`); derived on every read, never written"
+            "description": "How the thing gets to the place in the claim's role (`as`); derived on every read, never written"
           }
         },
         "type": "object",
@@ -7826,7 +7826,7 @@
           "path"
         ],
         "title": "ClaimView",
-        "description": "A claim as the list shows it. A claim file may be hand-edited and then hold anything, so any field may\nread as its text or as null; these descriptions cover a file the API wrote."
+        "description": "A claim as the list shows it. A claim file may be hand-edited and then hold anything, so the fields read\nfrom it may read as their text or as null; these descriptions cover a file the API wrote."
       },
       "ClassifyJob": {
         "properties": {

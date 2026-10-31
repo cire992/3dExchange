@@ -863,21 +863,22 @@ class ClaimPath(BaseModel):
     route: Literal["convert", "copy", "children"] | None = Field(
         description="children means each child dossier takes its own route; null when status is none")
     processes: list[str] = Field(
-        description="The chain in order; empty when there is none")
+        description="The processes in order; for route children, those of all the children's chains, "
+                    "each once; empty when there is none")
     process: str | None = Field(description="The first process that is not ready, when status is not_ready")
     problem: str | None = Field(description="Why the path can't be walked yet; null when it can")
     source_entry_id: int | None = Field(description="The ledger entry the route reads from; null when there is none")
 
 
 class ClaimView(BaseModel):
-    """A claim as the list shows it. A claim file may be hand-edited and then hold anything, so any field may
-    read as its text or as null; these descriptions cover a file the API wrote."""
+    """A claim as the list shows it. A claim file may be hand-edited and then hold anything, so the fields read
+    from it may read as their text or as null; these descriptions cover a file the API wrote."""
     id: str = Field(description="The file's name without .md")
     thing: str | None = Field(description="The dossier's uid")
     thing_name: str | None = Field(description="The dossier's name when the claim was made, as stored in the file; "
                                    "not refreshed on reads, so after a rename it differs from the dossier's name")
-    as_: str | None = Field(alias="as", description="What the thing is in the place, e.g. prop; blank or null "
-                            "for no role")
+    as_: str | None = Field(alias="as", description="What the thing is in the place, e.g. prop; null or an empty "
+                            "string for no role")
     place: str | None = Field(description="The environment's uid")
     place_name: str | None = Field(description="The environment's name when the claim was made, as stored in the "
                                    "file; not refreshed on reads, so after a rename it differs from the environment's")
@@ -888,15 +889,15 @@ class ClaimView(BaseModel):
     created: str | None = Field(description="The day the claim was made, as an ISO date")
     closed: str | None = Field(description="The day the claim was closed, as an ISO date; null while open")
     turn: Literal["you", "exchange", "build", "none"] = Field(
-        description="Whose move it is. you: the user's (`turn_line` says what). exchange: a requisition of the "
-                    "claim is queued or running in Exchange. build: no process takes the thing to the place yet, "
-                    "so one has to be built (also when the place is not in the library: `path.problem` says "
+        description="Whose move it is. you: the user's (`turn_line` says what). exchange: the claim's latest "
+                    "requisition is queued or running in Exchange. build: no process takes the thing to the place "
+                    "yet, so one has to be built (also when the place is not in the library: `path.problem` says "
                     "so). none: the claim is closed")
     turn_line: str = Field(description="What the turn's owner has to do when it is `you` or `build`; empty for "
                            "`exchange` and `none`")
     already_there: bool = Field(description="No role or folder and no requisitions, and the place already holds "
                                 "the thing: it has a live entry there on an online root")
-    path: ClaimPath = Field(description="The processes that take the thing to the place in the claim's role (`as`); "
+    path: ClaimPath = Field(description="How the thing gets to the place in the claim's role (`as`); "
                             "derived on every read, never written")
 
 
@@ -915,15 +916,19 @@ class ClaimDetail(ClaimView):
 
 
 class ClaimList(BaseModel):
-    claims: list[ClaimView] = Field(description="Newest created first; a claim with no created date comes last")
-    problems: list[str] = Field(description="A line for each claim file that could not be read")
+    claims: list[ClaimView] = Field(description="Newest created first")
+    problems: list[str] = Field(
+        description="A line for each claim file that could not be read, and for each whose milestone could not be "
+                    "saved (the claim is still listed then)")
 
 
 class ClaimPreviewRequest(BaseModel):
     uid: str = Field(description="The dossier to claim")
     environment: int = Field(description="The id of the environment it should end up in")
-    as_: str | None = Field(None, alias="as", description="What it is there, e.g. prop; blank or null for no role")
-    folder: str | None = Field(None, description="Absolute, or relative to the place; it may not leave the place")
+    as_: str | None = Field(None, alias="as", description="What it is there, e.g. prop; null or an empty string "
+                            "for no role")
+    folder: str | None = Field(None, description="Absolute (anywhere), or relative to the place; a relative one "
+                               "may not leave it")
 
 
 class ClaimRequest(ClaimPreviewRequest):
