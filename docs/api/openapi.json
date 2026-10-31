@@ -282,6 +282,18 @@
             "description": "Only Unidentified assets"
           },
           {
+            "name": "new",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Only what is new since the marker; none until a scan has set it",
+              "default": false,
+              "title": "New"
+            },
+            "description": "Only what is new since the marker; none until a scan has set it"
+          },
+          {
             "name": "offset",
             "in": "query",
             "required": false,
@@ -4675,6 +4687,83 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/dossiers/new/seen": {
+      "post": {
+        "tags": [
+          "library"
+        ],
+        "summary": "Mark All Seen",
+        "description": "Move the what's-new marker to the newest asset. It can't be undone.",
+        "operationId": "mark_all_seen_api_v1_dossiers_new_seen_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Seen"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -11960,6 +12049,20 @@
         ],
         "title": "ScanReport",
         "description": "What ``exchange scan`` (or ``rescan``) reports; a dry run only detects."
+      },
+      "Seen": {
+        "properties": {
+          "seen": {
+            "type": "integer",
+            "title": "Seen",
+            "description": "How many assets `new=true` listed (group all) just before they were marked seen"
+          }
+        },
+        "type": "object",
+        "required": [
+          "seen"
+        ],
+        "title": "Seen"
       },
       "Session": {
         "properties": {

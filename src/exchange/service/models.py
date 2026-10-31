@@ -90,6 +90,10 @@ class Page(BaseModel):
     offset: int
 
 
+class Seen(BaseModel):
+    seen: int = Field(description="How many assets `new=true` listed (group all) just before they were marked seen")
+
+
 class FieldValue(BaseModel):
     value: Any = None
     source: str | None = Field(None, description="scan, user, or a lookup source")

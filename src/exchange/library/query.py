@@ -13,6 +13,7 @@ from pathlib import Path
 
 from exchange.db import repository as repo
 from exchange.definitions.schema import DefinitionSet
+from exchange.library.new import marker as new_marker
 from exchange.library.search import DISMISSED, compile_query
 
 GROUPS = ("product", "type", "all")
@@ -63,6 +64,7 @@ def list_dossiers(
     container_id: int | None = None,
     type_id: str | None = None,
     parent_uid: str | None = None,
+    new: bool = False,
     offset: int = 0,
     limit: int = 200,
     threshold: float = 0.5,
@@ -72,11 +74,26 @@ def list_dossiers(
         raise ValueError(f"group must be one of {GROUPS}")
     where, params = compile_query(query, definitions, threshold=threshold, conn=conn)
     clauses, args = [where], list(params)
+    seen_up_to = None
+    if new:
+        seen_up_to = new_marker(conn)
+        if seen_up_to is None:
+            return Page([], 0, offset)
+        # Two uncorrelated sets: a correlated EXISTS per row is far too slow on a big library.
+        written = ("SELECT l.dossier_id FROM ledger l JOIN entry e ON e.ledger_id = l.id"
+                   " WHERE e.status != 'retired' AND e.requisition_id IS NULL")
+        clauses.append(f"d.id > ? AND (d.id IN ({written}) OR d.id IN"
+                       f" (SELECT c.parent_id FROM d c WHERE c.parent_id > ? AND c.id IN ({written})))")
+        args.extend([seen_up_to, seen_up_to])
     if parent_uid is not None:
         clauses.append("d.parent_id = (SELECT id FROM dossier WHERE uid = ?)")
         args.append(parent_uid)
     elif group == "product":
-        clauses.append("d.parent_id IS NULL")
+        if new:
+            clauses.append("(d.parent_id IS NULL OR d.parent_id <= ?)")
+            args.append(seen_up_to)
+        else:
+            clauses.append("d.parent_id IS NULL")
     elif group == "type":
         clauses.append("d.type_id != 'product'")
     if environment_id is not None:
