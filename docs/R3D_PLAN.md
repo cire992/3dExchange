@@ -54,7 +54,7 @@ By hand because it changes `test_the_role_filter_keeps_one_chain_and_drops_anoth
 ### R3d-3, by the factory: `ready` means it can run (problem 4)
 
 - A new optional `[input] extensions` in process manifests. `routes` keeps a chain only if the source entry holds such a file; only the first process of a chain is checked. Convert mesh declares its seven.
-- The same filter on `find_path`'s look past readiness, so the prop claim reads `none` ("a process has to be built"), which is true: getting a mesh out of a Daz prop needs Daz Studio. This also fixes *Requisition to…*, which has the same fault.
+- The same filter on `find_path`'s look past readiness, so a prop claimed with a role, or for a place that doesn't hold it, reads `none` ("a process has to be built"), which is true: getting a mesh out of a Daz prop needs Daz Studio. This also fixes *Requisition to…*, which has the same fault.
 
 ### R3d-4, by the factory: endpoints stay in their place (problem 3)
 
@@ -63,7 +63,7 @@ By hand because it changes `test_the_role_filter_keeps_one_chain_and_drops_anoth
 
 ## How it's built
 
-In that order, one PR each: the blockers first. Each factory issue is filed once the one before is merged, as R3a and R3b were. After R3d-2 I re-run R3c's claims on the sample library. R3 is done when *Krow HD* and a saved character both read `build` as `g8f_character`, the truck's prop reads `build`, and the mesh reaches Installed through a folder outside the place.
+In that order, one PR each: the blockers first. Each factory issue is filed once the one before is merged, as R3a and R3b were. After R3d-2 I re-run R3c's claims on the sample library. R3 is done when *Krow HD* and a saved character both read `build` as `g8f_character`, the truck's prop reads `build` as a role, and the mesh reaches Installed through a folder outside the place.
 
 ## Decisions (with recommended answers)
 
