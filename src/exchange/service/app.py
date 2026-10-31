@@ -28,6 +28,7 @@ from exchange.db import SCHEMA_VERSION, open_library, open_library_readonly
 from exchange.db import repository as repo
 from exchange.definitions import DefinitionSet, load_definitions
 from exchange.errors import ExchangeError
+from exchange.library import new as new_library
 from exchange.library.query import GROUPS, dossier_detail, list_collections, list_dossiers, sidebar
 from exchange.paths import is_within
 from exchange.scanner.enrichment import thumbnail_dir
@@ -151,6 +152,7 @@ def create_app(db_path: Path, *, token: str, definitions: DefinitionSet | None =
         parent: str | None = Query(None, description="One product's contents, by its uid"),
         collection: str | None = Query(None, description="One collection's members, by its uid"),
         unidentified: bool = Query(False, description="Only Unidentified assets"),
+        new: bool = Query(False, description="Only what is new since the marker; none until a scan has set it"),
         offset: int = Query(0, ge=0),
         limit: int = Query(200, ge=1, le=MAX_PAGE),
     ) -> dict:
@@ -162,7 +164,7 @@ def create_app(db_path: Path, *, token: str, definitions: DefinitionSet | None =
         try:
             page = list_dossiers(library.conn(), library.definitions, query=" ".join(p for p in parts if p),
                                  group=effective_group, environment_id=environment, container_id=container,
-                                 type_id=type, parent_uid=parent, offset=offset, limit=limit,
+                                 type_id=type, parent_uid=parent, new=new, offset=offset, limit=limit,
                                  threshold=library.threshold)
         except ExchangeError as exc:  # a search that does not parse
             raise HTTPException(400, str(exc)) from exc
@@ -224,6 +226,21 @@ def create_app(db_path: Path, *, token: str, definitions: DefinitionSet | None =
 
     library.jobs = jobs.Jobs(library, on_finished=on_finished)
     jobs.register(app, library, library.jobs, library.watcher, api, errors)
+
+    @app.post(PREFIX + "/dossiers/new/seen", response_model=models.Seen, dependencies=[api],
+              responses={**errors, 409: {"model": models.Problem}, 503: {"model": models.Problem}}, tags=["library"])
+    def mark_all_seen() -> dict:
+        """Move the what's-new marker to the newest asset. It can't be undone."""
+        library.jobs.refuse_while_writing()
+
+        def mark(curator) -> dict:
+            with repo.transaction(curator.conn):
+                seen = list_dossiers(curator.conn, library.definitions, group="all", new=True, limit=1,
+                                     threshold=library.threshold).total
+                new_library.mark_seen(curator.conn)
+            return {"seen": seen}
+
+        return library.editor.run(mark)
 
     from exchange.service import requisitions
 

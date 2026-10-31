@@ -765,6 +765,21 @@ The loop's claims (a markdown file each in `<data>/claims/`, `exchange claim` on
 
 **Change notices.** `GET /claims/changes` returns a `version` that grows whenever a claim may have changed, so a client waits on it (`since=<version>&wait=<seconds>`, returning when it differs) and lists again. It grows when the service makes, closes or walks a claim, when any job ends (a requisition's run moves its claim), and when a `.md` file in the claims folder is created, changed, moved or deleted (a rewrite's temporary file does not count, its move onto the claim does). The folder is watched with `watchdog` from the first `GET /claims/changes`, which makes the folder if it is missing; a preview or any other call never does. `available` is false without `watchdog` or with watching off, and then only the first two sources are noticed. Accepted gap: a requisition run from the command line (`exchange claim walk --run`, `exchange requisition run`) moves its claim with no notice until something next touches the file.
 
+### What's new
+
+The library can say what is new since you last looked, with a marker you move yourself. It is read and moved through the service, under `/api/v1` with the token, tag `library`; there is no command-line command.
+
+**What new means.** The marker is a dossier id, kept as a JSON integer in `library_setting` (key `new_marker`; no migration). A dossier is new when its id is above the marker, it has a live entry Exchange didn't write (`status != 'retired'` and `requisition_id` null), on itself or on a child, and the library's usual filters let it through (a dismissed or structural dossier is still left out). A "child" is by the effective parent, so a product you made, which has no entries of its own, is listed through its children. What a requisition writes joins the source dossier as an entry with `requisition_id` set, so a walk never makes anything new. The marker starts at the highest dossier id at the end of the first scan that leaves any dossier (`exchange scan`, `rescan`, and the jobs that run them), once classifying and enriching are done; a dry run or a cancelled scan sets nothing. A scan never moves it afterwards. A new environment floods the list once, until "Mark all seen". Dossiers made by curation or a regroup after the marker (a product of old things, a split) read as new too. With no marker the list is empty.
+
+**The routes.**
+
+| Route | Does |
+|---|---|
+| `GET /dossiers?new=true` | The usual listing, narrowed to what is new, and combining with every other filter, ordering and paging. With group `product` a new dossier is listed unless its parent is new too (the outermost new thing, so a new child of an old product shows by itself); a new product's children come with `parent=<uid>`. Groups `type` and `all` list every new dossier. No marker is an empty page; a search that doesn't parse is still a 400 |
+| `POST /dossiers/new/seen` | Moves the marker to the highest dossier id and returns `{seen}`, the number `new=true&group=all` listed just before (so it can be higher than the default listing's `total`; 0 with no marker). Refused with a 409 while a job writes, a 503 when the library is busy. It is not an edit: it writes nothing to the curation log and can't be undone |
+
+**Accepted limits.** Ids are reused after a deletion (SQLite hands out `max(id)+1`), so a dossier made after the highest one was deleted can sit at or under the marker and not read as new. A library that existed before this feature has no marker until its next scan, and `new=true` lists nothing until then. The query keeps to two uncorrelated sets of ids, not a correlated check per row, because the latter doesn't finish on a library of hundreds of thousands of dossiers.
+
 ## Roadmap
 
 The library and the first processes come first, then the workspace around them, proven on a real Unreal project. Goal numbers refer to `archive/IDENTITY.md`.

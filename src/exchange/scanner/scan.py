@@ -19,6 +19,7 @@ from exchange.db import open_library, open_library_readonly
 from exchange.db import repository as repo
 from exchange.definitions.schema import DefinitionSet, EnvironmentDefinition
 from exchange.errors import LibraryError, ScanError
+from exchange.library.new import start_marker
 from exchange.paths import fold, is_within
 from exchange.scanner.detection import DetectedEnvironment, RegisteredEnvironment, detect
 from exchange.scanner.discovery import discover
@@ -137,6 +138,8 @@ def run_scan(
             session.classify()
         if enrich and not dry_run and not report.cancelled:
             session.enrich()
+        if not dry_run and not report.cancelled:
+            start_marker(conn)
     finally:
         if conn is not None:
             conn.close()
@@ -179,6 +182,8 @@ def run_rescan(
             session.classify()
         if enrich and not report.cancelled:
             session.enrich()
+        if not report.cancelled:
+            start_marker(conn)
     finally:
         conn.close()
     return report
