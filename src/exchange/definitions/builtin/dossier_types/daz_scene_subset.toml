@@ -1,0 +1,8 @@
+# A scene subset saved from Daz Studio (.duf) is a bag of things: a figure with its clothing and
+# hair, a prop, or any mix. It is not split into the parts it holds.
+[dossier_type]
+id = "daz_scene_subset"
+name = "Daz scene subset"
+format_version = 1
+scope = "environment"
+environment = "daz_studio"

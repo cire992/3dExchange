@@ -62,6 +62,15 @@ manifest_glob = "Runtime/Support/*.dsx"
 "Preset/Wearables" = "daz_wearable"
 "Prop" = "daz_prop"
 
+# Saved files (a character, outfit or scene subset saved from Daz Studio) are in no manifest and in
+# no folder a rule knows, so the file says what it is: the asset_info.type in its first 64 KB maps
+# to a dossier type. Only .duf files outside data/ and Runtime/ are read; a type not listed here
+# leaves the file unattached.
+[layer.options.asset_types]
+character = "daz_character_preset"
+wearable = "daz_wearable"
+scene_subset = "daz_scene_subset"
+
 # An Asset's Compatibility (e.g. "/Genesis 9/Female") names its figure generation.
 [layer.options.compatibility_variants]
 "/Genesis 9" = "genesis_9"
@@ -102,4 +111,4 @@ globs = ["People/Genesis 2*/**", "data/**/Genesis 2/**"]
 
 [compatibility]
 uses_content_from = []
-native_dossier_types = ["daz_figure", "daz_character_preset", "daz_morph", "daz_wearable", "daz_hair", "daz_prop"]
+native_dossier_types = ["daz_figure", "daz_character_preset", "daz_morph", "daz_wearable", "daz_hair", "daz_prop", "daz_scene_subset"]

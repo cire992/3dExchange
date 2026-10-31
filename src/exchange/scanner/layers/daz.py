@@ -13,6 +13,11 @@
 
 Both carry the product's SKU, so a product installed both ways becomes one product dossier.
 Empty manifests (DIM writes some for "local user" content) are skipped.
+
+**Saved files** (a character, outfit or scene subset the user saved from Daz Studio) belong to no
+product and match no type rule, so their folder says nothing about them. Each ``.duf`` left over
+outside ``data/`` and ``Runtime/`` has its head read, and an ``asset_info.type`` named in
+``asset_types`` makes it a standalone dossier of its own.
 """
 
 from __future__ import annotations
@@ -27,6 +32,7 @@ from exchange.definitions.schema import GENERATED_LEXICON_KINDS
 from exchange.globs import glob_match
 from exchange.lexicons import LexiconIndex, with_generated
 from exchange.paths import fold, normalize_rel
+from exchange.scanner.formats import daz_asset_type
 from exchange.scanner.tokenize import tokenize
 from exchange.scanner.layers.base import (
     ChildSpec,
@@ -68,6 +74,11 @@ def identify(ctx: LayerContext) -> LayerResult:
     compat_variants = dict(ctx.options.get("compatibility_variants", {}))
     for type_id in set(content_types.values()) - set(ctx.definitions.dossier_types):
         result.warnings.append(f"content_types maps to unknown dossier type {type_id!r}")
+    asset_types = dict(ctx.options.get("asset_types", {}))
+    for type_id in set(asset_types.values()) - set(ctx.definitions.dossier_types):
+        result.warnings.append(f"asset_types maps to unknown dossier type {type_id!r}")
+    asset_types = {kind: type_id for kind, type_id in asset_types.items()
+                   if type_id in ctx.definitions.dossier_types}
 
     cloud: dict[str, list[FileInfo]] = defaultdict(list)
     for f in ctx.files:
@@ -178,6 +189,7 @@ def identify(ctx: LayerContext) -> LayerResult:
             product_key=f"daz:{sku}",
             type_root=folder,
         ))
+    result.standalone = _saved_files(ctx, result.products, asset_types)
     return result
 
 
@@ -312,6 +324,26 @@ def _folder_products(unlisted: list[str], index: LexiconIndex) -> list[ProductSp
         specs.append(ProductSpec(
             container_rel="", identity_key=f"folder:{key}", name=folder.rsplit("/", 1)[-1],
             confidence=UNMANIFESTED_CONFIDENCE, signals=signals, fields=fields, members=files))
+    return specs
+
+
+def _saved_files(ctx: LayerContext, products: list[ProductSpec], asset_types: dict[str, str]) -> list[ChildSpec]:
+    """Saved ``.duf`` files no product holds and no type rule matches, typed by their ``asset_info``.
+
+    Only the head of each candidate is read, and only when ``asset_types`` names something.
+    """
+    if not asset_types:
+        return []
+    held = {fold(r) for p in products for r in p.primary + p.members}
+    specs = []
+    for f in ctx.files:
+        if f.ext != ".duf" or fold(f.rel) in held or fold(f.rel.split("/", 1)[0]) in ("data", "runtime") \
+                or ctx.match_type(f.rel) is not None:
+            continue
+        asset_type = daz_asset_type(ctx.read_head(f.rel))
+        if asset_type in asset_types:
+            specs.append(ChildSpec(f.rel, asset_types[asset_type], UNMANIFESTED_CONFIDENCE,
+                                   [f"saved file: {asset_type}"]))
     return specs
 
 

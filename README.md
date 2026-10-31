@@ -12,7 +12,7 @@ It indexes Daz Studio libraries, Unreal Engine projects, Mod Organizer 2 instanc
 - **Indexes them in three phases:**
   1. Discovery: files.
   2. Identification:
-     - products from Daz manifests and Daz Connect, hand-installed Daz content grouped by folder
+     - products from Daz manifests and Daz Connect, hand-installed Daz content grouped by folder, saved characters, scene subsets and wearables noticed by the type their file says
      - MO2 mods with their `meta.ini`
      - Unreal content packs and plugins
      - folder guesses for loose files

@@ -44,7 +44,8 @@ class ContainerSpec:
 
 @dataclass
 class ChildSpec:
-    """A member file the layer itself identified (e.g. from a manifest's asset list)."""
+    """A file the layer itself identified: a product's member (e.g. from a manifest's asset list),
+    or a standalone file in ``LayerResult.standalone``."""
 
     rel: str  # root-relative path
     type_id: str
@@ -83,6 +84,9 @@ class LayerResult:
     warnings: list[str] = field(default_factory=list)
     # Words for generated lexicons found in this root: lexicon id -> (value, word) pairs.
     generated: dict[str, list[tuple[str, str]]] = field(default_factory=dict)
+    # Files outside any product that the layer identified itself (Daz saved characters, by what
+    # the file says it is). A type rule, a product or a link on the file keeps precedence.
+    standalone: list[ChildSpec] = field(default_factory=list)
 
 
 class LayerContext:
@@ -109,6 +113,9 @@ class LayerContext:
 
     def read_bytes(self, rel: str) -> bytes | None:
         return readonly.read_bytes(to_path(self.root, rel))
+
+    def read_head(self, rel: str) -> bytes | None:
+        return readonly.read_head(to_path(self.root, rel))
 
     def read_ini(self, rel: str):
         return readonly.read_ini(to_path(self.root, rel))

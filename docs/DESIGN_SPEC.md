@@ -143,6 +143,7 @@ When a scan finishes, the Workspace shows a **new acquisitions** report: the pro
 
 - **Daz manifests are hints, not truth.** `.dsx` support files seed product membership, then Exchange reconciles against reality: match by expected relative path, then filename + size, then hash. Files found elsewhere are marked *relocated*, not missing, and product identity rests on content, so manually installed products still group.
 - **Daz Connect products merge with DIM products** into one product dossier, so a product installed both ways appears once.
+- **Saved Daz files** (a character, outfit or scene subset saved from Daz Studio) are in no manifest and in no folder a rule knows. Each `.duf` outside `data/` and `Runtime/` that no product holds and no type rule matches has its head read, the first 64 KB through `readonly`, and its `asset_info.type` decides: `character`, `wearable` and `scene_subset` become a Daz character preset, wearable or scene subset (`asset_types` in `daz_studio.toml`) at confidence 0.6, a dossier of its own with no parent, whose signal names the type read. Any other type, or a file that can't be read, stays unattached. Type rules and products keep winning, so nothing identified before changes.
 - **Daz dependencies** come from the internal path references inside `.duf` and `.dsf` files. References broken by moved files are flagged; repairing them is a separate opt-in write action.
 - **MO2:** each mod folder is a container; `meta.ini` supplies the Nexus mod ID, version and source.
 - **Unreal:** content folders and plugins are containers; Fab packs are usually one top-level folder.
@@ -208,7 +209,7 @@ A dossier remains while any ledger holds a live entry. A dossier with only retir
 Types are data definitions with two scopes:
 
 - **Universal:** static mesh, skinned mesh, texture set, material, skeleton, animation, audio.
-- **Environment-specific:** Daz morph, Daz character preset, Daz wearable, Skyrim NPC, Starfield Ingestible, Unreal Blueprint actor.
+- **Environment-specific:** Daz morph, Daz character preset, Daz wearable, Daz scene subset (a bag of things), Skyrim NPC, Starfield Ingestible, Unreal Blueprint actor.
 
 The browser's environment filter shows a given environment's native types plus any dossier with a role there. Type definitions can be extended by the user and by process packages.
 
