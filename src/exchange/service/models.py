@@ -647,6 +647,7 @@ class ProcessView(BaseModel):
     problems: list[str] = Field(description="What is wrong with a trusted package's chain")
     trust: list[str] = Field(description="What trusting it lets it do, to show before asking")
     parameters: list[ParameterView]
+    roles: list[str] = Field(description="What its output is in a place (the manifest's [output] roles)")
 
 
 class ProcessList(BaseModel):
@@ -845,3 +846,66 @@ class RunRequest(BaseModel):
 
 class RemoveRequest(BaseModel):
     requisition: int
+
+
+# Claims (R4a) ------------------------------------------------------------------------------------
+
+
+class ClaimPath(BaseModel):
+    status: Literal["ready", "not_ready", "none"]
+    route: str | None
+    processes: list[str]
+    process: str | None = Field(description="The first process that is not ready, when status is not_ready")
+    problem: str | None
+    source_entry_id: int | None
+
+
+class ClaimView(BaseModel):
+    """A claim as the list shows it. A hand-edited file may hold any YAML, so the text fields read a
+    scalar as its text and anything else as null."""
+    id: str = Field(description="The file's name without .md")
+    thing: str | None = Field(description="The dossier's uid")
+    thing_name: str | None
+    as_: str | None = Field(alias="as", description="What the thing is in the place, e.g. prop")
+    place: str | None = Field(description="The environment's uid")
+    place_name: str | None
+    folder: str | None
+    milestone: str | None = Field(description="claimed, acquired, converted or installed")
+    created: str | None = Field(description="An ISO date")
+    closed: str | None = Field(description="An ISO date; null while open")
+    turn: Literal["you", "exchange", "build", "none"] = Field(description="Whose turn: none once closed")
+    turn_line: str = Field(description="What the turn's owner has to do")
+    already_there: bool = Field(description="No role, folder or requisitions, and the place already holds the thing")
+    path: ClaimPath
+
+
+class ClaimRequisition(BaseModel):
+    uid: str | None
+    id: int | None = Field(description="Null for a uid that no longer resolves")
+    state: str | None
+    message: str | None
+
+
+class ClaimDetail(ClaimView):
+    notes: str
+    requisitions: list[ClaimRequisition]
+
+
+class ClaimList(BaseModel):
+    claims: list[ClaimView]
+    problems: list[str] = Field(description="A line for each claim file that could not be read")
+
+
+class ClaimPreviewRequest(BaseModel):
+    uid: str = Field(description="The dossier to claim")
+    environment: int = Field(description="The place it should end up")
+    as_: str | None = Field(None, alias="as", description="What it is there, e.g. prop")
+    folder: str | None = Field(None, description="Absolute, or relative to the place; it may not leave the place")
+
+
+class ClaimRequest(ClaimPreviewRequest):
+    note: str = Field("", description="The claim's first note")
+
+
+class ClaimClose(BaseModel):
+    reason: str | None = Field(None, description="Added to the claim's notes")
