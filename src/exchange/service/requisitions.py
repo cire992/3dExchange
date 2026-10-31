@@ -71,7 +71,7 @@ def _process_view(package, tools: dict[str, str]) -> dict:
                                "tool": next((p.tool for p in m.prerequisites if p.id == s.id and p.kind == "tool"), None)}
                               for s in check_prerequisites(package, tools)],
             "problems": problems, "trust": describe_trust(package),
-            "parameters": [_parameter(p) for p in m.parameters]}
+            "parameters": [_parameter(p) for p in m.parameters], "roles": list(m.roles)}
 
 
 def _parameter(p) -> dict:

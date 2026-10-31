@@ -217,6 +217,10 @@ def create_app(db_path: Path, *, token: str, definitions: DefinitionSet | None =
     from exchange.service import requisitions
 
     requisitions.register(app, library, library.jobs, api, errors)
+
+    from exchange.service import claims
+
+    claims.register(app, library, api, errors)
     if watch:
         jobs.watch_roots(library, library.watcher)
     return app

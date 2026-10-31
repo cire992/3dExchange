@@ -736,6 +736,28 @@ It removes the voice coordinator, mobile access, the persona and its card regist
 - **PySide6** was used until the Workspace window reached library parity; it was removed in R2c.
 - **Windows only.**
 
+### Loop claims in the service
+
+The loop's claims (a markdown file each in `<data>/claims/`, `exchange claim` on the command line) are also read, made and closed through the service, for the Workspace. Everything is under `/api/v1` with the token, tag `claims`:
+
+| Route | Does |
+|---|---|
+| `POST /claims/preview` | Takes `uid`, `environment` (the id), `as` and `folder`; returns the claim those fields would make, with its path and whose turn it is. It goes through `claims.prepare`, the code a real claim goes through, so the two can't disagree, and writes nothing, not even the claims folder. Its `id` is the one a claim would get now |
+| `POST /claims` | The same plus `note`; makes the claim (`claims.new`) and returns it |
+| `GET /claims` | `{claims, problems}`: open claims, newest first (`created`, then `id`, both descending; no date sorts last), and a line for each file that can't be read (never filtered). Filters: `all` (closed ones too), `turn` (`you`, `exchange`, `build`), `thing` (a dossier uid) |
+| `GET /claims/{id}` | One claim |
+| `POST /claims/{id}/close` | Takes an optional `reason`; closes the claim and returns it |
+
+**The shape.** Every claim has the same typed fields: `id`, `thing`, `thing_name`, `as`, `place` (the environment's uid), `place_name`, `folder`, `milestone`, `created`, `closed`, `turn`, `turn_line`, `already_there` and `path` (an object: `status`, `route`, `processes`, `process`, `problem`, `source_entry_id`). `GET /claims/{id}`, `POST /claims` and `close` add `notes` and `requisitions`, a list of `{uid, id, state, message}` with the last three null for a uid that no longer resolves. The list leaves both out.
+
+**Hand-edited files.** A read does not answer 500 because of the types in a hand-edited file. A scalar of the wrong type reads as text (`thing: 123` is `"123"`, a date is ISO text) and anything else as null; a `thing` or `place` that doesn't resolve still has a turn; extra keys stay in the file and are never returned. A file that can't be parsed (bad YAML, a repeated key, an impossible date, bytes that aren't UTF-8) is a line in `problems`, and a 409 for `GET /claims/{id}` and `close`.
+
+**Errors.** 404: no such claim, thing or place (`ClaimNotFound`). 400: a relative folder that leaves the place (`FolderLeavesPlace`). 409: closing a closed claim, or a file that can't be read. Both subclass `ClaimError`, so the CLI is unchanged. An id is looked up among the files, never used to build a path, so `..` is a 404.
+
+**`already_there`.** True when the claim has no role, no folder and no requisitions, and the thing has a live entry in the place on an online root (the rule the Installed milestone uses). It only says so: the path, the turn and `walk` are unchanged. `claim show --json` carries it too.
+
+**Safe writes.** A read of an open claim saves a stale milestone, so the service writes files from several threads. One lock covers reading and rewriting a claim file, and a rewrite goes to a temporary file beside the claim (never ending in `.md`) and over it with `os.replace`; a failed write leaves the old file and reads as a problem line. The lock covers one process: a program holding the file open can still make `os.replace` fail on Windows.
+
 ## Roadmap
 
 The library and the first processes come first, then the workspace around them, proven on a real Unreal project. Goal numbers refer to `archive/IDENTITY.md`.

@@ -6549,6 +6549,503 @@
           }
         ]
       }
+    },
+    "/api/v1/claims/preview": {
+      "post": {
+        "tags": [
+          "claims"
+        ],
+        "summary": "Preview Claim",
+        "description": "The claim these fields would make, with its path and whose turn it is. Writes nothing.",
+        "operationId": "preview_claim_api_v1_claims_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/claims": {
+      "post": {
+        "tags": [
+          "claims"
+        ],
+        "summary": "Make Claim",
+        "description": "Make the claim: a file in the claims folder. Returns it as ``GET /claims/{id}`` does.",
+        "operationId": "make_claim_api_v1_claims_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ]
+      },
+      "get": {
+        "tags": [
+          "claims"
+        ],
+        "summary": "List Claims",
+        "description": "Claims newest first, and a line for each file that could not be read (never filtered).",
+        "operationId": "list_claims_api_v1_claims_get",
+        "parameters": [
+          {
+            "name": "all",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Closed claims too",
+              "default": false,
+              "title": "All"
+            },
+            "description": "Closed claims too"
+          },
+          {
+            "name": "turn",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "you",
+                    "exchange",
+                    "build"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only claims with this turn: you (the user's move), exchange (the latest requisition is queued or running), build (a process has to be built). A closed claim's turn is none, so it never matches",
+              "title": "Turn"
+            },
+            "description": "Only claims with this turn: you (the user's move), exchange (the latest requisition is queued or running), build (a process has to be built). A closed claim's turn is none, so it never matches"
+          },
+          {
+            "name": "thing",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only claims for this dossier uid",
+              "title": "Thing"
+            },
+            "description": "Only claims for this dossier uid"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimList"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/claims/{id}": {
+      "get": {
+        "tags": [
+          "claims"
+        ],
+        "summary": "Get Claim",
+        "description": "One claim with its notes and the requisitions it recorded.",
+        "operationId": "get_claim_api_v1_claims__id__get",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ]
+      }
+    },
+    "/api/v1/claims/{id}/close": {
+      "post": {
+        "tags": [
+          "claims"
+        ],
+        "summary": "Close Claim",
+        "description": "Close a claim; it keeps its milestone. The reason is added to its notes.",
+        "operationId": "close_claim_api_v1_claims__id__close_post",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ClaimClose"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "token": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -6698,6 +7195,638 @@
           "fields"
         ],
         "title": "Choices"
+      },
+      "ClaimClose": {
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Added to the claim's notes"
+          }
+        },
+        "type": "object",
+        "title": "ClaimClose"
+      },
+      "ClaimDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The file's name without .md"
+          },
+          "thing": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thing",
+            "description": "The dossier's uid"
+          },
+          "thing_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thing Name",
+            "description": "The dossier's name when the claim was made, as stored in the file; not refreshed on reads, so after a rename it differs from the dossier's name"
+          },
+          "as": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As",
+            "description": "What the thing is in the place, e.g. prop; null or an empty string for no role"
+          },
+          "place": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Place",
+            "description": "The environment's uid"
+          },
+          "place_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Place Name",
+            "description": "The environment's name when the claim was made, as stored in the file; not refreshed on reads, so after a rename it differs from the environment's"
+          },
+          "folder": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder",
+            "description": "Where the output should go: absolute, or relative to the place; blank or null is the place's default folder"
+          },
+          "milestone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Milestone",
+            "description": "claimed, acquired, converted or installed. An open claim's is derived from the library on every read; a closed claim keeps the one it had"
+          },
+          "created": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created",
+            "description": "The day the claim was made, as an ISO date"
+          },
+          "closed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed",
+            "description": "The day the claim was closed, as an ISO date; null while open"
+          },
+          "turn": {
+            "type": "string",
+            "enum": [
+              "you",
+              "exchange",
+              "build",
+              "none"
+            ],
+            "title": "Turn",
+            "description": "Whose move it is. you: the user's (`turn_line` says what). exchange: the claim's latest requisition is queued or running in Exchange. build: no process takes the thing to the place yet, so one has to be built (also when the place is not in the library: `path.problem` says so). none: the claim is closed"
+          },
+          "turn_line": {
+            "type": "string",
+            "title": "Turn Line",
+            "description": "What the turn's owner has to do when it is `you` or `build`; empty for `exchange` and `none`"
+          },
+          "already_there": {
+            "type": "boolean",
+            "title": "Already There",
+            "description": "No role or folder and no requisitions, and the place already holds the thing: it has a live entry there on an online root"
+          },
+          "path": {
+            "$ref": "#/components/schemas/ClaimPath",
+            "description": "How the thing gets to the place in the claim's role (`as`); derived on every read, never written"
+          },
+          "notes": {
+            "type": "string",
+            "title": "Notes",
+            "description": "The claim file's body, under its front matter"
+          },
+          "requisitions": {
+            "items": {
+              "$ref": "#/components/schemas/ClaimRequisition"
+            },
+            "type": "array",
+            "title": "Requisitions",
+            "description": "The requisitions the claim has walked, in the order its file lists them"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "thing",
+          "thing_name",
+          "as",
+          "place",
+          "place_name",
+          "folder",
+          "milestone",
+          "created",
+          "closed",
+          "turn",
+          "turn_line",
+          "already_there",
+          "path",
+          "notes",
+          "requisitions"
+        ],
+        "title": "ClaimDetail"
+      },
+      "ClaimList": {
+        "properties": {
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/ClaimView"
+            },
+            "type": "array",
+            "title": "Claims",
+            "description": "Newest created first"
+          },
+          "problems": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Problems",
+            "description": "A line for each claim file that could not be read, and for each whose milestone could not be saved (the claim is still listed then)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "claims",
+          "problems"
+        ],
+        "title": "ClaimList"
+      },
+      "ClaimPath": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "not_ready",
+              "none"
+            ],
+            "title": "Status",
+            "description": "ready: a route can be walked now. not_ready: a chain exists and `process` names the first process that needs setup. none: no process takes the thing to the place, or the dossier or place is not in the library; `problem` says which"
+          },
+          "route": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "convert",
+                  "copy",
+                  "children"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route",
+            "description": "children means each child dossier takes its own route; null when status is none"
+          },
+          "processes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Processes",
+            "description": "The processes in order; empty when there is none"
+          },
+          "process": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Process",
+            "description": "The first process that is not ready, when status is not_ready"
+          },
+          "problem": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Problem",
+            "description": "Why the path can't be walked yet; null when it can"
+          },
+          "source_entry_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Entry Id",
+            "description": "The ledger entry the route reads from; null when there is none"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "route",
+          "processes",
+          "process",
+          "problem",
+          "source_entry_id"
+        ],
+        "title": "ClaimPath"
+      },
+      "ClaimPreviewRequest": {
+        "properties": {
+          "uid": {
+            "type": "string",
+            "title": "Uid",
+            "description": "The dossier to claim"
+          },
+          "environment": {
+            "type": "integer",
+            "title": "Environment",
+            "description": "The id of the environment it should end up in"
+          },
+          "as": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As",
+            "description": "What it is there, e.g. prop; null or an empty string for no role"
+          },
+          "folder": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder",
+            "description": "Absolute (anywhere), or relative to the place; a relative one may not leave it"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uid",
+          "environment"
+        ],
+        "title": "ClaimPreviewRequest"
+      },
+      "ClaimRequest": {
+        "properties": {
+          "uid": {
+            "type": "string",
+            "title": "Uid",
+            "description": "The dossier to claim"
+          },
+          "environment": {
+            "type": "integer",
+            "title": "Environment",
+            "description": "The id of the environment it should end up in"
+          },
+          "as": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As",
+            "description": "What it is there, e.g. prop; null or an empty string for no role"
+          },
+          "folder": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder",
+            "description": "Absolute (anywhere), or relative to the place; a relative one may not leave it"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note",
+            "description": "The claim's first note",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "uid",
+          "environment"
+        ],
+        "title": "ClaimRequest"
+      },
+      "ClaimRequisition": {
+        "properties": {
+          "uid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uid",
+            "description": "The requisition's uid as the file lists it"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id",
+            "description": "Null when the uid no longer resolves to a requisition"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "queued",
+                  "held",
+                  "running",
+                  "needs_attention",
+                  "fulfilled",
+                  "partially_fulfilled",
+                  "failed",
+                  "stale",
+                  "removed",
+                  "replaced"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State",
+            "description": "Null when `id` is"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message",
+            "description": "Null when `id` is, and when the requisition has no message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uid",
+          "id",
+          "state",
+          "message"
+        ],
+        "title": "ClaimRequisition",
+        "description": "One requisition a claim has walked. See `ClaimView` on hand-edited files."
+      },
+      "ClaimView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The file's name without .md"
+          },
+          "thing": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thing",
+            "description": "The dossier's uid"
+          },
+          "thing_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thing Name",
+            "description": "The dossier's name when the claim was made, as stored in the file; not refreshed on reads, so after a rename it differs from the dossier's name"
+          },
+          "as": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As",
+            "description": "What the thing is in the place, e.g. prop; null or an empty string for no role"
+          },
+          "place": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Place",
+            "description": "The environment's uid"
+          },
+          "place_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Place Name",
+            "description": "The environment's name when the claim was made, as stored in the file; not refreshed on reads, so after a rename it differs from the environment's"
+          },
+          "folder": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Folder",
+            "description": "Where the output should go: absolute, or relative to the place; blank or null is the place's default folder"
+          },
+          "milestone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Milestone",
+            "description": "claimed, acquired, converted or installed. An open claim's is derived from the library on every read; a closed claim keeps the one it had"
+          },
+          "created": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created",
+            "description": "The day the claim was made, as an ISO date"
+          },
+          "closed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closed",
+            "description": "The day the claim was closed, as an ISO date; null while open"
+          },
+          "turn": {
+            "type": "string",
+            "enum": [
+              "you",
+              "exchange",
+              "build",
+              "none"
+            ],
+            "title": "Turn",
+            "description": "Whose move it is. you: the user's (`turn_line` says what). exchange: the claim's latest requisition is queued or running in Exchange. build: no process takes the thing to the place yet, so one has to be built (also when the place is not in the library: `path.problem` says so). none: the claim is closed"
+          },
+          "turn_line": {
+            "type": "string",
+            "title": "Turn Line",
+            "description": "What the turn's owner has to do when it is `you` or `build`; empty for `exchange` and `none`"
+          },
+          "already_there": {
+            "type": "boolean",
+            "title": "Already There",
+            "description": "No role or folder and no requisitions, and the place already holds the thing: it has a live entry there on an online root"
+          },
+          "path": {
+            "$ref": "#/components/schemas/ClaimPath",
+            "description": "How the thing gets to the place in the claim's role (`as`); derived on every read, never written"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "thing",
+          "thing_name",
+          "as",
+          "place",
+          "place_name",
+          "folder",
+          "milestone",
+          "created",
+          "closed",
+          "turn",
+          "turn_line",
+          "already_there",
+          "path"
+        ],
+        "title": "ClaimView",
+        "description": "A claim as the list shows it. A claim file may be hand-edited and then hold anything, so the fields read\nfrom it may read as their text or as null; these descriptions cover a file the API wrote."
       },
       "ClassifyJob": {
         "properties": {
@@ -9382,6 +10511,14 @@
             },
             "type": "array",
             "title": "Parameters"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Roles",
+            "description": "What its output can be in a place, e.g. prop (the manifest's [output] roles); empty for built-ins"
           }
         },
         "type": "object",
@@ -9402,7 +10539,8 @@
           "prerequisites",
           "problems",
           "trust",
-          "parameters"
+          "parameters",
+          "roles"
         ],
         "title": "ProcessView"
       },
