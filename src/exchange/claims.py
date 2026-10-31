@@ -28,7 +28,16 @@ from exchange.paths import data_dir
 from exchange.processes.registry import ProcessPackage, Registry, check_prerequisites, ready, tool_paths, validate
 from exchange.projects import frontmatter
 from exchange.requisitions.endpoints import configured_folder
-from exchange.requisitions.plan import PlanError, _entries, find_chains, plan_requisition, queue_plan, routes
+from exchange.requisitions.plan import (
+    PlanError,
+    _entries,
+    find_chains,
+    for_role,
+    grants,
+    plan_requisition,
+    queue_plan,
+    routes,
+)
 
 MILESTONES = ("claimed", "acquired", "converted", "installed")  # in order, each derived from the library
 OWNED_KEYS = ("requisitions", "milestone", "closed")  # the only keys Exchange rewrites
@@ -228,8 +237,8 @@ def close(conn: sqlite3.Connection, id: str, reason: str = "", today: dt.date | 
 # Path, whose turn, walking -------------------------------------------------------------------
 
 
-def _has_role(registry: Registry, chain: list[str], role: str) -> bool:
-    return role in {r.casefold() for r in registry.packages[chain[-1]].manifest.roles}
+def _role(meta: dict[str, Any]) -> str | None:
+    return None if meta.get("as") in (None, "") else str(meta["as"]).casefold()
 
 
 def _setup_problem(package: ProcessPackage, tools: dict[str, str]) -> tuple[str, str]:
@@ -246,44 +255,51 @@ def _setup_problem(package: ProcessPackage, tools: dict[str, str]) -> tuple[str,
 def find_path(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Registry, claim: Claim,
               tools: dict[str, str] | None = None) -> dict:
     """The claim's path: ``ready`` (a route that can be walked now), ``not_ready`` (a chain whose first
-    non-ready process is named, with why) or ``none``. Never imports an untrusted package's code."""
+    non-ready process is named, with why) or ``none``. A product with no route of its own takes the
+    routes of its children (route ``children``), as a requisition plans them. A copy never satisfies
+    a role. Never imports an untrusted package's code."""
     tools = tool_paths() if tools is None else tools
     meta = claim.meta
-    role = None if meta.get("as") in (None, "") else str(meta["as"]).casefold()
+    role = _role(meta)
     thing, place = str(meta.get("thing")), str(meta.get("place"))
 
     def result(status, route=None, processes=(), process=None, problem=None, source=None) -> dict:
         return {"status": status, "route": route, "processes": list(processes), "process": process,
                 "problem": problem, "source_entry_id": source}
 
-    dossier = conn.execute("SELECT type_id FROM dossier_effective WHERE uid = ?", (thing,)).fetchone()
+    dossier = conn.execute("SELECT id, type_id FROM dossier_effective WHERE uid = ?", (thing,)).fetchone()
     if dossier is None:
         return result("none", problem=f"no dossier {thing} in the library")
     env = conn.execute("SELECT id, name, type_id FROM environment WHERE uid = ?", (place,)).fetchone()
     if env is None:
         return result("none", problem=f"no environment {place} in the library")
+    children = conn.execute("SELECT uid, type_id FROM dossier_effective WHERE parent_id = ? ORDER BY lower(name)",
+                            (dossier["id"],)).fetchall()
     try:
-        found = routes(conn, definitions, registry, thing, env["id"], tools)
+        kept = for_role(registry, routes(conn, definitions, registry, thing, env["id"], tools), role)
+        beneath = [] if kept else [r for child in children for r in for_role(
+            registry, routes(conn, definitions, registry, child["uid"], env["id"], tools), role)]
     except PlanError as exc:
         return result("none", problem=str(exc))
-    kept = [r for r in found if r["route"] == "copy" or role is None or _has_role(registry, r["processes"], role)]
     kept.sort(key=lambda r: r["route"] != "convert")  # convert from the source unless it is already there
     if kept:
         return result("ready", kept[0]["route"], kept[0]["processes"], source=kept[0]["source_entry_id"])
-    tags = repo.effective_tags(conn, thing)
-    best = None  # (chain, source entry, first non-ready process): the shortest
-    for entry in _entries(conn, thing):
-        for chain in find_chains(registry, definitions, dossier["type_id"], tags, entry["env_type"], env["type_id"],
-                                 tools, ready_only=False):
-            if role is not None and not _has_role(registry, chain, role):
-                continue
-            unready = next((p for p in chain if not ready(registry.packages[p], tools)), None)
-            if unready is not None and (best is None or len(chain) < len(best[0])):
-                best = (chain, entry["id"], unready)
+    if beneath:
+        return result("ready", "children", dict.fromkeys(p for r in beneath for p in r["processes"]))
+    best = None  # (chain, route, source entry, first non-ready process): the shortest
+    for uid, type_id in [(thing, dossier["type_id"]), *map(tuple, children)]:
+        tags = repo.effective_tags(conn, uid)
+        for entry in _entries(conn, uid):
+            for chain in find_chains(registry, definitions, type_id, tags, entry["env_type"], env["type_id"],
+                                     tools, ready_only=False):
+                if role is not None and not grants(registry, chain, role):
+                    continue
+                unready = next((p for p in chain if not ready(registry.packages[p], tools)), None)
+                if unready is not None and (best is None or len(chain) < len(best[0])):
+                    best = (chain, *(("convert", entry["id"]) if uid == thing else ("children", None)), unready)
     if best is not None:
-        chain, source, unready = best
-        return result("not_ready", "convert", chain, unready, _setup_problem(registry.packages[unready], tools)[0],
-                      source)
+        chain, route, source, unready = best
+        return result("not_ready", route, chain, unready, _setup_problem(registry.packages[unready], tools)[0], source)
     return result("none", problem=f"no process takes it to {env['name']}" + (f" as {meta['as']}" if role else ""))
 
 
@@ -353,8 +369,9 @@ def walk(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Registr
     if latest is not None and latest["state"] == "held":
         raise ClaimError(f"Release requisition {latest['id']}")
     env_id = conn.execute("SELECT id FROM environment WHERE uid = ?", (str(claim.meta.get("place")),)).fetchone()[0]
-    plan = plan_requisition(conn, definitions, registry, str(claim.meta["thing"]), env_id, processes=path["processes"],
-                            source_entry_id=path["source_entry_id"],
+    processes = None if path["route"] == "children" else path["processes"]  # each child takes its own route
+    plan = plan_requisition(conn, definitions, registry, str(claim.meta["thing"]), env_id, processes=processes,
+                            source_entry_id=path["source_entry_id"], role=_role(claim.meta),
                             endpoint_folder=_endpoint_folder(conn, claim.meta, env_id), tools=tools)
     requisition_id = queue_plan(conn, plan, registry)
     uid = conn.execute("SELECT uid FROM requisition WHERE id = ?", (requisition_id,)).fetchone()[0]

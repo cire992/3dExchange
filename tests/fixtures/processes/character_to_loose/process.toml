@@ -1,0 +1,21 @@
+# A test process that takes a product's child somewhere the product can't go, and grants it a role.
+
+[process]
+id = "character_to_loose"
+name = "Character to loose files"
+version = "1.0.0"
+author = "Tests"
+format_version = 1
+
+[input]
+dossier_types = ["daz_character_preset"]
+artifact = "Files"
+
+[output]
+environment = "loose_files"
+folder = "Characters/{name}"
+roles = ["figure"]
+
+[[step]]
+id = "copy"
+operation = "core.copy"

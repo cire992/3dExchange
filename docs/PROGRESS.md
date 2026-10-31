@@ -36,7 +36,7 @@ Exchange is refocused on one loop: **Exchange notices a thing → Luke claims it
 
 ## R3c: claims on real data (2026-10-31)
 
-Claims work on real content: a real product walked from Claimed to Installed, and so did a real mesh through Blender. The check also found four problems, two of them in the way of the first proof. None is fixed yet.
+Claims work on real content: a real product walked from Claimed to Installed, and so did a real mesh through Blender. The check also found the problems below, and `R3D_PLAN.md` fixes them, one PR each.
 
 **How:** on a sample library, built by `scripts/sample_library.py` (see `AGENTS.md`), not a scan of the real one. A full scan with enrichment ran 1 h 43 min without finishing and was stopped. The sample was three real products with their DIM manifests, a hand-installed character and three files Luke saved: 353 files, 369 MB, scanned with enrichment in 27 s. Claims, database and endpoints all lived in scratch, and the real library and data folder were not touched.
 
@@ -52,14 +52,15 @@ Claims work on real content: a real product walked from Claimed to Installed, an
 
 **The problems:**
 
-1. **A role is ignored on a copy route** (`claims.py`, `find_path`). A claim "as `g8f_character`" on a G9 character reads `ready` by copy instead of `build`: walking it would copy a G9 character and call it Installed. This is the first proof's own claim. The issue asked for it ("a copy route is a path too") and `test_the_role_filter_keeps_one_chain_and_drops_another` pins it, so the fix changes that test.
-2. **Saved files aren't noticed** (`scanner/layers/daz.py`, `_folder_products`). RESTART_PLAN's decision 8 asked this. An installed G9 character is noticed (*Krow*: a product and 11 children), and so is a saved subset in a folder of its own (*TFD Dia*), but anything under `People/` shallower than four folders is "too shallow to be one product". The Exchange copies Luke saved (`People/Genesis 9/Genesis 9 Exchange.duf`, a `character`, and the G8 ones, `scene_subset`) are unattached files. So is anything saved to `People/<figure>/Characters/`. Across the library that rule skips 1,380 `.duf` files no manifest lists: 277 `character` and 133 `scene_subset` among them, so a fix adds hundreds of dossiers, not thousands.
+1. **A role was ignored on a copy route** (`claims.py`, `find_path`). A claim "as `g8f_character`" on a G9 character read `ready` by copy instead of `build`: walking it would have copied a G9 character and called it Installed. This is the first proof's own claim. Fixed in R3d-1: a copy never satisfies a role.
+2. **Some saved files aren't noticed** (`scanner/layers/daz.py`). RESTART_PLAN's decision 8 asked this. An installed G9 character is noticed (*Krow*: a product and 11 children), so is a saved subset in a folder of its own (*TFD Dia*), and so is a loose file a type rule matches, such as anything in `People/<figure>/Characters/`. The rest are unattached, including the Exchange copies Luke saved (`People/Genesis 9/Genesis 9 Exchange.duf`, a `character`, and the G8 ones, `scene_subset`). Across the library, no product holds 11,345 `.duf` files: 2,397 become dossiers by a type rule, and of the 8,948 left, 994 are `scene_subset`, 747 `wearable` and 54 `character`, the rest being presets. (This corrects the first write-up, which said everything in `Characters/` was missed and counted 1,380 files.)
 3. **A folder outside a single-root place never reaches Installed** (`runner.py`, `_rescan`). The endpoint becomes a new environment, so the claim's place never holds the output, and its turn line wrongly says "the place no longer holds what requisition 3 wrote". Daz Studio gathers roots, so it doesn't happen there.
 4. **`ready` doesn't mean a process can run.** Convert mesh's input is matched by dossier type, and a `daz_prop` matches, but its entry holds a `.cr2`: the OBJ is a support file of the product. So R3_PLAN's check, Convert mesh on a Daz product, can't be done, which is why the OBJ was walked loose. R6's path goes through the Daz Studio bridge, so it doesn't depend on this.
+5. **A product claim said "build" when only its children can travel** (`claims.py`, `find_path`), though the planner plans them. Found while planning the fixes. Fixed in R3d-1: a product with no route of its own takes its children's (route `children`), and with a role, only those that grant it.
 
 ## Where we are
 
-**Phases 1-3, 4a-4c, phase 6 up to 6i, phase 7 part 1 and R1 are merged.** R2 (6j) is done: R2a (#30) closed the parity gaps `PARITY_CHECKLIST.md` lists, Luke signed the checklist off on 2026-10-29 (R2b), and the PySide6 window is removed in R2c. R3a and R3b are merged; R3c, the check on real data, is next.
+**Phases 1-3, 4a-4c, phase 6 up to 6i, phase 7 part 1 and R1 are merged.** R2 (6j) is done: R2a (#30) closed the parity gaps `PARITY_CHECKLIST.md` lists, Luke signed the checklist off on 2026-10-29 (R2b), and the PySide6 window is removed in R2c. R3a, R3b and R3c are merged; R3d (`R3D_PLAN.md`), the fixes from R3c, is next.
 
 - **Stacked PRs:** after merging one, change the next PR's base to `main` before merging it (or delete the merged branch, and GitHub moves it). This has gone wrong three times: #11 and #12 needed #13 to reach `main`, #26 needed #27, and the shell's #14 needed its #16. Turning on *Automatically delete head branches* (Settings › General › Pull Requests, in both repositories) makes GitHub retarget them by itself; until then, prefer branching from `main`.
 
@@ -98,7 +99,9 @@ Claims work on real content: a real product walked from Claimed to Installed, an
 | R2c | 6j's end: the PySide6 window removed (its package and tests, the `ui` extra, the PySide6 and Qt test dependencies, the window's entry point) | merged (#33) |
 | R3a | Claims core, part 1: claim files in `<data>/claims/`, Claimed and Acquired, `exchange claim add / list / show / close` (#34) | merged (#35) |
 | R3b | Claims core, part 2: claim paths by role and place, whose turn, `exchange claim walk [--run]`, Converted and Installed (#36) | merged (#37) |
-| R3 | The frozen slice's `exchange claims list/ack` moved to `exchange project claims list/ack`, no alias; the R3 plan committed | in review |
+| R3 | The frozen slice's `exchange claims list/ack` moved to `exchange project claims list/ack`, no alias; the R3 plan committed | merged (#38) |
+| R3c | Claims on real data, `scripts/sample_library.py` | merged (#39) |
+| R3d-1 | Claims tell the truth: a copy never satisfies a role, and a product's path includes its children | in review |
 
 ## Phase 6: Service and Workspace
 
