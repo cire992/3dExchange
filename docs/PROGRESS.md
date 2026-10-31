@@ -108,6 +108,7 @@ Claims work on real content: a real product walked from Claimed to Installed, an
 | R3d-5 | A joined folder can be forgotten on its own (`env forget --root`), and can't retype its place (#48) | merged (#50) |
 | R3d-6 | A place holds only what's on an online root: output on an offline or deleted root reads Converted, and Installed again when the root is back (#49) | in review |
 | R4a | Claims in the service API: read, make, close, preview, `already_there`, `ProcessView.roles`, safe claim writes (#52) | in review |
+| R4b | Walk a claim through the API: `plan` and `walk` with options, `excluded` and `on_collision`; `GET /claims/changes` change notices (#54) | in review |
 
 ## Phase 6: Service and Workspace
 

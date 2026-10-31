@@ -738,7 +738,7 @@ It removes the voice coordinator, mobile access, the persona and its card regist
 
 ### Loop claims in the service
 
-The loop's claims (a markdown file each in `<data>/claims/`, `exchange claim` on the command line) are also read, made and closed through the service, for the Workspace. Everything is under `/api/v1` with the token, tag `claims`:
+The loop's claims (a markdown file each in `<data>/claims/`, `exchange claim` on the command line) are also read, made, closed and walked through the service, for the Workspace. Everything is under `/api/v1` with the token, tag `claims`:
 
 | Route | Does |
 |---|---|
@@ -747,16 +747,23 @@ The loop's claims (a markdown file each in `<data>/claims/`, `exchange claim` on
 | `GET /claims` | `{claims, problems}`: open claims, newest first (`created`, then `id`, both descending; no date sorts last), and a line for each file that can't be read (never filtered). Filters: `all` (closed ones too), `turn` (`you`, `exchange`, `build`), `thing` (a dossier uid) |
 | `GET /claims/{id}` | One claim |
 | `POST /claims/{id}/close` | Takes an optional `reason`; closes the claim and returns it |
+| `POST /claims/{id}/plan` | Takes `options`, `preset`, `excluded` and `on_collision` (as `/requisitions/plan`); returns the `PlanResult` for the claim's path, which `walk` would queue. Writes nothing |
+| `POST /claims/{id}/walk` | The same plus `run` (default true); queues the path as a requisition and records its uid in the claim. Returns `{claim, requisition, job, problem}` |
+| `GET /claims/changes` | `{available, version}`; takes `since` and `wait` (at most 25 seconds) as `GET /jobs` does. See *Change notices* |
 
 **The shape.** Every claim has the same typed fields: `id`, `thing`, `thing_name`, `as`, `place` (the environment's uid), `place_name`, `folder`, `milestone`, `created`, `closed`, `turn`, `turn_line`, `already_there` and `path` (an object: `status`, `route`, `processes`, `process`, `problem`, `source_entry_id`). `GET /claims/{id}`, `POST /claims` and `close` add `notes` and `requisitions`, a list of `{uid, id, state, message}` with the last three null for a uid that no longer resolves. The list leaves both out.
 
+**Walking.** `plan` and `walk` plan the claim's path with `claims.plan_path`, the code `exchange claim walk` goes through, so the plan shown is the plan queued. Options are chosen as for `POST /requisitions/queue`: the request's, over the preset's (which replaces the last used rather than layering on it), over those last used with each process. A walk remembers the included items' options as last used; `exchange claim walk` takes none and never uses them. `excluded` leaves items out (a product's children); a walk with nothing included is refused. A `plan` with nothing included is a 200 with `included` 0, so a rejected option shows as the item's `problems`. With `run` (the default) the walk also starts a job running that requisition alone (`exchange requisition run <id>`). If the job cannot start (another job is writing, the service is stopping) the response is still 200 with `job` null and the reason in `problem`: the requisition is queued and the client can run it with `POST /jobs/requisitions`. A walk waits for no job: it is refused while one writes.
+
 **Hand-edited files.** A read does not answer 500 because of the types in a hand-edited file. A scalar of the wrong type reads as text (`thing: 123` is `"123"`, a date is ISO text) and anything else as null; a `thing` or `place` that doesn't resolve still has a turn; extra keys stay in the file and are never returned. A file that can't be parsed (bad YAML, a repeated key, an impossible date, bytes that aren't UTF-8) is a line in `problems`, and a 409 for `GET /claims/{id}` and `close`.
 
-**Errors.** 404: no such claim, thing or place (`ClaimNotFound`). 400: a relative folder that leaves the place (`FolderLeavesPlace`). 409: closing a closed claim, or a file that can't be read. Both subclass `ClaimError`, so the CLI is unchanged. An id is looked up among the files, never used to build a path, so `..` is a 404.
+**Errors.** 404: no such claim, thing or place (`ClaimNotFound`). 400: a relative folder that leaves the place (`FolderLeavesPlace`). 409: closing a closed claim, or a file that can't be read; and for `plan` and `walk` a closed claim, a claim with no path or one that isn't ready, a latest requisition that is queued, running or held, a plan the core refuses (`PlanError`, `EndpointError`, a rejected option), nothing included (`walk`), or another job writing (`walk`). 503: the library is busy (`walk`). 404 also for an unknown preset. Both subclass `ClaimError`, so the CLI is unchanged. An id is looked up among the files, never used to build a path, so `..` is a 404.
 
 **`already_there`.** True when the claim has no role, no folder and no requisitions, and the thing has a live entry in the place on an online root (the rule the Installed milestone uses). It only says so: the path, the turn and `walk` are unchanged. `claim show --json` carries it too.
 
 **Safe writes.** A read of an open claim saves a stale milestone, so the service writes files from several threads. One lock covers reading and rewriting a claim file, and a rewrite goes to a temporary file beside the claim (never ending in `.md`) and over it with `os.replace`; a failed write leaves the old file and reads as a problem line. The lock covers one process: a program holding the file open can still make `os.replace` fail on Windows.
+
+**Change notices.** `GET /claims/changes` returns a `version` that grows whenever a claim may have changed, so a client waits on it (`since=<version>&wait=<seconds>`, returning when it differs) and lists again. It grows when the service makes, closes or walks a claim, when any job ends (a requisition's run moves its claim), and when a `.md` file in the claims folder is created, changed, moved or deleted (a rewrite's temporary file does not count, its move onto the claim does). The folder is watched with `watchdog` from the first `GET /claims/changes`, which makes the folder if it is missing; a preview or any other call never does. `available` is false without `watchdog` or with watching off, and then only the first two sources are noticed. Accepted gap: a requisition run from the command line (`exchange claim walk --run`, `exchange requisition run`) moves its claim with no notice until something next touches the file.
 
 ## Roadmap
 
