@@ -392,9 +392,12 @@ class _Session:
             root["path"], root["detection_confidence"], [], root["variant"], True,
             status="offline", offline_days=days))
         if days >= OFFLINE_PROMPT_DAYS:
+            from exchange.environments import can_forget_root
+
+            only = f' --root "{root["path"]}"' if can_forget_root(self.conn, self.definitions, root) else ""
             self.report.notes.append(
                 f"{root['path']} has been offline for {days} days; if it is gone for good, "
-                f"run: exchange env forget {env['id']}")
+                f"run: exchange env forget {env['id']}{only}")
 
     # End of phase 2: classification and suggestions ---------------------------------------------
 

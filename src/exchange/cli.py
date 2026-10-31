@@ -90,6 +90,8 @@ def build_parser() -> argparse.ArgumentParser:
         "forget", parents=[common],
         help="remove an environment from the library (nothing on disk changes)")
     forget.add_argument("id", type=int)
+    forget.add_argument("--root", type=Path, metavar="FOLDER",
+                        help="forget only this folder of the environment, not the whole place")
     forget.add_argument("--yes", action="store_true", help="do it; without this, only say what would go")
 
     from exchange import cli_claims, cli_curation, cli_projects, cli_requisitions, cli_service
@@ -312,8 +314,34 @@ def _env_exclude(args, definitions, conn) -> int:
     return 0
 
 
+def _env_forget_root(args, definitions, conn, env) -> int:
+    from exchange.environments import can_forget_root
+    from exchange.paths import fold
+
+    root = repo.find_root(conn, fold(str(Path(args.root).resolve())))
+    if root is None or root["environment_id"] != env["id"]:
+        raise ScanError(f"{args.root} is not a folder of {env['name']}")
+    if not can_forget_root(conn, definitions, root):
+        raise ScanError(
+            f"{root['path']} can't be forgotten on its own: it is the only folder of {env['name']}, or "
+            f"the first of a single-folder type. To remove the whole place, run: exchange env forget {env['id']}")
+    if not args.yes:
+        print(f"Would remove {root['path']} from {env['name']} and everything scanned from it from the "
+              f"library; {env['name']} stays. Files on disk are not touched; your edits stay in the "
+              f"library. Run again with --yes to do it.")
+        return 1
+    with repo.transaction(conn):
+        removed = repo.forget_root(conn, root["id"])
+    _emit(args, {"forgotten": env["id"], "root": root["path"], "dossiers_removed": removed},
+          f"Forgot {root['path']} from {env['name']}; {removed} dossiers no longer in any environment "
+          f"were removed.")
+    return 0
+
+
 def _env_forget(args, definitions, conn) -> int:
     env = _get_env(conn, args.id)
+    if args.root is not None:
+        return _env_forget_root(args, definitions, conn, env)
     roots = [r["path"] for r in repo.list_roots(conn, env["id"])]
     if not args.yes:
         print(f"Would remove {env['name']} ({', '.join(roots)}) and everything scanned from it from "

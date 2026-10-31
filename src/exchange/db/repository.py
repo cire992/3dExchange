@@ -158,7 +158,50 @@ def forget_environment(conn: sqlite3.Connection, environment_id: int) -> int:
                  " (SELECT id FROM environment_root WHERE environment_id = :env)", p)
     conn.execute("DELETE FROM environment_root WHERE environment_id = :env", p)
     conn.execute("DELETE FROM environment WHERE id = :env", p)
+    return _remove_orphan_dossiers(conn)
 
+
+def forget_root(conn: sqlite3.Connection, root_id: int) -> int:
+    """Remove one root of an environment and everything scanned from it. Nothing on disk is touched.
+
+    The environment, its settings and every ledger that still holds an entry stay; a ledger left with
+    none goes, and so do dossiers left with no ledger anywhere. The user's overrides are kept. Returns
+    the number of dossiers removed.
+    """
+    containers = "SELECT id FROM container WHERE root_id = :root"
+    entries = f"SELECT id FROM entry WHERE container_id IN ({containers})"
+    files = "SELECT id FROM file WHERE root_id = :root"
+    p = {"root": root_id}
+    ledgers = [r[0] for r in conn.execute(f"SELECT DISTINCT ledger_id FROM entry WHERE id IN ({entries})", p)]
+    conn.execute(f"DELETE FROM entry_file WHERE entry_id IN ({entries}) OR file_id IN ({files})", p)
+    conn.execute(f"UPDATE entry SET source_entry_id = NULL WHERE source_entry_id IN ({entries})", p)
+    conn.execute(f"DELETE FROM entry WHERE id IN ({entries})", p)
+    conn.execute(f"UPDATE dossier_dependency SET target_file_id = NULL, status = 'broken'"
+                 f" WHERE target_file_id IN ({files})", p)
+    conn.execute(f"UPDATE thumbnail SET source_file_id = NULL WHERE source_file_id IN ({files})", p)
+    conn.execute("DELETE FROM file WHERE root_id = :root", p)
+    conn.execute("DELETE FROM container WHERE root_id = :root", p)
+    conn.execute("DELETE FROM scan WHERE root_id = :root", p)
+    conn.execute("DELETE FROM lexicon_generated WHERE root_id = :root", p)
+    conn.execute("DELETE FROM environment_root WHERE id = :root", p)
+
+    touched: list[int] = []
+    for batch in _chunks(ledgers):
+        marks = ",".join("?" * len(batch))
+        touched += [r[0] for r in conn.execute(
+            f"SELECT DISTINCT dossier_id FROM ledger WHERE id IN ({marks})", batch)]
+        conn.execute(f"DELETE FROM ledger WHERE id IN ({marks})"
+                     f" AND NOT EXISTS (SELECT 1 FROM entry e WHERE e.ledger_id = ledger.id)", batch)
+    removed = _remove_orphan_dossiers(conn)
+    for batch in _chunks(touched):
+        marks = ",".join("?" * len(batch))
+        index_dossiers(conn, [r[0] for r in conn.execute(
+            f"SELECT id FROM dossier WHERE id IN ({marks})", batch)])
+    return removed
+
+
+def _remove_orphan_dossiers(conn: sqlite3.Connection) -> int:
+    """Remove the dossiers no ledger holds, with what hangs off them; returns how many."""
     orphans = [r[0] for r in conn.execute(
         "SELECT id FROM dossier d WHERE NOT EXISTS (SELECT 1 FROM ledger l WHERE l.dossier_id = d.id)")]
     for batch in _chunks(orphans):
