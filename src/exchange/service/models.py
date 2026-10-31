@@ -857,11 +857,12 @@ class RemoveRequest(BaseModel):
 
 class ClaimPath(BaseModel):
     status: Literal["ready", "not_ready", "none"]
-    route: str | None
-    processes: list[str]
+    route: Literal["convert", "copy", "children"] | None = Field(
+        description="children means each child dossier takes its own route")
+    processes: list[str] = Field(description="The chain in order; empty when there is none")
     process: str | None = Field(description="The first process that is not ready, when status is not_ready")
-    problem: str | None
-    source_entry_id: int | None
+    problem: str | None = Field(description="Why the path can't be walked yet; null when it can")
+    source_entry_id: int | None = Field(description="The ledger entry the route reads from; null when there is none")
 
 
 class ClaimView(BaseModel):
@@ -873,7 +874,7 @@ class ClaimView(BaseModel):
     as_: str | None = Field(alias="as", description="What the thing is in the place, e.g. prop")
     place: str | None = Field(description="The environment's uid")
     place_name: str | None
-    folder: str | None
+    folder: str | None = Field(description="Where the output should go; null is the place's default folder")
     milestone: str | None = Field(description="claimed, acquired, converted or installed")
     created: str | None = Field(description="An ISO date")
     closed: str | None = Field(description="An ISO date; null while open, and also for a closed claim whose file "
@@ -882,11 +883,12 @@ class ClaimView(BaseModel):
     turn_line: str = Field(description="What the turn's owner has to do")
     already_there: bool = Field(description="No role, folder or requisitions, and the place already holds the "
                                 "thing: it has a live entry there on an online root")
-    path: ClaimPath
+    path: ClaimPath = Field(description="The processes that take the thing to the place, as the role: derived on "
+                            "every read, never written")
 
 
 class ClaimRequisition(BaseModel):
-    uid: str | None
+    uid: str | None = Field(description="Null when the file's entry is not text")
     id: int | None = Field(description="Null for a uid that no longer resolves")
     state: RequisitionState | None = Field(description="Null for a uid that no longer resolves")
     message: str | None = Field(description="Null for a uid that no longer resolves")
@@ -894,7 +896,8 @@ class ClaimRequisition(BaseModel):
 
 class ClaimDetail(ClaimView):
     notes: str
-    requisitions: list[ClaimRequisition]
+    requisitions: list[ClaimRequisition] = Field(
+        description="The requisitions the claim has walked, in the order its file lists them")
 
 
 class ClaimList(BaseModel):

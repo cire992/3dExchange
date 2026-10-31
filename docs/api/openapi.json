@@ -7288,7 +7288,8 @@
                 "type": "null"
               }
             ],
-            "title": "Folder"
+            "title": "Folder",
+            "description": "Where the output should go; null is the place's default folder"
           },
           "milestone": {
             "anyOf": [
@@ -7348,7 +7349,8 @@
             "description": "No role, folder or requisitions, and the place already holds the thing: it has a live entry there on an online root"
           },
           "path": {
-            "$ref": "#/components/schemas/ClaimPath"
+            "$ref": "#/components/schemas/ClaimPath",
+            "description": "The processes that take the thing to the place, as the role: derived on every read, never written"
           },
           "notes": {
             "type": "string",
@@ -7359,7 +7361,8 @@
               "$ref": "#/components/schemas/ClaimRequisition"
             },
             "type": "array",
-            "title": "Requisitions"
+            "title": "Requisitions",
+            "description": "The requisitions the claim has walked, in the order its file lists them"
           }
         },
         "type": "object",
@@ -7422,20 +7425,27 @@
           "route": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "enum": [
+                  "convert",
+                  "copy",
+                  "children"
+                ]
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Route"
+            "title": "Route",
+            "description": "children means each child dossier takes its own route"
           },
           "processes": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Processes"
+            "title": "Processes",
+            "description": "The chain in order; empty when there is none"
           },
           "process": {
             "anyOf": [
@@ -7458,7 +7468,8 @@
                 "type": "null"
               }
             ],
-            "title": "Problem"
+            "title": "Problem",
+            "description": "Why the path can't be walked yet; null when it can"
           },
           "source_entry_id": {
             "anyOf": [
@@ -7469,7 +7480,8 @@
                 "type": "null"
               }
             ],
-            "title": "Source Entry Id"
+            "title": "Source Entry Id",
+            "description": "The ledger entry the route reads from; null when there is none"
           }
         },
         "type": "object",
@@ -7588,7 +7600,8 @@
                 "type": "null"
               }
             ],
-            "title": "Uid"
+            "title": "Uid",
+            "description": "Null when the file's entry is not text"
           },
           "id": {
             "anyOf": [
@@ -7722,7 +7735,8 @@
                 "type": "null"
               }
             ],
-            "title": "Folder"
+            "title": "Folder",
+            "description": "Where the output should go; null is the place's default folder"
           },
           "milestone": {
             "anyOf": [
@@ -7782,7 +7796,8 @@
             "description": "No role, folder or requisitions, and the place already holds the thing: it has a live entry there on an online root"
           },
           "path": {
-            "$ref": "#/components/schemas/ClaimPath"
+            "$ref": "#/components/schemas/ClaimPath",
+            "description": "The processes that take the thing to the place, as the role: derived on every read, never written"
           }
         },
         "type": "object",
