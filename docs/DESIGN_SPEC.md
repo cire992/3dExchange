@@ -567,7 +567,7 @@ glb_to_starfield_ingestible/
 └─ README.md
 ```
 
-The manifest declares name, version, author, input predicate (dossier type + required tags, e.g. static mesh tagged Food), source and target environment variants, operation chain with each step's executor, parameters with defaults, prerequisites, and which roles it grants.
+The manifest declares name, version, author, input predicate (dossier type + required tags, e.g. static mesh tagged Food), source and target environment variants, operation chain with each step's executor, parameters with defaults, prerequisites, and which roles it grants. An optional `extensions` list under `[input]` names the file types the process reads, each with a leading dot and compared case-insensitively; empty means any. A chain is offered from a source entry only if that entry holds a live file with one of its first process's extensions; later processes aren't checked, and neither is a copy. The extension is the whole check: no file's contents are read.
 
 Packages live in three places: built into Exchange, installed globally, or in a project home's `processes/` for project-specific work.
 

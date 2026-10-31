@@ -15,6 +15,7 @@ prerequisites and its steps::
     tags = []                         # all of these tags
     environments = []                 # source environment types; empty: any
     artifact = "Images"               # the type of the source files
+    extensions = [".png", ".jpg"]     # the source must hold a live file of one of these; empty: any
 
     [output]
     environment = "same"              # target environment type, or "same" as the source's
@@ -120,6 +121,7 @@ class ProcessManifest:
     source: str
     input_types: tuple[str, ...]
     input_tags: tuple[str, ...]
+    input_extensions: tuple[str, ...]
     input_environments: tuple[str, ...]
     input_artifact: str
     output_environment: str
@@ -184,7 +186,11 @@ def parse_manifest(data: dict, source: str) -> ProcessManifest:
     version = p.get("format_version", int)
     if version != FORMAT_VERSION:
         raise DefinitionError(source, f"unsupported format_version {version} (expected {FORMAT_VERSION})")
-    i = top.table("input", ["dossier_types", "tags", "environments", "artifact"])
+    i = top.table("input", ["dossier_types", "tags", "environments", "artifact", "extensions"])
+    extensions = i.strings("extensions")
+    for extension in extensions:
+        if not extension.startswith("."):
+            raise DefinitionError(source, f"{i.where}.extensions: {extension!r} must start with a dot")
     o = top.table("output", ["environment", "dossier_type", "folder", "entry_status", "roles"])
 
     parameters = []
@@ -242,7 +248,7 @@ def parse_manifest(data: dict, source: str) -> ProcessManifest:
         id=_identifier(p), name=p.get("name", str), version=p.get("version", str), author=p.get("author", str, ""),
         description=p.get("description", str, ""), source=source,
         input_types=i.strings("dossier_types"), input_tags=i.strings("tags"),
-        input_environments=i.strings("environments"), input_artifact=i.get("artifact", str, "Files"),
+        input_extensions=extensions, input_environments=i.strings("environments"), input_artifact=i.get("artifact", str, "Files"),
         output_environment=o.get("environment", str), output_dossier_type=o.get("dossier_type", str, ""),
         output_folder=o.get("folder", str, "{name}"),
         entry_status=o.get("entry_status", str, "requisitioned", choices=ENTRY_STATUSES),

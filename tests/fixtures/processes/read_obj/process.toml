@@ -1,0 +1,21 @@
+# A test process that reads only .obj files, in the same kind of environment.
+
+[process]
+id = "read_obj"
+name = "Read OBJ"
+version = "1.0.0"
+author = "Tests"
+format_version = 1
+
+[input]
+dossier_types = ["mesh"]
+extensions = [".obj"]
+artifact = "Files"
+
+[output]
+environment = "same"
+folder = "Read/{name}"
+
+[[step]]
+id = "pass"
+operation = "core.copy"

@@ -1,0 +1,27 @@
+# A test process that takes .obj files to Daz Studio, with a tool no machine has.
+
+[process]
+id = "obj_to_daz_tool"
+name = "OBJ to Daz (tool)"
+version = "1.0.0"
+author = "Tests"
+format_version = 1
+
+[input]
+dossier_types = ["mesh"]
+extensions = [".obj"]
+artifact = "Files"
+
+[output]
+environment = "daz_studio"
+folder = "Read/{name}"
+
+[[prerequisite]]
+id = "missing"
+kind = "tool"
+tool = "exchange_test_missing_tool"
+hint = "no machine has it"
+
+[[step]]
+id = "pass"
+operation = "core.copy"

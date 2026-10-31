@@ -1,0 +1,21 @@
+# A test process that takes .obj files to Daz Studio; it has code of its own.
+
+[process]
+id = "obj_to_daz"
+name = "OBJ to Daz"
+version = "1.0.0"
+author = "Tests"
+format_version = 1
+
+[input]
+dossier_types = ["mesh"]
+extensions = [".obj"]
+artifact = "Files"
+
+[output]
+environment = "daz_studio"
+folder = "Read/{name}"
+
+[[step]]
+id = "pass"
+operation = "ops.pass_through"

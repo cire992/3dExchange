@@ -1,0 +1,21 @@
+# A test process that takes common mesh files to loose files.
+
+[process]
+id = "mesh_to_loose"
+name = "Mesh to loose files"
+version = "1.0.0"
+author = "Tests"
+format_version = 1
+
+[input]
+dossier_types = ["mesh"]
+extensions = [".fbx", ".obj", ".glb"]
+artifact = "Files"
+
+[output]
+environment = "loose_files"
+folder = "Read/{name}"
+
+[[step]]
+id = "pass"
+operation = "core.copy"
