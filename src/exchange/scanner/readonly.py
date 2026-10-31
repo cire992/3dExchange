@@ -7,11 +7,13 @@ for writing, create a folder or change attributes inside a scanned folder.
 from __future__ import annotations
 
 import configparser
+import zlib
 from pathlib import Path
 
 from exchange.paths import os_path
 
 MAX_READ_BYTES = 8 * 1024 * 1024  # manifests and ini files are small; refuse to slurp anything big
+HEAD_BYTES = 64 * 1024  # enough to hold a Daz file's asset_info, which comes first
 
 
 def read_bytes(path: Path, limit: int = MAX_READ_BYTES) -> bytes | None:
@@ -20,6 +22,21 @@ def read_bytes(path: Path, limit: int = MAX_READ_BYTES) -> bytes | None:
         with open(os_path(path), "rb") as fh:
             return fh.read(limit)
     except OSError:
+        return None
+
+
+def read_head(path: Path, limit: int = HEAD_BYTES) -> bytes | None:
+    """The first ``limit`` bytes of ``path``, gunzipped if it is gzip; None if unreadable or corrupt.
+
+    Reads at most ``limit`` bytes from disk and returns at most ``limit`` decompressed ones. A
+    gzip stream cut by the limit is expected, not an error; a corrupt one is.
+    """
+    data = read_bytes(path, limit)
+    if data is None or data[:2] != b"\x1f\x8b":
+        return data
+    try:
+        return zlib.decompressobj(zlib.MAX_WBITS | 16).decompress(data, limit)
+    except zlib.error:
         return None
 
 

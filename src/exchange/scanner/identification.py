@@ -4,7 +4,8 @@ The environment's layer handler names containers and products. The engine then:
 
 * makes a product dossier for each product, and a child dossier for each member file that a
   dossier-type rule recognizes;
-* makes a standalone dossier for each recognized file that no product claims;
+* makes a standalone dossier for each recognized file that no product claims (by a type rule, or
+  because the layer identified it itself, like a Daz saved character);
 * records every dossier's presence as an entry (in a ledger for this environment) with its files;
 * retires entries of this root whose files are gone, so history is kept.
 
@@ -29,7 +30,7 @@ from exchange.links import apply_file_links, linked_keys
 from exchange.requisitions.sidecars import apply_sidecars, is_sidecar, read_sidecars, sidecar_keys
 from exchange.paths import fold, rel_under
 from exchange.scanner.layers import HANDLERS
-from exchange.scanner.layers.base import FileInfo, LayerContext
+from exchange.scanner.layers.base import ChildSpec, FileInfo, LayerContext
 from exchange.scanner.tokenize import tokenize
 
 # Packed archives are indexed by name only; extraction is a user action (Roadmap phase 5).
@@ -201,6 +202,20 @@ def identify_root(
             spec.fields["variant"] = variant
         return spec
 
+    def given_spec(f: FileInfo, given: ChildSpec, container_key: str, parent_id: int | None) -> _Spec:
+        """A dossier for a file the layer identified itself."""
+        rel = rel_under(f.rel, container_key) if container_key else f.rel
+        spec = _Spec(
+            key=f"file:{fold(rel)}", type_id=given.type_id, name=display_name(f.rel),
+            confidence=given.confidence, signals=given.signals,
+            container_id=container_ids[container_key], primary=[f], parent_id=parent_id,
+            fields=dict(given.fields))
+        if "variant" not in spec.fields:
+            variant = _dossier_variant(definition, rel)
+            if variant:
+                spec.fields["variant"] = variant
+        return spec
+
     writer = _Writer(conn, environment_id, definition.handler, definitions)
     # Files the user linked onto a dossier belong to it, and so do files a requisition wrote (to
     # the asset it converted); they do not become dossiers of their own.
@@ -244,16 +259,7 @@ def identify_root(
                 continue
             given = explicit.get(fold(m.rel))
             if given is not None:
-                child = _Spec(
-                    key=f"file:{fold(rel_under(m.rel, container_key) if container_key else m.rel)}",
-                    type_id=given.type_id, name=display_name(m.rel),
-                    confidence=given.confidence, signals=given.signals,
-                    container_id=container_ids[container_key], primary=[m], parent_id=product_id,
-                    fields=dict(given.fields))
-                if "variant" not in child.fields:
-                    variant = _dossier_variant(definition, rel_under(m.rel, container_key) if container_key else m.rel)
-                    if variant:
-                        child.fields["variant"] = variant
+                child = given_spec(m, given, container_key, product_id)
             elif product.children_only:
                 continue
             else:
@@ -263,11 +269,14 @@ def identify_root(
                 children.add(m.id)
                 count(child)
 
+    standalone = {fold(c.rel): c for c in result.standalone}
     for f in content:
         container_key = file_container[f.id]
         if f.id in claimed or container_key is None:
             continue
         spec = child_spec(f, container_key, None)
+        if spec is None and fold(f.rel) in standalone:
+            spec = given_spec(f, standalone[fold(f.rel)], container_key, None)
         if spec is not None:
             writer.persist(spec)
             claimed.add(f.id)

@@ -1,12 +1,14 @@
-"""Small readers for environment-specific file formats used during enrichment.
+"""Small readers for environment-specific file formats.
 
 * Daz ``.duf``/``.dsf`` files (JSON, often gzip-compressed): the content paths they reference,
-  plus geometry and morph statistics.
+  plus geometry and morph statistics (enrichment), and the ``asset_info`` type of a file's head
+  (identification).
 * Unreal ``.uasset`` files: the editor thumbnail stored inside the package.
 """
 
 from __future__ import annotations
 
+import codecs
 import gzip
 import io
 import json
@@ -65,6 +67,49 @@ def read_daz_file(data: bytes) -> DazFileInfo | None:
             if isinstance(deltas, int):
                 info.stats["morph_deltas"] = info.stats.get("morph_deltas", 0) + deltas
     return info
+
+
+def daz_asset_type(head: bytes | None) -> str | None:
+    """``asset_info.type`` read from the start of a ``.duf`` (already gunzipped); None if absent.
+
+    The head is usually cut mid-JSON, so this walks the top-level keys and parses only the values
+    before ``asset_info`` and ``asset_info`` itself, which must be whole in the head.
+    """
+    if not head:
+        return None
+    try:
+        text = codecs.getincrementaldecoder("utf-8-sig")().decode(head)  # keeps a cut character back
+    except UnicodeDecodeError:
+        return None
+    decoder, pos = json.JSONDecoder(), 0
+
+    def skip(at: int) -> int:
+        while at < len(text) and text[at] in " \t\r\n":
+            at += 1
+        return at
+
+    try:
+        pos = skip(pos)
+        if text[pos] != "{":
+            return None
+        pos = skip(pos + 1)
+        while text[pos] != "}":
+            key, pos = decoder.raw_decode(text, pos)
+            pos = skip(pos)
+            if not isinstance(key, str) or text[pos] != ":":
+                return None
+            value, pos = decoder.raw_decode(text, skip(pos + 1))
+            if key == "asset_info":
+                kind = value.get("type") if isinstance(value, dict) else None
+                return kind if isinstance(kind, str) else None
+            pos = skip(pos)
+            if text[pos] == ",":
+                pos = skip(pos + 1)
+            elif text[pos] != "}":
+                return None
+    except (IndexError, ValueError, RecursionError):  # cut by the head, or not JSON
+        return None
+    return None
 
 
 def _strings(value) -> Iterator[str]:
