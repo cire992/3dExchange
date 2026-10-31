@@ -119,14 +119,87 @@ def test_the_role_filter_keeps_one_chain_and_drops_another(world):
     for role in ("prop", "Prop"):
         path = path_of(world, registry, claim_of(world, world["barrel"], "loose_files", role=role))
         assert path["status"] == "ready" and path["route"] == "convert" and path["processes"] == ["copy_as_prop"]
-    figure = path_of(world, registry, claim_of(world, world["barrel"], "loose_files", role="figure"))
-    assert figure["status"] == "ready" and figure["route"] == "copy" and figure["processes"] == ["copy_entry"]
+    assert path_of(world, registry, claim_of(world, world["barrel"], "loose_files", role="figure"))["status"] == "none"
+
+
+def test_a_copy_never_satisfies_a_role(world):
+    registry = registry_with("copy_as_prop")
+    plain = path_of(world, registry, claim_of(world, world["ding"], "loose_files"))
+    assert plain["status"] == "ready" and plain["route"] == "copy"  # the place already holds it
+    claim = claim_of(world, world["ding"], "loose_files", role="prop")
+    path = path_of(world, registry, claim)
+    assert path["status"] == "none" and path["processes"] == [] and "as prop" in path["problem"]
+    assert turn_of(world, registry, claim) == ("build", "No path yet: a process has to be built")
+    with pytest.raises(claims.ClaimError, match="No path yet"):
+        walk(world, registry, claim)
+    assert reread(world, claim).meta["requisitions"] == []
 
 
 def test_a_role_no_process_has_is_not_a_path_elsewhere(world):
     registry = registry_with("to_daz")
     path = path_of(world, registry, claim_of(world, world["barrel"], "daz_studio", role="prop"))
     assert path["status"] == "none"
+
+
+def marius(world):
+    return world["conn"].execute("SELECT uid FROM dossier WHERE name LIKE 'Marius%' AND parent_id IS NULL").fetchone()[0]
+
+
+def items_of(world, rid):
+    return {row[0]: row[1] for row in world["conn"].execute(
+        "SELECT d.name, i.include FROM requisition_item i JOIN dossier_effective d ON d.uid = i.dossier_uid"
+        " WHERE i.requisition_id = ?", (rid,))}
+
+
+def test_a_products_path_is_its_childrens(world):
+    registry = registry_with("character_to_loose", "morph_to_loose")
+    claim = claim_of(world, marius(world), "loose_files")
+    path = path_of(world, registry, claim)
+    assert path["status"] == "ready" and path["route"] == "children" and path["source_entry_id"] is None
+    assert sorted(path["processes"]) == ["character_to_loose", "morph_to_loose"]
+    assert turn_of(world, registry, claim) == ("you", "Walk it")
+    _, rid = walk(world, registry, claim)
+    assert items_of(world, rid) == {"Marius HD-8K": 1, "Marius Head": 1, "Marius Body": 1}
+
+
+def test_a_role_on_a_product_keeps_the_children_that_grant_it(world):
+    registry = registry_with("character_to_loose", "morph_to_loose")
+    claim = claim_of(world, marius(world), "loose_files", role="Figure")
+    path = path_of(world, registry, claim)
+    assert path["route"] == "children" and path["processes"] == ["character_to_loose"]
+    _, rid = walk(world, registry, claim)
+    assert items_of(world, rid) == {"Marius HD-8K": 1, "Marius Head": 0, "Marius Body": 0}
+
+
+def test_a_product_in_its_place_needs_a_process_for_a_role(world):
+    registry = registry_with("character_to_loose")
+    claim = claim_of(world, marius(world), "daz_studio", role="figure")
+    assert path_of(world, registry, claim)["status"] == "none"
+    assert turn_of(world, registry, claim)[0] == "build"
+
+
+def test_a_product_nothing_can_move_is_the_builds_turn(world):
+    registry = registry_with()
+    path = path_of(world, registry, claim_of(world, marius(world), "loose_files"))
+    assert path["status"] == "none" and path["processes"] == []
+
+
+def test_a_childs_unready_process_is_named(world):
+    registry = registry_with("character_to_loose", trusted=False)
+    claim = claim_of(world, marius(world), "loose_files")
+    path = path_of(world, registry, claim)
+    assert path["status"] == "not_ready" and path["route"] == "children" and path["source_entry_id"] is None
+    assert path["process"] == "character_to_loose" and path["processes"] == ["character_to_loose"]
+    assert turn_of(world, registry, claim) == ("you", "Set up character_to_loose: trust it")
+
+
+def test_a_product_walks_to_installed_through_its_children(world):
+    registry = registry_with("character_to_loose")
+    claim, rid = walk(world, registry, claim_of(world, marius(world), "loose_files", role="figure"))
+    run_queue(world["db"], world["definitions"], registry, only=[rid])
+    claim = reread(world, claim)
+    assert claim.milestone == "installed"
+    assert turn_of(world, registry, claim) == ("you", "Close it, or take it into play")
 
 
 def test_a_hand_edited_claim_has_no_path_not_an_error(world):

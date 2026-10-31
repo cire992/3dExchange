@@ -1,0 +1,20 @@
+# A test process for a product's other children: it takes them there, but grants no role.
+
+[process]
+id = "morph_to_loose"
+name = "Morph to loose files"
+version = "1.0.0"
+author = "Tests"
+format_version = 1
+
+[input]
+dossier_types = ["daz_morph"]
+artifact = "Files"
+
+[output]
+environment = "loose_files"
+folder = "Morphs/{name}"
+
+[[step]]
+id = "copy"
+operation = "core.copy"

@@ -134,18 +134,32 @@ def routes(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Regis
     return out
 
 
+def grants(registry: Registry, chain: list[str], role: str) -> bool:
+    """Whether a chain's last process grants ``role`` (casefolded)."""
+    return role in {r.casefold() for r in registry.packages[chain[-1]].manifest.roles}
+
+
+def for_role(registry: Registry, options: list[dict], role: str | None) -> list[dict]:
+    """The routes that give a dossier ``role`` (casefolded): convert chains that grant it, never a
+    copy, which leaves the asset what it was. With no role, every route."""
+    if role is None:
+        return options
+    return [o for o in options if o["route"] == "convert" and grants(registry, o["processes"], role)]
+
+
 def plan_requisition(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Registry, uid: str,
                      environment_id: int, *, processes: list[str] | None = None, source_entry_id: int | None = None,
                      params: dict[str, Any] | None = None, defaults: dict[str, Any] | None = None,
                      endpoint_folder: str | None = None,
                      on_collision: str = "ask", name: str | None = None,
-                     tools: dict[str, str] | None = None) -> Plan:
+                     tools: dict[str, str] | None = None, role: str | None = None) -> Plan:
     """Plan getting a dossier (or a whole product) into an environment.
 
     ``processes`` picks a chain (otherwise the first route found, preferring conversion from the
     origin); ``params`` sets options, as ``{"size": 512}`` (any process with that option) or
     ``{"convert_mesh.format": "obj"}``. ``defaults`` (a preset, last-used options) are the same
     shape but lenient: options a process does not have, or values it would reject, are dropped.
+    ``role`` (casefolded) keeps only the routes that grant it, for the dossier and each child.
     """
     dossier = conn.execute("SELECT * FROM dossier_effective WHERE uid = ?", (uid,)).fetchone()
     if dossier is None:
@@ -161,7 +175,7 @@ def plan_requisition(conn: sqlite3.Connection, definitions: DefinitionSet, regis
     items = []
     for subject in subjects:
         item = _plan_item(conn, definitions, registry, subject, environment_id, processes,
-                          source_entry_id if subject == uid else None, params or {}, tools, defaults or {})
+                          source_entry_id if subject == uid else None, params or {}, tools, defaults or {}, role)
         if subject == uid and children and item.route == "none":
             continue  # a product with no process of its own: its children carry the plan
         items.append(item)
@@ -192,9 +206,9 @@ def _lenient(manifest, values: dict[str, Any]) -> dict[str, Any]:
 
 
 def _plan_item(conn, definitions, registry, uid, environment_id, wanted, source_entry_id, params, tools,
-               defaults=None) -> PlanItem:
+               defaults=None, role=None) -> PlanItem:
     d = conn.execute("SELECT name, type_id FROM dossier_effective WHERE uid = ?", (uid,)).fetchone()
-    options = routes(conn, definitions, registry, uid, environment_id, tools)
+    options = for_role(registry, routes(conn, definitions, registry, uid, environment_id, tools), role)
     if source_entry_id is not None:
         options = [o for o in options if o["source_entry_id"] == source_entry_id]
     if wanted:
