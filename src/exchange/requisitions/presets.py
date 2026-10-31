@@ -18,8 +18,11 @@ requisition is queued from the window, and pre-fill the next plan when no preset
 
 from __future__ import annotations
 
+import contextlib
 import json
+import os
 import re
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -27,6 +30,8 @@ from typing import Any
 from exchange.errors import ExchangeError
 from exchange.paths import data_dir
 from exchange.processes.registry import Registry
+
+_last_lock = threading.Lock()  # remembering, on the service's threads
 
 
 class PresetError(ExchangeError):
@@ -116,11 +121,20 @@ def last_used() -> dict[str, dict[str, Any]]:
 
 
 def remember(options: dict[str, dict[str, Any]]) -> None:
-    """Remember these options as each process's last used."""
-    known = last_used()
-    known.update({k: v for k, v in options.items() if v})
-    _last_file().parent.mkdir(parents=True, exist_ok=True)
-    _last_file().write_text(json.dumps(known, indent=2, ensure_ascii=False), encoding="utf-8")
+    """Remember these options as each process's last used. A convenience: it runs after a requisition is
+    queued, so a write that fails is dropped, and the file keeps what it had."""
+    with _last_lock:
+        known = last_used()
+        known.update({k: v for k, v in options.items() if v})
+        temp = _last_file().with_suffix(f".{os.getpid()}.tmp")
+        try:
+            text = json.dumps(known, indent=2, ensure_ascii=False).encode("utf-8")
+            temp.parent.mkdir(parents=True, exist_ok=True)
+            temp.write_bytes(text)
+            os.replace(temp, _last_file())
+        except (OSError, ValueError):
+            with contextlib.suppress(OSError):
+                temp.unlink(missing_ok=True)
 
 
 def last_used_params(processes: list[str]) -> dict[str, Any]:

@@ -778,7 +778,9 @@ The library can say what is new since you last looked, with a marker you move yo
 | `GET /dossiers?new=true` | The usual listing, narrowed to what is new, and combining with every other filter, ordering and paging. With group `product` a new dossier is listed unless its parent is new too (the outermost new thing, so a new child of an old product shows by itself); a new product's children come with `parent=<uid>`. Groups `type` and `all` list every new dossier. No marker is an empty page; a search that doesn't parse is still a 400 |
 | `POST /dossiers/new/seen` | Moves the marker to the highest dossier id and returns `{seen}`, the number `new=true&group=all` listed just before (so it can be higher than the default listing's `total`; 0 with no marker). Refused with a 409 while a job writes, a 503 when the library is busy. It is not an edit: it writes nothing to the curation log and can't be undone |
 
-**Accepted limits.** Ids are reused after a deletion (SQLite hands out `max(id)+1`), so a dossier made after the highest one was deleted can sit at or under the marker and not read as new. A library that existed before this feature has no marker until its next scan, and `new=true` lists nothing until then. The query keeps to two uncorrelated sets of ids, not a correlated check per row, because the latter doesn't finish on a library of hundreds of thousands of dossiers.
+**Deleting dossiers.** Ids are reused after a deletion (SQLite hands out `max(id)+1`), so deleting dossiers brings the marker down to the highest id left, and forgetting the last one forgets the marker, so the next scan is a first scan again. Without that, forgetting an environment would hide whatever the next scan found.
+
+**Accepted limits.** A library that existed before this feature has no marker until its next scan, and `new=true` lists nothing until then. The query keeps to two uncorrelated sets of ids, not a correlated check per row, because the latter doesn't finish on a library of hundreds of thousands of dossiers.
 
 ## Roadmap
 

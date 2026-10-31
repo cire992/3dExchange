@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any
 
+from exchange.library.new import after_deleting
 from exchange.scanner.tokenize import tokenize
 
 
@@ -213,6 +214,8 @@ def _remove_orphan_dossiers(conn: sqlite3.Connection) -> int:
             conn.execute(f"DELETE FROM {table} WHERE dossier_id IN ({marks})", batch)
         conn.execute(f"DELETE FROM dossier_fts WHERE rowid IN ({marks})", batch)
         conn.execute(f"DELETE FROM dossier WHERE id IN ({marks})", batch)
+    if orphans:
+        after_deleting(conn)
     return len(orphans)
 
 
@@ -460,6 +463,7 @@ def delete_dossier(conn: sqlite3.Connection, dossier_id: int) -> None:
                  " (SELECT 1 FROM entry e WHERE e.ledger_id = ledger.id)", (dossier_id,))
     conn.execute("DELETE FROM dossier_fts WHERE rowid = ?", (dossier_id,))
     conn.execute("DELETE FROM dossier WHERE id = ?", (dossier_id,))
+    after_deleting(conn)
 
 
 def has_user_work(conn: sqlite3.Connection, uid: str) -> bool:
