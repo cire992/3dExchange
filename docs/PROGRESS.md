@@ -111,6 +111,27 @@ R5 is done: the loop runs in the Workspace with no terminal. A new mesh went fro
 
 **Rough edges, not fixed:** two claims on the same thing and place look alike in the list; only the detail shows their folders. Holding a requisition from Runs sends no change notice, so a claim moves when the view is next read.
 
+## R6c: the G8 path in the Workspace, by hand (2026-11-02)
+
+The first proof's claim walks from the Workspace: a Genesis 9 character claimed `as g8f_character` in Daz Studio reads **Claim and walk**, and reaches Installed as a G8F morph with no step outside Exchange.
+
+**How:** as R5f did it, with the shell's real UI built from `main` in its own browser, driven by Playwright, on the real core the shell's service started. The data folder, database and content folder were in scratch, the library was R6b's sample, and your app wasn't touched. The sample hashed the same before and after, and the page threw no errors. Daz Studio and Blender ran headless, with your own content directories.
+
+| Claim | In the dialog | Installed after | The morph |
+| --- | --- | --- | --- |
+| *ES3D Luanne* (a female G9 character product) | Character to Genesis 8 Female (shape), **Claim and walk** | 67 s | 16,556 vertices moved, the largest by 10.3 cm |
+| *Genesis 9 Exchange* (your saved copy of the base figure) | the same | 42 s | 16,556 vertices moved, the largest by 11.6 cm |
+
+Both morphs name only the regular G8F (no `/data/Exchange/` left) and keep stable ids. Both claims read Installed, Your turn, "Close it, or take it into play".
+
+**A wrong expectation:** R6_PLAN said the Exchange G9 copy would give a morph of nearly zero. It doesn't, and it shouldn't. Genesis 9's base shape isn't Genesis 8 Female's, so converting it gives G8F the G9 base proportions. It's still a useful baseline: Luanne's morph minus this one is what's hers.
+
+**Your check, on the regular G8F:** Luke loaded both morphs on their usual Genesis 8 Female in Daz Studio, from the scratch folder added as a content directory. Both look right: each dial is under *Morphs › Exchange* and shapes the figure as expected, and the joints follow.
+
+**Rough edges, not fixed:**
+- **Rescan after a walk:** the Workspace offered *Rescan changed (1)* and marked Daz Studio *changed*, though the runner had already rescanned what it wrote. The watcher sees Exchange's own output.
+- **Process ids:** a claim's detail names its path by the process id (`daz_character_to_g8f`) rather than its name.
+
 ## R6b: the G8 path, built (2026-11-02)
 
 `daz_character_to_g8f` is a built-in process: a Genesis 9 character claimed `as g8f_character` in Daz Studio walks to Installed, as a morph for Genesis 8 Female. Each step was run for real while it was written, headless, on scratch data, with the user's own content directories.
@@ -135,7 +156,7 @@ R5 is done: the loop runs in the Workspace with no terminal. A new mesh went fro
 
 ## Where we are
 
-**Phases 1-3, 4a-4c, phase 6 up to 6i, phase 7 part 1 and R1 are merged.** R2 (6j) is done: R2a (#30) closed the parity gaps `PARITY_CHECKLIST.md` lists, Luke signed the checklist off on 2026-10-29 (R2b), and the PySide6 window is removed in R2c. R3 (claims core) and R4 (claims API, `R4_PLAN.md`) are done; R5 (claims in the Workspace, `R5_PLAN.md`) is done, built by hand: its decision 1 replaces RESTART_PLAN's decision 9, so the shell has no factory. R6, the G8 path's shape (`R6_PLAN.md`), is in progress, built by hand: the package is R6b.
+**Phases 1-3, 4a-4c, phase 6 up to 6i, phase 7 part 1 and R1 are merged.** R2 (6j) is done: R2a (#30) closed the parity gaps `PARITY_CHECKLIST.md` lists, Luke signed the checklist off on 2026-10-29 (R2b), and the PySide6 window is removed in R2c. R3 (claims core) and R4 (claims API, `R4_PLAN.md`) are done; R5 (claims in the Workspace, `R5_PLAN.md`) is done, built by hand: its decision 1 replaces RESTART_PLAN's decision 9, so the shell has no factory. R6, the G8 path's shape (`R6_PLAN.md`), is done, built by hand. R7, the skin and the proof end to end, is next.
 
 - **Stacked PRs:** after merging one, change the next PR's base to `main` before merging it (or delete the merged branch, and GitHub moves it). This has gone wrong three times: #11 and #12 needed #13 to reach `main`, #26 needed #27, and the shell's #14 needed its #16. Turning on *Automatically delete head branches* (Settings › General › Pull Requests, in both repositories) makes GitHub retarget them by itself; until then, prefer branching from `main`.
 
@@ -190,7 +211,8 @@ R5 is done: the loop runs in the Workspace with no terminal. A new mesh went fro
 | R5b-e | The Workspace's claims: the Claims view, Claim…, walking and Runs, New (cire992/Exchange-Shell#20-#23) | merged |
 | R5f | The loop in the Workspace by hand, on the real core and the sample library | merged (#60) |
 | R6a | The G8 path's groundwork: `[input] variants`, `content` prerequisites, Daz Studio jobs run `-headless`, `core.rewrite_daz_paths`; `R6_PLAN.md` | merged (#61) |
-| R6b | The G8 path's package, `daz_character_to_g8f`: export (Daz), Daz Generations (Blender), build and check (Daz), rewrite; `ctx.tool()`; a morph's id kept stable | in review |
+| R6b | The G8 path's package, `daz_character_to_g8f`: export (Daz), Daz Generations (Blender), build and check (Daz), rewrite; `ctx.tool()`; a morph's id kept stable | merged (#62) |
+| R6c | The G8 path walked from the Workspace, by hand, on the real core and a sample library | in review |
 
 ## Phase 6: Service and Workspace
 
