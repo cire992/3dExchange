@@ -88,9 +88,32 @@ R4 is done: everything the CLI does with a claim, a client can do through the AP
 
 **Left open, set aside by Luke:** the 500s R4a's approver found (a hex integer past 4,300 digits in a claim file, lone surrogates in `note` and `reason`, a NUL in a relative `folder`, an `environment` of `10**30`), and how hand-edited `as` and `folder` behave.
 
+## R5f: the loop in the Workspace, by hand (2026-11-02)
+
+R5 is done: the loop runs in the Workspace with no terminal. A new mesh went from the New list to Installed, and a saved character claimed as a G8 character says a process has to be built.
+
+**How:** the shell's real UI, built from `main`, in its own browser driven by Playwright, on the real core started by the shell's service. The data folder, database and endpoints were in scratch, the library was the R3c sample, and your app wasn't touched. The sample and the loose folder hashed the same before and after, and the page threw no errors.
+
+| Step | Result |
+| --- | --- |
+| Scan the sample, then the loose folder | 28 s for the sample, then New read 0, as a first scan should. After the loose folder the status line said "1 new thing · Show them" |
+| Show them | New listed the mesh, *sstFAAPU*, with its real thumbnail and a Claim button |
+| Claim…, for its own place | "This place already holds it: walking writes a second copy", and only Claim offered |
+| The same with a folder of its own | Convert mesh (Blender), Walk it, and **Claim and walk** offered |
+| Claim and walk | **Installed** in 5 to 14 s over three runs, with no click: the gauge filled in the Claims view |
+| A second claim, Walk with options…, `gltf` | Installed in 4.4 s: a `.gltf` and `.bin` in its folder, and `gltf` remembered as last used |
+| *Genesis 9 Exchange* as `g8f_character` in Daz Studio | "No path yet: a process has to be built", only Claim offered, and the claim in the inspector, To build |
+| Close… with a reason, then Mark all seen | Closed, and New back to 0 |
+
+**Fixed here:** Mark all seen went disabled while a search left New's list empty, though it marks everything new. It now follows New's count.
+
+**Not covered on real files:** a checkpoint, and Show the work folder, because no built-in process has one. The fake core's tests and R5a's test cover them. R6's Daz steps will be the first real ones.
+
+**Rough edges, not fixed:** two claims on the same thing and place look alike in the list; only the detail shows their folders. Holding a requisition from Runs sends no change notice, so a claim moves when the view is next read.
+
 ## Where we are
 
-**Phases 1-3, 4a-4c, phase 6 up to 6i, phase 7 part 1 and R1 are merged.** R2 (6j) is done: R2a (#30) closed the parity gaps `PARITY_CHECKLIST.md` lists, Luke signed the checklist off on 2026-10-29 (R2b), and the PySide6 window is removed in R2c. R3 (claims core) and R4 (claims API, `R4_PLAN.md`) are done; R5, claims in the Workspace (`R5_PLAN.md`), is in progress, built by hand: its decision 1 replaces RESTART_PLAN's decision 9, so the shell has no factory.
+**Phases 1-3, 4a-4c, phase 6 up to 6i, phase 7 part 1 and R1 are merged.** R2 (6j) is done: R2a (#30) closed the parity gaps `PARITY_CHECKLIST.md` lists, Luke signed the checklist off on 2026-10-29 (R2b), and the PySide6 window is removed in R2c. R3 (claims core) and R4 (claims API, `R4_PLAN.md`) are done; R5 (claims in the Workspace, `R5_PLAN.md`) is done, built by hand: its decision 1 replaces RESTART_PLAN's decision 9, so the shell has no factory. R6, the G8 path's shape, is next.
 
 - **Stacked PRs:** after merging one, change the next PR's base to `main` before merging it (or delete the merged branch, and GitHub moves it). This has gone wrong three times: #11 and #12 needed #13 to reach `main`, #26 needed #27, and the shell's #14 needed its #16. Turning on *Automatically delete head branches* (Settings › General › Pull Requests, in both repositories) makes GitHub retarget them by itself; until then, prefer branching from `main`.
 
@@ -141,7 +164,9 @@ R4 is done: everything the CLI does with a claim, a client can do through the AP
 | R4b | Walk a claim through the API: `plan` and `walk` with options, `excluded` and `on_collision`; `GET /claims/changes` change notices (#54) | merged (#55) |
 | R4c | What's new, with a marker you move yourself: `GET /dossiers?new=true`, `POST /dossiers/new/seen` (#56) | merged (#57) |
 | R4d | The claims API by hand on the sample library; a claim that can't record its requisition queues nothing, `remember` writes safely, deleting dossiers brings the new marker down; `R4_PLAN.md` | merged (#58) |
-| R5a | A requisition's `work_folder`, for R5's Show the work folder; `R5_PLAN.md` | in review |
+| R5a | A requisition's `work_folder`, for R5's Show the work folder; `R5_PLAN.md` | merged (#59) |
+| R5b-e | The Workspace's claims: the Claims view, Claim…, walking and Runs, New (cire992/Exchange-Shell#20-#23) | merged |
+| R5f | The loop in the Workspace by hand, on the real core and the sample library | in review |
 
 ## Phase 6: Service and Workspace
 
