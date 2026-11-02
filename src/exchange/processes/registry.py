@@ -14,7 +14,9 @@ to them needs trusting again. Untrusted packages are listed (from their manifest
 never imported.
 
 Tool paths (Blender, texconv, Daz Studio …) are shared by every process that needs the tool:
-``tools.json`` in the data folder maps a tool id to the executable.
+``tools.json`` in the data folder maps a tool id to the executable. A ``content`` prerequisite is
+a file an app must find in its own content directories (a figure in Daz Studio's library); those
+are read from the app's settings, never changed.
 """
 
 from __future__ import annotations
@@ -30,6 +32,7 @@ from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
 
+from exchange.bridges import content_directories
 from exchange.errors import DefinitionError, ExchangeError
 from exchange.paths import data_dir
 from exchange.processes.core_ops import CORE_OPERATIONS
@@ -288,6 +291,16 @@ def check_prerequisites(package: ProcessPackage, tools: dict[str, str] | None = 
             found = resolve_tool(package, p.tool, tools)
             out.append(PrerequisiteStatus(p.id, p.label, found is not None, found or (
                 f"not found; set it with: exchange tools set {p.tool} PATH" + (f" ({p.hint})" if p.hint else ""))))
+        elif p.kind == "content":
+            folders = content_directories(p.tool)
+            homes = [next((folder for folder in folders if folder.joinpath(*f.split("/")).is_file()), None)
+                     for f in p.paths]
+            missing = [f for f, home in zip(p.paths, homes) if home is None]
+            detail = (f"in {homes[0]}" if not missing else
+                      f"missing {', '.join(missing)} from {p.tool}'s content directories" if folders else
+                      f"{p.tool} has no content directories")
+            out.append(PrerequisiteStatus(p.id, p.label, not missing,
+                                          detail + (f" ({p.hint})" if missing and p.hint else "")))
         else:
             missing = [f for f in p.paths if not (package.path / f).exists()]
             out.append(PrerequisiteStatus(p.id, p.label, not missing,

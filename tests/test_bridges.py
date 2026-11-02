@@ -61,7 +61,7 @@ def test_daz_bridge_closes_daz_studio_after_the_result(tmp_path, logs):
     result = bridge.run(script, {"figure": "Genesis 8 Female"}, timeout=60)
     assert time.monotonic() - started < 30  # closed once the result was written, not after its 120 s
     assert result["echo"] == {"figure": "Genesis 8 Female"}  # the wrapper adds workdir inside Daz Studio
-    assert result["flags"] == ["-instanceName", "Exchange", "-noPrompt", "-noDefaultScene"]
+    assert result["flags"] == ["-instanceName", "Exchange", "-noPrompt", "-noDefaultScene", "-headless"]
     assert any("closing it" in line for line in logs)
     wrapper = (tmp_path / "work" / "exchange_daz_job.dsa").read_text(encoding="utf-8")
     assert "include(" in wrapper and "App.delayedExit" in wrapper

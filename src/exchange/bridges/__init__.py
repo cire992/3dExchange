@@ -28,11 +28,19 @@ from pathlib import Path
 
 from exchange.bridges.base import Bridge, BridgeError, CommandBridge
 from exchange.bridges.blender import BlenderBridge
-from exchange.bridges.daz import DazBridge
+from exchange.bridges.daz import DazBridge, content_directories as daz_content_directories
 
-__all__ = ["Bridge", "BridgeError", "CommandBridge", "BlenderBridge", "DazBridge", "make_bridge"]
+__all__ = ["Bridge", "BridgeError", "CommandBridge", "BlenderBridge", "DazBridge", "make_bridge",
+           "content_directories"]
 
 KINDS: dict[str, type[Bridge]] = {"blender": BlenderBridge, "daz_studio": DazBridge}
+CONTENT: dict[str, Callable[[], list[Path]]] = {"daz_studio": daz_content_directories}
+
+
+def content_directories(app: str) -> list[Path]:
+    """Where an app looks for content (Daz Studio's content directories); empty for an app that has none."""
+    lookup = CONTENT.get(app)
+    return lookup() if lookup else []
 
 
 def make_bridge(app: str, executable: Path, workdir: Path, log: Callable[[str], None]) -> Bridge:

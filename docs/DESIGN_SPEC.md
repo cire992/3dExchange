@@ -569,13 +569,13 @@ glb_to_starfield_ingestible/
 └─ README.md
 ```
 
-The manifest declares name, version, author, input predicate (dossier type + required tags, e.g. static mesh tagged Food), source and target environment variants, operation chain with each step's executor, parameters with defaults, prerequisites, and which roles it grants. An optional `extensions` list under `[input]` names the file types the process reads, each with a leading dot and compared case-insensitively; empty means any. A chain is offered from a source entry only if that entry holds a live file with one of its first process's extensions; later processes aren't checked, and neither is a copy. The extension is the whole check: no file's contents are read.
+The manifest declares name, version, author, input predicate (dossier type + required tags, e.g. static mesh tagged Food), source and target environment variants, operation chain with each step's executor, parameters with defaults, prerequisites, and which roles it grants. An optional `extensions` list under `[input]` names the file types the process reads, each with a leading dot and compared case-insensitively; empty means any. A chain is offered from a source entry only if that entry holds a live file with one of its first process's extensions; later processes aren't checked, and neither is a copy. The extension is the whole check: no file's contents are read. An optional `variants` list under `[input]` names the asset variants it takes, such as a figure generation (`genesis_9`), compared case-insensitively against the asset's own; empty means any. Like tags, it is checked only at a chain's first process.
 
 Packages live in three places: built into Exchange, installed globally, or in a project home's `processes/` for project-specific work.
 
 ### Prerequisites
 
-Each process has a setup page under Settings › Processes listing its prerequisites: external tool paths and versions, templates, plugins (e.g. a Blender add-on). Each shows green or red with a fix hint. A process is selectable only when every prerequisite is green. Setup is one-time, with a cheap recheck on launch (paths and versions still match) to catch tool updates that silently break templates.
+Each process has a setup page under Settings › Processes listing its prerequisites: external tool paths and versions, templates, plugins (e.g. a Blender add-on). Each shows green or red with a fix hint. A process is selectable only when every prerequisite is green. A `content` prerequisite is a file the app must find in its own content directories, such as a figure in Daz Studio's library: each path is relative to a content directory, and the directories are read from the app's settings (Daz Studio's main instance), never changed. Setup is one-time, with a cheap recheck on launch (paths and versions still match) to catch tool updates that silently break templates.
 
 ### Authoring with AI
 

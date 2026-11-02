@@ -113,7 +113,7 @@ R5 is done: the loop runs in the Workspace with no terminal. A new mesh went fro
 
 ## Where we are
 
-**Phases 1-3, 4a-4c, phase 6 up to 6i, phase 7 part 1 and R1 are merged.** R2 (6j) is done: R2a (#30) closed the parity gaps `PARITY_CHECKLIST.md` lists, Luke signed the checklist off on 2026-10-29 (R2b), and the PySide6 window is removed in R2c. R3 (claims core) and R4 (claims API, `R4_PLAN.md`) are done; R5 (claims in the Workspace, `R5_PLAN.md`) is done, built by hand: its decision 1 replaces RESTART_PLAN's decision 9, so the shell has no factory. R6, the G8 path's shape, is next.
+**Phases 1-3, 4a-4c, phase 6 up to 6i, phase 7 part 1 and R1 are merged.** R2 (6j) is done: R2a (#30) closed the parity gaps `PARITY_CHECKLIST.md` lists, Luke signed the checklist off on 2026-10-29 (R2b), and the PySide6 window is removed in R2c. R3 (claims core) and R4 (claims API, `R4_PLAN.md`) are done; R5 (claims in the Workspace, `R5_PLAN.md`) is done, built by hand: its decision 1 replaces RESTART_PLAN's decision 9, so the shell has no factory. R6, the G8 path's shape (`R6_PLAN.md`), is in progress, built by hand.
 
 - **Stacked PRs:** after merging one, change the next PR's base to `main` before merging it (or delete the merged branch, and GitHub moves it). This has gone wrong three times: #11 and #12 needed #13 to reach `main`, #26 needed #27, and the shell's #14 needed its #16. Turning on *Automatically delete head branches* (Settings › General › Pull Requests, in both repositories) makes GitHub retarget them by itself; until then, prefer branching from `main`.
 
@@ -166,7 +166,8 @@ R5 is done: the loop runs in the Workspace with no terminal. A new mesh went fro
 | R4d | The claims API by hand on the sample library; a claim that can't record its requisition queues nothing, `remember` writes safely, deleting dossiers brings the new marker down; `R4_PLAN.md` | merged (#58) |
 | R5a | A requisition's `work_folder`, for R5's Show the work folder; `R5_PLAN.md` | merged (#59) |
 | R5b-e | The Workspace's claims: the Claims view, Claim…, walking and Runs, New (cire992/Exchange-Shell#20-#23) | merged |
-| R5f | The loop in the Workspace by hand, on the real core and the sample library | in review |
+| R5f | The loop in the Workspace by hand, on the real core and the sample library | merged (#60) |
+| R6a | The G8 path's groundwork: `[input] variants`, `content` prerequisites, Daz Studio jobs run `-headless`, `core.rewrite_daz_paths`; `R6_PLAN.md` | in review |
 
 ## Phase 6: Service and Workspace
 
@@ -653,7 +654,7 @@ The formats and rules are in `docs/PROJECT_HOME.md` (*Gap claims*, *Triage*, *Fa
     - `EXCHANGE_DATA_DIR` pointed at scratch, keeping work folders, logs, locks, tool paths and the trust list out of the user's real Exchange folder
 
     Nothing in a real environment is written to.
-  - **Apps with windows:** Blender runs headless and can be checked any time. Daz Studio opens a window and may stop on a prompt, so it is only launched while the user is at the computer.
+  - **Apps with windows:** Blender runs headless and can be checked any time. Daz Studio jobs run `-headless` since R6a (R6_PLAN's decisions 10 and 11): they may run while the user is away, always with the user's own content directories and writing only to scratch, and stop if Daz ever asks for anything.
   - **A full real scan takes about 10 minutes without enrichment, and hours with it** (R3c: stopped after 1 h 43 min); the 3a slowdowns only showed at that size, so run one (`--no-enrich`) before a PR that touches scanning. For anything else, use a sample library (`AGENTS.md`).
 - **Constraints from the kickoff:**
   - Windows and Python 3.11+, using `pathlib`.
@@ -724,7 +725,7 @@ Phase 4 (approved 2026-10-22, all recommended answers):
 1. **First conversion** (open): what cross-figure converts first (characters, clothing, hair) and with which tool. The recommendation was clothing via Transfer Utility and auto-fit, pending the user's own workflow.
 2. **VaM backporting and DS3 legacy conversion** move to phase 5, with the VaM environment.
 3. **Daz output:** an `Exchange Conversions` folder beside the library. Exchange never edits the user's Daz Studio settings; adding it in the Content Directory Manager (of the main instance) is the user's one-time step.
-4. **Daz Studio window:** accepted during jobs, as a separate instance (`-instanceName Exchange`).
+4. **Daz Studio window:** accepted during jobs, as a separate instance (`-instanceName Exchange`). Since R6a jobs run `-headless`, with no window.
    - **Its settings** (decided 2026-10-22): before each job, Exchange copies the update setting (`AutoUpdate`) and the content, Poser, import and MDL directory lists from the main instance's registry key (`HKCU\Software\DAZ\Studio4`) into the Exchange instance's (`Studio4[Exchange]`). The main key is only read. So a folder added in the main instance reaches jobs too.
 5. **Pipelines:** built-ins ship with Exchange; the user's go in `<data>/pipelines/`, trusted before they run.
 6. **Types:** operations take and make named artifact types (`Files` accepts any), checked along the chain. Dossier types are unchanged.

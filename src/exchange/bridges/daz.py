@@ -1,10 +1,11 @@
 """Daz Studio: a separate instance runs a generated DazScript at launch.
 
-``DAZStudio.exe -instanceName Exchange -noPrompt -noDefaultScene <wrapper.dsa>``
+``DAZStudio.exe -instanceName Exchange -noPrompt -noDefaultScene -headless <wrapper.dsa>``
 
 * **A separate instance** (``-instanceName Exchange``) leaves a Daz Studio the user has open alone.
 * **Prompts:** ``-noPrompt`` keeps message boxes from waiting for an answer.
-* **No window-less mode:** Daz Studio always opens its window, so a job shows one while it runs.
+* **No window:** ``-headless`` runs the job without one (checked on 2026-10-22: the same results,
+  and a clean exit).
 
 The process's script is a DazScript file defining ``exchangeRun(args)``, which returns an object
 (saved as JSON). The generated wrapper reads the arguments from a JSON file named in the wrapper
@@ -42,7 +43,7 @@ from pathlib import Path
 from exchange.bridges.base import Bridge, BridgeError
 
 INSTANCE = "Exchange"
-FLAGS = ["-instanceName", INSTANCE, "-noPrompt", "-noDefaultScene"]
+FLAGS = ["-instanceName", INSTANCE, "-noPrompt", "-noDefaultScene", "-headless"]
 
 REGISTRY_KEY = r"Software\DAZ"  # under HKEY_CURRENT_USER; tests point it elsewhere
 MAIN_INSTANCE = "Studio4"
@@ -54,6 +55,30 @@ def instance_folder() -> Path | None:
     """Where Daz Studio keeps the Exchange instance's log and layout."""
     appdata = os.environ.get("APPDATA")
     return Path(appdata) / "DAZ 3D" / f"{MAIN_INSTANCE} [{INSTANCE}]" if appdata else None
+
+
+def content_directories() -> list[Path]:
+    """The content directories Daz Studio's main instance uses (the ones jobs get), in its order.
+    Only read; empty off Windows or with no main instance."""
+    if sys.platform != "win32":
+        return []
+    import winreg
+
+    found, i = {}, 0
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, rf"{REGISTRY_KEY}\{MAIN_INSTANCE}") as main:
+            while True:
+                try:
+                    name, value, _ = winreg.EnumValue(main, i)
+                except OSError:
+                    break
+                match = re.fullmatch(r"ContentDir(\d+)", name)
+                if match and isinstance(value, str) and value.strip():
+                    found[int(match.group(1))] = Path(value.strip())
+                i += 1
+    except OSError:
+        return []
+    return [found[k] for k in sorted(found)]
 
 
 def sync_instance_settings() -> list[str]:

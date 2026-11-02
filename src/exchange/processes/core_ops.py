@@ -1,4 +1,5 @@
-"""Core operations shipped with Exchange: copy, select, resize and convert images, rename, pack.
+"""Core operations shipped with Exchange: copy, select, resize and convert images, rename, pack,
+and rewriting the figure Daz files name.
 
 Processes name them ``core.<name>``. None of them touch the source files: they read from the
 input artifact and write new files into their own work folder (copy passes files through and
@@ -7,11 +8,14 @@ lets the requisition writer copy them to the endpoint).
 
 from __future__ import annotations
 
+import gzip
 import shutil
 import zipfile
 from pathlib import Path
+from urllib.parse import unquote
 
 from exchange.globs import any_match
+from exchange.paths import fold, join_rel, rel_under
 from exchange.processes.operations import ANY, Artifact, Context, OperationError, operation
 
 IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".tga", ".bmp", ".tif", ".tiff", ".dds", ".webp")
@@ -143,5 +147,49 @@ def pack(ctx: Context, files: Artifact, name: str = "{name}.zip") -> Artifact:
     return files.derive(out, [archive_name], type=ANY)
 
 
+DAZ_FILE_EXTS = (".dsf", ".duf")
+
+
+@operation("rewrite_daz_paths", inputs=(ANY,), output=ANY)
+def rewrite_daz_paths(ctx: Context, files: Artifact, source: str = "", target: str = "") -> Artifact:
+    """Point Daz files at another figure. ``source`` and ``target`` are data folders as Daz writes
+    them, percent-encoded (``/data/Exchange/Genesis%208/Female/``): every mention of ``source`` in the
+    .dsf and .duf files becomes ``target``, and files in ``source``'s folder move to ``target``'s.
+    Compressed files stay compressed; other files pass through. No file mentioning ``source`` is an
+    error, so output still naming the wrong figure is never installed."""
+    for name, value in (("source", source), ("target", target)):
+        if not value.startswith("/data/") or not value.endswith("/"):
+            raise OperationError(f"{name} must be a data folder like /data/DAZ%203D/Genesis%208/Female/, got {value!r}")
+    old_folder, new_folder = unquote(source).strip("/"), unquote(target).strip("/")
+    out = ctx.new_dir("rewritten")
+    moved, mentions, written, taken = 0, 0, [], set()
+    for path, rel in zip(files.paths(), files.files):
+        inside = rel_under(rel, old_folder)
+        new_rel = join_rel(new_folder, inside) if inside is not None else rel
+        moved += inside is not None
+        if fold(new_rel) in taken:
+            raise OperationError(f"{rel} would overwrite {new_rel}")
+        taken.add(fold(new_rel))
+        written.append(new_rel)
+        target_path = out.joinpath(*new_rel.split("/"))
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        if path.suffix.lower() not in DAZ_FILE_EXTS:
+            shutil.copy2(path, target_path)
+            continue
+        raw = path.read_bytes()
+        packed = raw[:2] == b"\x1f\x8b"
+        try:
+            text = (gzip.decompress(raw) if packed else raw).decode("utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            raise OperationError(f"cannot read {rel}: {exc}") from exc
+        mentions += text.count(source)
+        data = text.replace(source, target).encode("utf-8")
+        target_path.write_bytes(gzip.compress(data) if packed else data)
+    if not mentions:
+        raise OperationError(f"no file mentions {source}")
+    ctx.log(f"{source} → {target}: {mentions} mentions; {moved} of {len(files.files)} files moved")
+    return files.derive(out, written)
+
+
 CORE_OPERATIONS = {f.__exchange_operation__.name: f.__exchange_operation__
-                   for f in (copy, select, resize_images, convert_images, rename, pack)}
+                   for f in (copy, select, resize_images, convert_images, rename, pack, rewrite_daz_paths)}
