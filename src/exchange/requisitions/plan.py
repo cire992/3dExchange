@@ -69,12 +69,17 @@ def _entries(conn: sqlite3.Connection, uid: str) -> list[dict]:
 
 
 def matches(package: ProcessPackage, definitions: DefinitionSet, type_id: str, tags: set[str],
-            source_env_type: str, target_env_type: str | None, *, check_tags: bool = True) -> bool:
+            source_env_type: str, target_env_type: str | None, *, check_tags: bool = True,
+            variant: str | None = None) -> bool:
+    """Whether a package takes this asset. Tags and the variant are the source asset's, so a chain
+    checks them only at its first process (``check_tags``)."""
     m = package.manifest
     if m.input_types and not any(type_id in definitions.dossier_types and definitions.is_a(type_id, t)
                                  for t in m.input_types):
         return False
     if check_tags and not {t.casefold() for t in m.input_tags} <= {t.casefold() for t in tags}:
+        return False
+    if check_tags and m.input_variants and (variant or "").casefold() not in {v.casefold() for v in m.input_variants}:
         return False
     if m.input_environments and source_env_type not in m.input_environments:
         return False
@@ -95,7 +100,8 @@ def can_read(conn: sqlite3.Connection, package: ProcessPackage, entry_id: int) -
 
 def find_chains(registry: Registry, definitions: DefinitionSet, type_id: str, tags: set[str],
                 source_env_type: str, target_env_type: str, tools: dict[str, str] | None = None,
-                *, ready_only: bool = True, first: Callable[[ProcessPackage], bool] | None = None) -> list[list[str]]:
+                *, ready_only: bool = True, first: Callable[[ProcessPackage], bool] | None = None,
+                variant: str | None = None) -> list[list[str]]:
     """Ready process chains from (type, environment) to the target environment, shortest first.
     ``ready_only=False`` searches every package, ready or not (from manifests alone). ``first`` says
     whether a package can start a chain (it can read the source entry); a package it refuses is
@@ -109,7 +115,7 @@ def find_chains(registry: Registry, definitions: DefinitionSet, type_id: str, ta
         for chain, current_type, current_env in frontier:
             for package in usable:
                 if package.id in chain or not matches(package, definitions, current_type, tags, current_env, None,
-                                                      check_tags=not chain):
+                                                      check_tags=not chain, variant=variant):
                     continue
                 if not chain and first is not None and not first(package):
                     continue
@@ -137,6 +143,7 @@ def routes(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Regis
     if target is None:
         raise PlanError(f"no environment {environment_id}")
     tags = repo.effective_tags(conn, uid)
+    variant = repo.effective_fields(conn, uid).get("variant")
     tools = tool_paths() if tools is None else tools
     out = []
     for entry in _entries(conn, uid):
@@ -147,7 +154,7 @@ def routes(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Regis
                 out.append({"route": "copy", "processes": [COPY_PROCESS], "source_entry_id": entry["id"],
                             "source": label})
         for chain in find_chains(registry, definitions, dossier["type_id"], tags, entry["env_type"],
-                                 target["type_id"], tools,
+                                 target["type_id"], tools, variant=variant,
                                  first=lambda p, entry_id=entry["id"]: can_read(conn, p, entry_id)):
             out.append({"route": "convert", "processes": chain, "source_entry_id": entry["id"], "source": label})
     return out

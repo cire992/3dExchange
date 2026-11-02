@@ -14,6 +14,7 @@ prerequisites and its steps::
     dossier_types = ["texture"]       # a dossier of (a subtype of) one of these; empty: any
     tags = []                         # all of these tags
     environments = []                 # source environment types; empty: any
+    variants = []                     # the asset's variant (a figure generation: genesis_9); empty: any
     artifact = "Images"               # the type of the source files
     extensions = [".png", ".jpg"]     # the source must hold a live file of one of these; empty: any
 
@@ -32,9 +33,15 @@ prerequisites and its steps::
     [[prerequisite]]
     id = "texconv"
     kind = "tool"                     # tool (an executable) | file (in the package)
-    tool = "texconv"
+    tool = "texconv"                  #   | content (in an app's content directories)
     paths = ["C:/Tools/texconv.exe"]
     hint = "Download texconv from …"
+
+    [[prerequisite]]
+    id = "exchange_g8f"
+    kind = "content"                  # each path, relative, in one of the app's content directories
+    tool = "daz_studio"
+    paths = ["People/Genesis 8 Female/Genesis 8 Basic Female Exchange.duf"]
 
     [[step]]
     id = "resize"
@@ -56,7 +63,7 @@ from exchange.errors import DefinitionError
 
 FORMAT_VERSION = 1
 PARAMETER_TYPES = ("str", "int", "float", "bool", "choice", "path")
-PREREQUISITE_KINDS = ("tool", "file")
+PREREQUISITE_KINDS = ("tool", "file", "content")
 ENTRY_STATUSES = ("requisitioned", "copied")
 _PY_TYPES = {"str": str, "int": int, "float": (int, float), "bool": bool, "choice": str, "path": str}
 _REFERENCE = re.compile(r"^\{(\w+)\}$")
@@ -99,8 +106,9 @@ class Prerequisite:
     kind: str
     label: str
     hint: str = ""
-    tool: str = ""  # for kind "tool": the shared tool id (blender, texconv, daz_studio)
-    paths: tuple[str, ...] = ()  # tool: likely install paths; file: paths inside the package
+    tool: str = ""  # the shared tool id (blender, texconv, daz_studio); content: the app whose content it is
+    paths: tuple[str, ...] = ()  # tool: likely install paths; file: paths inside the package; content: paths
+    # relative to a content directory
 
 
 @dataclass(frozen=True)
@@ -123,6 +131,7 @@ class ProcessManifest:
     input_tags: tuple[str, ...]
     input_extensions: tuple[str, ...]
     input_environments: tuple[str, ...]
+    input_variants: tuple[str, ...]
     input_artifact: str
     output_environment: str
     output_dossier_type: str
@@ -186,7 +195,7 @@ def parse_manifest(data: dict, source: str) -> ProcessManifest:
     version = p.get("format_version", int)
     if version != FORMAT_VERSION:
         raise DefinitionError(source, f"unsupported format_version {version} (expected {FORMAT_VERSION})")
-    i = top.table("input", ["dossier_types", "tags", "environments", "artifact", "extensions"])
+    i = top.table("input", ["dossier_types", "tags", "environments", "variants", "artifact", "extensions"])
     extensions = i.strings("extensions")
     for extension in extensions:
         if not extension.startswith("."):
@@ -217,8 +226,10 @@ def parse_manifest(data: dict, source: str) -> ProcessManifest:
     for t in top.tables("prerequisite", ["id", "kind", "label", "hint", "tool", "paths"]):
         kind = t.get("kind", str, choices=PREREQUISITE_KINDS)
         tool = t.get("tool", str, "")
-        if kind == "tool" and not tool:
-            raise DefinitionError(source, f"{t.where}.tool is required for a tool prerequisite")
+        if kind in ("tool", "content") and not tool:
+            raise DefinitionError(source, f"{t.where}.tool is required for a {kind} prerequisite")
+        if kind == "content" and not t.strings("paths"):
+            raise DefinitionError(source, f"{t.where}.paths is required for a content prerequisite")
         prerequisites.append(Prerequisite(_identifier(t), kind, t.get("label", str, "") or tool or t.data["id"],
                                           t.get("hint", str, ""), tool, t.strings("paths")))
 
@@ -248,7 +259,8 @@ def parse_manifest(data: dict, source: str) -> ProcessManifest:
         id=_identifier(p), name=p.get("name", str), version=p.get("version", str), author=p.get("author", str, ""),
         description=p.get("description", str, ""), source=source,
         input_types=i.strings("dossier_types"), input_tags=i.strings("tags"),
-        input_extensions=extensions, input_environments=i.strings("environments"), input_artifact=i.get("artifact", str, "Files"),
+        input_extensions=extensions, input_environments=i.strings("environments"),
+        input_variants=i.strings("variants"), input_artifact=i.get("artifact", str, "Files"),
         output_environment=o.get("environment", str), output_dossier_type=o.get("dossier_type", str, ""),
         output_folder=o.get("folder", str, "{name}"),
         entry_status=o.get("entry_status", str, "requisitioned", choices=ENTRY_STATUSES),

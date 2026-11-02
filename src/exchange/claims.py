@@ -370,9 +370,10 @@ def find_path(conn: sqlite3.Connection, definitions: DefinitionSet, registry: Re
     best = None  # (chain, route, source entry, first non-ready process): the shortest
     for uid, type_id in [(thing, dossier["type_id"]), *map(tuple, children)]:
         tags = repo.effective_tags(conn, uid)
+        variant = repo.effective_fields(conn, uid).get("variant")
         for entry in _entries(conn, uid):
             for chain in find_chains(registry, definitions, type_id, tags, entry["env_type"], env["type_id"],
-                                     tools, ready_only=False,
+                                     tools, ready_only=False, variant=variant,
                                      first=lambda p, entry_id=entry["id"]: can_read(conn, p, entry_id)):
                 if role is not None and not grants(registry, chain, role):
                     continue
