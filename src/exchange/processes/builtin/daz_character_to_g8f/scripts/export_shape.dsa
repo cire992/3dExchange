@@ -4,6 +4,8 @@
 // args.source  the character's .duf (an absolute path); it loads Genesis 9 with its morphs dialled
 // args.target  the content path of the figure to write as the target mesh (the Exchange G8F copy)
 // args.shape   where to write the character's shape; args.base: where to write the target's mesh
+// args.skin    where to write the character's skin (skin.json); args.layered: a folder for flattened
+//              layered images
 //
 // The shape is the character as saved, at base resolution in the zero pose: bone rotations and
 // translations are zeroed, bone scales kept (they're part of a character), and a scale of the whole
@@ -98,6 +100,68 @@ function writeObj(path, points, geom) {
     return { vertices: points.length, facets: geom.getNumFacets() };
 }
 
+function colorValue(c) {
+    return [c.red / 255, c.green / 255, c.blue / 255];
+}
+
+function textureInfo(tex) {
+    if (!tex) { return null; }
+    var info = { file: tex.getFilename(), kind: tex.className() };
+    if (tex.getGamma) { info.gamma = tex.getGamma(); }
+    return info;
+}
+
+// A layered image (a makeup or tattoo over the base map): Daz flattens it into its temp folder for the
+// renderer, and the flattened copy is kept, as <folder>/<surface>_<channel>.png.
+function flattened(tex, folder, name) {
+    var temp = tex.getTempFilename();
+    var copy = folder + "/" + name.replace(/[^A-Za-z0-9]+/g, "") + ".png";
+    if (!temp || !new DzFile(temp).exists() || !new DzFile(temp).copy(copy)) { return null; }
+    return copy;
+}
+
+// Each surface's shader and channels as Daz loaded them: a channel's value, and its map if it has one.
+function writeSkin(fig, path, layered) {
+    var shape = fig.getObject().getCurrentShape();
+    var surfaces = {};
+    for (var m = 0; m < shape.getNumMaterials(); m++) {
+        var mat = shape.getMaterial(m);
+        var channels = [];
+        for (var p = 0; p < mat.getNumProperties(); p++) {
+            var prop = mat.getProperty(p);
+            var channel = { name: prop.getName(), label: prop.getLabel() };
+            if (prop.inherits("DzColorProperty")) {
+                channel.type = "color";
+                channel.value = colorValue(prop.getColorValue());
+            } else if (prop.inherits("DzNumericProperty")) {
+                channel.type = "float";
+                channel.value = prop.getValue();
+            } else if (prop.inherits("DzImageProperty")) {
+                channel.type = "image";
+            } else {
+                continue;
+            }
+            var map = null;
+            if (prop.inherits("DzImageProperty")) { map = prop.getValue(); }
+            else if (prop.isMappable && prop.isMappable()) { map = prop.getMapValue(); }
+            if (map) {
+                channel.map = textureInfo(map);
+                if (map.inherits("DzLayeredTexture")) {
+                    channel.map.file = layered ? flattened(map, layered, mat.getName() + "_" + prop.getLabel()) : null;
+                }
+            }
+            channels.push(channel);
+        }
+        surfaces[mat.getName()] = { label: mat.getLabel(), shader: mat.getMaterialName(), kind: mat.className(),
+                                    channels: channels };
+    }
+    var file = new DzFile(path);
+    if (!file.open(DzFile.WriteOnly | DzFile.Truncate)) { throw new Error("cannot write " + path); }
+    file.write(JSON.stringify({ figure: fig.getLabel(), surfaces: surfaces }, null, 1));
+    file.close();
+    return shape.getNumMaterials();
+}
+
 function exchangeRun(args) {
     var log = [];
     var started = new Date().getTime();
@@ -114,6 +178,7 @@ function exchangeRun(args) {
     var points = [];
     for (var v = 0; v < mesh.getNumVertices(); v++) { points.push(mesh.getVertex(v)); }
     var shape = writeObj(args.shape, points, obj.getCurrentShape().getGeometry());
+    var surfaces = args.skin ? writeSkin(character, args.skin, args.layered) : 0;
 
     var path = App.getContentMgr().findFile(args.target, DzContentMgr.AllDirs);
     if (!path) { throw new Error(args.target + " is in none of Daz Studio's content directories"); }
@@ -122,5 +187,5 @@ function exchangeRun(args) {
     var stock = [];
     for (var s = 0; s < geom.getNumVertices(); s++) { stock.push(geom.getVertex(s)); }
     var base = writeObj(args.base, stock, geom);
-    return { figure: character.getLabel(), shape: shape, base: base, log: log };
+    return { figure: character.getLabel(), shape: shape, base: base, surfaces: surfaces, log: log };
 }

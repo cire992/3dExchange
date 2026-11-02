@@ -111,6 +111,36 @@ R5 is done: the loop runs in the Workspace with no terminal. A new mesh went fro
 
 **Rough edges, not fixed:** two claims on the same thing and place look alike in the list; only the detail shows their folders. Holding a requisition from Runs sends no change notice, so a claim moves when the view is next read.
 
+## R7a: the G8 path's skin bake (2026-11-02)
+
+Walking a Genesis 9 character as `g8f_character` now also bakes its skin onto Genesis 8 Female's four maps, with your Texture Converter G9 → G8F template, and installs the maps beside the morph in `Runtime/Textures/Exchange/<character>/`. R7b puts them on G8F and saves the character preset.
+
+**How it works** (`R7_PLAN.md`, steps 1 and 3):
+- **Step 1** also writes `skin.json`: each surface's shader and channels as Daz loaded them, and each map's file. A layered image (a makeup over the base map) is flattened by Daz for its renderer, headless too, and step 1 copies that file out.
+- **Step 3** opens the template from Exchange's data folder (`texture_converter_g9_g8f`, extracted once from your zip) and bakes every channel mapped on Head, Body, Legs, Arms or the nails, one bake per channel. A surface without that channel's map bakes a neutral flat colour. Data maps (roughness, normals, bump) are read and written with no colour conversion.
+
+**On ES3D Luanne, walked for real** with `exchange claim walk --run` on R6b's sample and scratch data: **Installed in 406 s**, 21 files, 114 MB.
+
+| Step | Time | Result |
+| --- | --- | --- |
+| Export | 39.5 s | the shape, and 7 PBRSkin surfaces |
+| Convert | 5.5 s | as R6 |
+| Bake | 340 s | 5 channels (base colour, translucency, roughness, normal, detail normal) at 4096 px, about 65 s each, on the RTX 4090 |
+| Build | 18 s | the morph, within 0.00005 cm |
+| Rewrite and install | | 1,022 mentions; the morph and 20 maps |
+
+**Checked:**
+- **Colours pass through exactly:** a solid (200, 150, 100) map comes out (200, 150, 100), for colour and data maps alike.
+- **By eye:** the face, torso, legs and arms land on G8F's tiles 1001-1004, sharp at 4096 px. The nails come from the bake without the template's overlays (`R7_PLAN.md`, decision 7).
+- **Sample count doesn't matter:** 4 samples took 60 s a channel, 16 took 64 s, so the default stays 16.
+
+**A second character, MSO Merida HD** (Iray Uber, with the *MU Black* layered makeup preset applied for the test): 4 channels (base colour, translucency, specular reflectivity, bump) in 277 s, 123 MB. Her flattened makeup and painted brows came through onto G8F's face.
+
+**What R7a changed in the plan** (its *Found in R7a*):
+- **The shader:** R7b keeps the source's own shader on G8F, since Merida isn't PBRSkin.
+- **Map size:** maps are capped at 4096 px. Genesis 9's shared detail normals are 8192 px and took 252 s at full size.
+- **The sample's textures:** not needed, because Daz jobs find textures through your content directories.
+
 ## R6c: the G8 path in the Workspace, by hand (2026-11-02)
 
 The first proof's claim walks from the Workspace: a Genesis 9 character claimed `as g8f_character` in Daz Studio reads **Claim and walk**, and reaches Installed as a G8F morph with no step outside Exchange.
@@ -156,7 +186,7 @@ Both morphs name only the regular G8F (no `/data/Exchange/` left) and keep stabl
 
 ## Where we are
 
-**Phases 1-3, 4a-4c, phase 6 up to 6i, phase 7 part 1 and R1 are merged.** R2 (6j) is done: R2a (#30) closed the parity gaps `PARITY_CHECKLIST.md` lists, Luke signed the checklist off on 2026-10-29 (R2b), and the PySide6 window is removed in R2c. R3 (claims core) and R4 (claims API, `R4_PLAN.md`) are done; R5 (claims in the Workspace, `R5_PLAN.md`) is done, built by hand: its decision 1 replaces RESTART_PLAN's decision 9, so the shell has no factory. R6, the G8 path's shape (`R6_PLAN.md`), is done, built by hand. R7, the skin and the proof end to end, is next.
+**Phases 1-3, 4a-4c, phase 6 up to 6i, phase 7 part 1 and R1 are merged.** R2 (6j) is done: R2a (#30) closed the parity gaps `PARITY_CHECKLIST.md` lists, Luke signed the checklist off on 2026-10-29 (R2b), and the PySide6 window is removed in R2c. R3 (claims core) and R4 (claims API, `R4_PLAN.md`) are done; R5 (claims in the Workspace, `R5_PLAN.md`) is done, built by hand: its decision 1 replaces RESTART_PLAN's decision 9, so the shell has no factory. R6, the G8 path's shape (`R6_PLAN.md`), is done, built by hand. R7, the skin and the proof end to end (`R7_PLAN.md`), is under way: R7a bakes the skin.
 
 - **Stacked PRs:** after merging one, change the next PR's base to `main` before merging it (or delete the merged branch, and GitHub moves it). This has gone wrong three times: #11 and #12 needed #13 to reach `main`, #26 needed #27, and the shell's #14 needed its #16. Turning on *Automatically delete head branches* (Settings › General › Pull Requests, in both repositories) makes GitHub retarget them by itself; until then, prefer branching from `main`.
 
@@ -212,7 +242,8 @@ Both morphs name only the regular G8F (no `/data/Exchange/` left) and keep stabl
 | R5f | The loop in the Workspace by hand, on the real core and the sample library | merged (#60) |
 | R6a | The G8 path's groundwork: `[input] variants`, `content` prerequisites, Daz Studio jobs run `-headless`, `core.rewrite_daz_paths`; `R6_PLAN.md` | merged (#61) |
 | R6b | The G8 path's package, `daz_character_to_g8f`: export (Daz), Daz Generations (Blender), build and check (Daz), rewrite; `ctx.tool()`; a morph's id kept stable | merged (#62) |
-| R6c | The G8 path walked from the Workspace, by hand, on the real core and a sample library | in review |
+| R6c | The G8 path walked from the Workspace, by hand, on the real core and a sample library | merged (#63) |
+| R7a | The G8 path's skin bake: step 1 writes the skin (layered images flattened), the Texture Converter bake, the maps installed beside the morph; `R7_PLAN.md` | in review |
 
 ## Phase 6: Service and Workspace
 
