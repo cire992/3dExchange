@@ -324,6 +324,16 @@ def bridges_for(package: ProcessPackage, tools, workdir: Path, log: Callable[[st
     return get
 
 
+def tools_for(package: ProcessPackage, tools):
+    """What ``ctx.tool(tool)`` returns for a package's step: the path its prerequisite resolves to."""
+    def get(tool: str) -> Path:
+        path = resolve_tool(package, tool, tools)
+        if path is None:
+            raise OperationError(f"{tool} is not set up; set it with: exchange tools set {tool} PATH")
+        return Path(path)
+    return get
+
+
 def _run_step(req_uid, package, step, spec, inputs, params, dossier, log: _Log, resuming: bool,
               tools=None) -> Artifact:
     key = hashlib.sha1(json.dumps([package.id, package.manifest.version, step.operation,
@@ -335,7 +345,7 @@ def _run_step(req_uid, package, step, spec, inputs, params, dossier, log: _Log, 
         return Artifact.from_json(json.loads(marker.read_text(encoding="utf-8")))
     say = lambda message: log(step.id, message)  # noqa: E731
     ctx = Context(folder / "work", dossier, say, resuming=resuming,
-                  bridges=bridges_for(package, tools, folder / "work", say))
+                  bridges=bridges_for(package, tools, folder / "work", say), tools=tools_for(package, tools))
     log(step.id, f"{step.operation} {params}" if params else step.operation)
     result = spec.func(ctx, *inputs, **params)
     if not isinstance(result, Artifact):
@@ -381,7 +391,7 @@ def test_process(conn: sqlite3.Connection, folder: Path, uid: str, out_dir: Path
         log(step.id, f"{step.operation} {params}" if params else step.operation)
         say = lambda message, s=step.id: log(s, message)  # noqa: E731
         ctx = Context(work / step.id, dossier, say, resuming=True,
-                      bridges=bridges_for(package, None, work / step.id, say))
+                      bridges=bridges_for(package, None, work / step.id, say), tools=tools_for(package, None))
         result = spec.func(ctx, *[produced[name] for name in step.inputs], **params)
         if not isinstance(result, Artifact) or not accepts(spec.output, result.type):
             raise OperationError(f"{step.operation} should make an Artifact of type {spec.output}")

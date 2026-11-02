@@ -1,0 +1,101 @@
+# A Genesis 9 character's shape as a Genesis 8 Female morph (R6), installed in a Daz content
+# directory: dial it to 1 on the regular Genesis 8 Female to give her the character's shape.
+#
+# 1. Daz Studio loads the character and writes its shape, and the Exchange G8F copy's mesh, as OBJ.
+# 2. Blender runs Daz Generations (Chokaphi's add-on, the user's own copy) from the G9 shape onto G8F.
+# 3. Daz Studio builds the morph on the Exchange G8F copy (Morph Loader, Adjust Rigging, ERC Freeze),
+#    checks that at 1 it lands on step 2's mesh, and saves it.
+# 4. The morph's paths are pointed from the copy at the regular Genesis 8 Female.
+# The files it needs outside Exchange are listed in docs/PROCESS_FILES.md.
+
+[process]
+id = "daz_character_to_g8f"
+name = "Character to Genesis 8 Female (shape)"
+version = "1.0.0"
+author = "Exchange"
+description = "Turns a Genesis 9 character's shape into a morph for Genesis 8 Female."
+format_version = 1
+
+[input]
+dossier_types = ["daz_character_preset"]
+environments = ["daz_studio"]
+variants = ["genesis_9"]
+extensions = [".duf"]
+artifact = "Files"
+
+[output]
+environment = "daz_studio"
+dossier_type = "daz_morph"
+folder = ""
+roles = ["g8f_character"]
+
+[[parameter]]
+id = "method"
+label = "Conversion"
+help = "Daz Generations' conversion: v3 moves the eyes and mouth as a unit and averages 4 neighbours"
+type = "choice"
+choices = ["v3", "v2", "v1"]
+default = "v3"
+
+[[parameter]]
+id = "tolerance"
+label = "Check tolerance (cm)"
+help = "How far the built morph may land from the converted shape before the step fails"
+type = "float"
+default = 0.01
+min = 0.0001
+max = 1
+
+[[prerequisite]]
+id = "daz_studio"
+label = "Daz Studio"
+kind = "tool"
+tool = "daz_studio"
+paths = ["C:/Daz 3D/Applications/64-bit/DAZ 3D/DAZStudio4/DAZStudio.exe",
+         "C:/Program Files/DAZ 3D/DAZStudio4/DAZStudio.exe"]
+hint = "Daz Studio 4.24 or newer"
+
+[[prerequisite]]
+id = "blender"
+label = "Blender"
+kind = "tool"
+tool = "blender"
+paths = ["C:/Program Files/Blender Foundation/Blender */blender.exe",
+         "C:/Program Files (x86)/Steam/steamapps/common/Blender/blender.exe"]
+hint = "Blender 3.0 or newer, for Daz Generations"
+
+[[prerequisite]]
+id = "daz_generations"
+label = "Daz Generations"
+kind = "tool"
+tool = "daz_generations"
+hint = "the add-on's archive, Daz_Generations 1.1.0.zip; it is never installed into your Blender"
+
+[[prerequisite]]
+id = "exchange_g8f"
+label = "Exchange G8F"
+kind = "content"
+tool = "daz_studio"
+paths = ["People/Genesis 8 Female/Genesis 8 Basic Female Exchange.duf",
+         "data/Exchange/Genesis 8/Female/Genesis8Female.dsf"]
+hint = "a renamed copy of Genesis 8 Female with no morphs; see docs/PROCESS_FILES.md"
+
+[[step]]
+id = "export"
+operation = "g8f_ops.export_shape"
+params = { target_figure = "/People/Genesis 8 Female/Genesis 8 Basic Female Exchange.duf" }
+
+[[step]]
+id = "convert"
+operation = "g8f_ops.convert_shape"
+params = { method = "{method}" }
+
+[[step]]
+id = "build"
+operation = "g8f_ops.build_morph"
+params = { figure = "/People/Genesis 8 Female/Genesis 8 Basic Female Exchange.duf", tolerance = "{tolerance}" }
+
+[[step]]
+id = "rewrite"
+operation = "core.rewrite_daz_paths"
+params = { source = "/data/Exchange/Genesis%208/Female/", target = "/data/Daz%203D/Genesis%208/Female/" }
