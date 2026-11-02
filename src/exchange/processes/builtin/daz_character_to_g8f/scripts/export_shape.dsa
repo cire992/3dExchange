@@ -1,0 +1,126 @@
+// Step 1 of daz_character_to_g8f: a Genesis 9 character's shape, and the stock Genesis 8 Female mesh,
+// as OBJ files with Daz's own vertex order (centimetres, Y up), for Daz Generations.
+//
+// args.source  the character's .duf (an absolute path); it loads Genesis 9 with its morphs dialled
+// args.target  the content path of the figure to write as the target mesh (the Exchange G8F copy)
+// args.shape   where to write the character's shape; args.base: where to write the target's mesh
+//
+// The shape is the character as saved, at base resolution in the zero pose: bone rotations and
+// translations are zeroed, bone scales kept (they're part of a character), and a scale of the whole
+// figure put back to 100% (the morph keeps the proportions, not the size).
+
+var G9_VERTICES = 25182;
+var G8F_VERTICES = 16556;
+
+function skeletons() {
+    var out = [];
+    for (var i = 0; i < Scene.getNumSkeletons(); i++) { out.push(Scene.getSkeleton(i)); }
+    return out;
+}
+
+function added(before) {
+    var out = [];
+    var all = skeletons();
+    for (var i = 0; i < all.length; i++) {
+        if (before.indexOf(all[i]) < 0) { out.push(all[i]); }
+    }
+    return out;
+}
+
+function baseVertices(fig) {
+    var obj = fig.getObject();
+    var shape = obj ? obj.getCurrentShape() : null;
+    var geom = shape ? shape.getGeometry() : null;
+    return geom ? geom.getNumVertices() : -1;
+}
+
+function load(path, vertices, what) {
+    var before = skeletons();
+    if (!App.getContentMgr().openFile(path, true)) { throw new Error("Daz Studio could not open " + path); }
+    var found = added(before);
+    var counts = [];
+    for (var i = 0; i < found.length; i++) {
+        var n = baseVertices(found[i]);
+        if (n === vertices) { return found[i]; }
+        counts.push(found[i].getLabel() + " (" + n + " vertices)");
+    }
+    throw new Error(path + " is not " + what + " (a " + vertices + "-vertex figure); it loaded " +
+                    (counts.length ? counts.join(", ") : "no figure"));
+}
+
+function zeroPose(fig, log) {
+    var bones = fig.getAllBones();
+    var nodes = [fig];
+    for (var i = 0; i < bones.length; i++) { nodes.push(bones[i]); }
+    var moved = 0;
+    for (var j = 0; j < nodes.length; j++) {
+        var node = nodes[j];
+        var controls = [node.getXRotControl(), node.getYRotControl(), node.getZRotControl(),
+                        node.getXPosControl(), node.getYPosControl(), node.getZPosControl()];
+        for (var k = 0; k < controls.length; k++) {
+            if (Math.abs(controls[k].getValue()) > 1e-6) { controls[k].setValue(0); moved++; }
+        }
+    }
+    if (moved) { log.push("zeroed " + moved + " pose values"); }
+    var scale = fig.getScaleControl();
+    if (Math.abs(scale.getValue() - 1) > 1e-6) {
+        log.push("the figure was scaled to " + Math.round(scale.getValue() * 1000) / 10 +
+                 "%: the morph keeps its proportions at 100%");
+        scale.setValue(1);
+    }
+}
+
+function baseResolution(fig, log) {
+    var shape = fig.getObject().getCurrentShape();
+    var lod = shape.getLODControl ? shape.getLODControl() : null;
+    if (lod && lod.getValue() !== 0) {
+        log.push("resolution set to Base (was " + lod.getStringValue() + ")");
+        lod.setValue(0);
+    }
+}
+
+function writeObj(path, points, geom) {
+    var lines = [];
+    for (var v = 0; v < points.length; v++) {
+        var p = points[v];
+        lines.push("v " + p.x + " " + p.y + " " + p.z);
+    }
+    for (var f = 0; f < geom.getNumFacets(); f++) {
+        var fc = geom.getFacet(f);
+        var idx = [fc.vertIdx1 + 1, fc.vertIdx2 + 1, fc.vertIdx3 + 1];
+        if (fc.vertIdx4 >= 0) { idx.push(fc.vertIdx4 + 1); }
+        lines.push("f " + idx.join(" "));
+    }
+    var file = new DzFile(path);
+    if (!file.open(DzFile.WriteOnly | DzFile.Truncate)) { throw new Error("cannot write " + path); }
+    file.write(lines.join("\n") + "\n");
+    file.close();
+    return { vertices: points.length, facets: geom.getNumFacets() };
+}
+
+function exchangeRun(args) {
+    var log = [];
+    var started = new Date().getTime();
+    var character = load(args.source, G9_VERTICES, "a Genesis 9 character");
+    log.push("loaded " + character.getLabel() + " in " + (new Date().getTime() - started) / 1000 + " s");
+    zeroPose(character, log);
+    baseResolution(character, log);
+    var obj = character.getObject();
+    obj.forceCacheUpdate(character, false);
+    var mesh = obj.getCachedGeom();
+    if (mesh.getNumVertices() !== G9_VERTICES) {
+        throw new Error("the posed mesh has " + mesh.getNumVertices() + " vertices, not " + G9_VERTICES);
+    }
+    var points = [];
+    for (var v = 0; v < mesh.getNumVertices(); v++) { points.push(mesh.getVertex(v)); }
+    var shape = writeObj(args.shape, points, obj.getCurrentShape().getGeometry());
+
+    var path = App.getContentMgr().findFile(args.target, DzContentMgr.AllDirs);
+    if (!path) { throw new Error(args.target + " is in none of Daz Studio's content directories"); }
+    var target = load(path, G8F_VERTICES, "Genesis 8 Female");
+    var geom = target.getObject().getCurrentShape().getGeometry();
+    var stock = [];
+    for (var s = 0; s < geom.getNumVertices(); s++) { stock.push(geom.getVertex(s)); }
+    var base = writeObj(args.base, stock, geom);
+    return { figure: character.getLabel(), shape: shape, base: base, log: log };
+}

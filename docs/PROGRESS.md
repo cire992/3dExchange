@@ -111,9 +111,31 @@ R5 is done: the loop runs in the Workspace with no terminal. A new mesh went fro
 
 **Rough edges, not fixed:** two claims on the same thing and place look alike in the list; only the detail shows their folders. Holding a requisition from Runs sends no change notice, so a claim moves when the view is next read.
 
+## R6b: the G8 path, built (2026-11-02)
+
+`daz_character_to_g8f` is a built-in process: a Genesis 9 character claimed `as g8f_character` in Daz Studio walks to Installed, as a morph for Genesis 8 Female. Each step was run for real while it was written, headless, on scratch data, with the user's own content directories.
+
+**On *ES3D Luanne HD* (a female G9 character product, from a sample library):** `exchange claim walk --run` reached **Installed** in 65 s with no hand-holding.
+
+| Step | Time | What happened |
+| --- | --- | --- |
+| 1. Export (Daz) | 39 s | Luanne loaded in 23 s, the regular Genesis 9 with the full morph library. Two pose values were zeroed and the resolution set from High to Base. Her shape (25,182 vertices) and the Exchange G8F's mesh (16,556) were written as OBJ files. |
+| 2. Convert (Blender) | 5.6 s | Daz Generations V3, 3 s of it. She's 169 cm against stock G8F's 180, and the converted G8F is 170 cm (rescale "Full"). |
+| 3. Build and check (Daz) | 18 s | Morph Loader moved all 16,556 vertices, and ERC Freeze made 1,020 joint values follow the morph. At 1 the morph lands within 0.00005 cm of step 2's mesh. |
+| 4. Rewrite | <1 s | 1,022 mentions of the copy's path rewritten, and the file moved to `data/Daz 3D/Genesis 8/Female/Morphs/Exchange/ES3D Luanne/ES3DLuanne.dsf`. |
+
+**Checked afterwards:** the installed morph, with its paths pointed back at the copy, was loaded on the Exchange G8F copy. Its dial reads "ES3D Luanne" under Morphs/Exchange, it lands within 0.00005 cm of the shape at 1, and the hip follows it from 105.2 cm to 98.7 cm. Loading it on the regular G8F is R6c's step, in Luke's Daz Studio.
+
+**Found and fixed while building it:**
+- **The morph's id:** Daz saves a new morph's id with a random suffix (`ES3DLuanne-0xab0df0d`), a new one at each save. Walking a claim again would then break scenes using the last morph. The suffix is now dropped after saving; setting `assetId` in DazScript doesn't help, since the filter adds it anyway.
+- **Stale content directories:** Daz keeps `ContentDirN` values past `NumContentDirs`, and the `content` check now ignores them.
+- **Tools that aren't apps:** an operation can ask for one with `ctx.tool(id)`, such as the add-on's zip.
+
+**Not yet:** walking it from the Workspace, the saved Exchange G9 character, and the morph on the regular G8F in Luke's own Daz Studio (R6c).
+
 ## Where we are
 
-**Phases 1-3, 4a-4c, phase 6 up to 6i, phase 7 part 1 and R1 are merged.** R2 (6j) is done: R2a (#30) closed the parity gaps `PARITY_CHECKLIST.md` lists, Luke signed the checklist off on 2026-10-29 (R2b), and the PySide6 window is removed in R2c. R3 (claims core) and R4 (claims API, `R4_PLAN.md`) are done; R5 (claims in the Workspace, `R5_PLAN.md`) is done, built by hand: its decision 1 replaces RESTART_PLAN's decision 9, so the shell has no factory. R6, the G8 path's shape (`R6_PLAN.md`), is in progress, built by hand.
+**Phases 1-3, 4a-4c, phase 6 up to 6i, phase 7 part 1 and R1 are merged.** R2 (6j) is done: R2a (#30) closed the parity gaps `PARITY_CHECKLIST.md` lists, Luke signed the checklist off on 2026-10-29 (R2b), and the PySide6 window is removed in R2c. R3 (claims core) and R4 (claims API, `R4_PLAN.md`) are done; R5 (claims in the Workspace, `R5_PLAN.md`) is done, built by hand: its decision 1 replaces RESTART_PLAN's decision 9, so the shell has no factory. R6, the G8 path's shape (`R6_PLAN.md`), is in progress, built by hand: the package is R6b.
 
 - **Stacked PRs:** after merging one, change the next PR's base to `main` before merging it (or delete the merged branch, and GitHub moves it). This has gone wrong three times: #11 and #12 needed #13 to reach `main`, #26 needed #27, and the shell's #14 needed its #16. Turning on *Automatically delete head branches* (Settings › General › Pull Requests, in both repositories) makes GitHub retarget them by itself; until then, prefer branching from `main`.
 
@@ -167,7 +189,8 @@ R5 is done: the loop runs in the Workspace with no terminal. A new mesh went fro
 | R5a | A requisition's `work_folder`, for R5's Show the work folder; `R5_PLAN.md` | merged (#59) |
 | R5b-e | The Workspace's claims: the Claims view, Claim…, walking and Runs, New (cire992/Exchange-Shell#20-#23) | merged |
 | R5f | The loop in the Workspace by hand, on the real core and the sample library | merged (#60) |
-| R6a | The G8 path's groundwork: `[input] variants`, `content` prerequisites, Daz Studio jobs run `-headless`, `core.rewrite_daz_paths`; `R6_PLAN.md` | in review |
+| R6a | The G8 path's groundwork: `[input] variants`, `content` prerequisites, Daz Studio jobs run `-headless`, `core.rewrite_daz_paths`; `R6_PLAN.md` | merged (#61) |
+| R6b | The G8 path's package, `daz_character_to_g8f`: export (Daz), Daz Generations (Blender), build and check (Daz), rewrite; `ctx.tool()`; a morph's id kept stable | in review |
 
 ## Phase 6: Service and Workspace
 
@@ -903,7 +926,7 @@ Key ideas:
   - **Queue mode:** the queue only runs when you press Run; there's no "run immediately" setting yet.
   - Parallel command-line operations: the runner does one step at a time.
   - Blender thumbnails for formats the small renderer can't draw.
-- **The Daz Studio bridge has run only a trivial job** (version, scene, one file written), not a real conversion. That's for R6.
+- **The Daz Studio bridge's first real conversion** was R6b's (see *R6b*). Daz jobs still pay for loading the regular Genesis 9 with the full morph library: about 25 s of a 40 s export.
 - **Rebuilding from sidecars after a lost database** keeps each output with its asset's original uid. The source environment's rescan makes a new uid for the same asset, so the two show as separate assets until merged.
 - **Overwriting another requisition's output:** both sidecars list the files, so the asset shows an entry for each until one is removed.
 - **Edits run on the UI thread.** Those that change counts (merge, new product, accepted suggestions, retype, undo) reload the sidebar, about 1.7 s on the real library. The first big batch after opening can take several seconds while the database warms up.

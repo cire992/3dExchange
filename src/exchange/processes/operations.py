@@ -102,12 +102,14 @@ class Context:
     """What an operation gets besides its inputs: a work folder, the dossier, logging, checkpoints."""
 
     def __init__(self, workdir: Path, dossier: dict, log: Callable[[str], None], *,
-                 resuming: bool = False, bridges: Callable[[str], Any] | None = None) -> None:
+                 resuming: bool = False, bridges: Callable[[str], Any] | None = None,
+                 tools: Callable[[str], Path] | None = None) -> None:
         self.workdir = Path(workdir)
         self.dossier = dossier  # name, uid, type_id, variant, fields
         self._log = log
         self.resuming = resuming
         self._bridges = bridges
+        self._tools = tools
 
     def new_dir(self, name: str = "out") -> Path:
         path = self.workdir / name
@@ -122,6 +124,13 @@ class Context:
         user resumes, the step runs again and this returns at once."""
         if not self.resuming:
             raise Checkpoint(message)
+
+    def tool(self, tool: str) -> Path:
+        """Where a tool the process declares is (an add-on's archive, say), for an operation that reads
+        it rather than running it as an app."""
+        if self._tools is None:
+            raise OperationError(f"no tool {tool} is available here")
+        return self._tools(tool)
 
     def bridge(self, app: str) -> Any:
         """The bridge to an external app (Blender, Daz Studio, a command-line tool)."""

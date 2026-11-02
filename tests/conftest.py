@@ -26,6 +26,34 @@ def isolated_daz_instance(tmp_path_factory, monkeypatch):
     monkeypatch.setattr(daz, "instance_folder", lambda: folder)
 
 
+@pytest.fixture
+def daz_settings():
+    """Daz Studio's main instance settings, in the tests' registry key (see isolated_daz_instance):
+    set its content directories with ``daz_settings([...])``. Removed afterwards."""
+    import sys
+
+    if sys.platform != "win32":
+        pytest.skip("Daz Studio keeps its settings in the Windows registry")
+    import winreg
+
+    from exchange.bridges import daz
+
+    base = daz.REGISTRY_KEY
+
+    def set_dirs(folders):
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{base}\Studio4") as key:
+            winreg.SetValueEx(key, "NumContentDirs", 0, winreg.REG_DWORD, len(folders))
+            for i, folder in enumerate(folders):
+                winreg.SetValueEx(key, f"ContentDir{i}", 0, winreg.REG_SZ, str(folder))
+
+    yield set_dirs
+    for key in (rf"{base}\Studio4", base, base.rsplit("\\", 1)[0]):
+        try:
+            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, key)
+        except OSError:
+            pass
+
+
 @pytest.fixture(scope="session")
 def definitions() -> DefinitionSet:
     return load_definitions(include_user_dir=False)

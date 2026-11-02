@@ -1,0 +1,159 @@
+// Step 3 of daz_character_to_g8f: the verified morph recipe on the Exchange G8F copy, then a check.
+//
+// args.figure   the content path of the figure to build on (the Exchange G8F copy)
+// args.shape    the converted shape (step 2's OBJ, the figure's vertex order)
+// args.morph    the morph's name; args.label: its dial's label; args.product: its folder
+// args.library  the folder the morph is saved into (as a content directory)
+// args.tolerance  how far (cm) the built morph may land from the shape
+//
+// Morph Loader, Adjust Rigging to Shape and ERC Freeze, as the 4d spike found them to work headless:
+// addPropertiesToFreeze collects nothing without a selection the user made, so the rigging the
+// adjustment changed is frozen explicitly; and "restore rigging" restores memorized rigging, which a
+// fresh session hasn't memorized, so the stock rig is recorded first and written back by hand. Then
+// the morph is dialled to 1 and the mesh compared, vertex by vertex, with the shape it was made from.
+
+var VERTICES = 16556;
+
+function loadFigure(contentPath) {
+    var cm = App.getContentMgr();
+    var path = cm.findFile(contentPath, DzContentMgr.AllDirs);
+    if (!path) { throw new Error(contentPath + " is in none of Daz Studio's content directories"); }
+    if (!cm.openFile(path, true)) { throw new Error("Daz Studio could not open " + path); }
+    for (var i = 0; i < Scene.getNumSkeletons(); i++) {
+        var fig = Scene.getSkeleton(i);
+        var obj = fig.getObject();
+        if (obj && obj.getCurrentShape().getGeometry().getNumVertices() === VERTICES) { return fig; }
+    }
+    throw new Error(contentPath + " loaded no " + VERTICES + "-vertex figure");
+}
+
+function objSettings() {
+    var s = new DzFileIOSettings();
+    s.setIntValue("RunSilent", 1);
+    s.setFloatValue("Scale", 1);
+    s.setStringValue("LatAxis", "X");
+    s.setStringValue("VertAxis", "Y");
+    s.setStringValue("DepthAxis", "Z");
+    s.setBoolValue("InvertLat", false);
+    s.setBoolValue("InvertVert", false);
+    s.setBoolValue("InvertDepth", false);
+    s.setBoolValue("IncludeG", false);
+    s.setBoolValue("IncludeMtllib", false);
+    s.setBoolValue("IncludeUsemtl", false);
+    s.setBoolValue("IncludeVT", false);
+    return s;
+}
+
+function rigControls(bone) {
+    return [bone.getOriginXControl(), bone.getOriginYControl(), bone.getOriginZControl(),
+            bone.getEndXControl(), bone.getEndYControl(), bone.getEndZControl(),
+            bone.getOrientXControl(), bone.getOrientYControl(), bone.getOrientZControl()];
+}
+
+function readShape(path) {
+    var file = new DzFile(path);
+    if (!file.open(DzFile.ReadOnly)) { throw new Error("cannot read " + path); }
+    var lines = file.read().split("\n");
+    file.close();
+    var points = [];
+    for (var i = 0; i < lines.length; i++) {
+        if (lines[i].indexOf("v ") === 0) {
+            var p = lines[i].split(" ");
+            points.push([parseFloat(p[1]), parseFloat(p[2]), parseFloat(p[3])]);
+        }
+    }
+    return points;
+}
+
+function exchangeRun(args) {
+    var log = [];
+    var fig = loadFigure(args.figure);
+
+    var loader = new DzMorphLoader();
+    loader.setFilename(args.shape);
+    loader.setMorphName(args.morph);
+    loader.setPropertyGroupPath("Morphs/Exchange");
+    loader.setDeltaTolerance(0.001);
+    loader.setCreateControlProperty(false);
+    loader.setReverseDeformations(false);
+    loader.setOverwriteExisting(DzMorphLoader.MakeUnique);
+    loader.setMorphMirroring(DzMorphLoader.DoNotMirror);
+    loader.setLoadMode(DzMorphLoader.PrimaryNode, fig);
+    var created = loader.createMorph(objSettings(), fig, true);
+    var modifier = fig.getObject().findModifier(args.morph);
+    if (!modifier) { throw new Error("Morph Loader made no morph " + args.morph + ": " + created); }
+    var morph = modifier.getValueChannel();
+    morph.setLabel(args.label);
+    log.push("Morph Loader: " + modifier.getDeltas().getNumDeltas() + " vertices moved");
+
+    var stock = [];
+    var bones = fig.getAllBones();
+    for (var b = 0; b < bones.length; b++) {
+        var controls = rigControls(bones[b]);
+        for (var c = 0; c < controls.length; c++) { stock.push([controls[c], controls[c].getValue()]); }
+    }
+    morph.setValue(1);
+    var adjuster = new DzShapeRiggingAdjuster();
+    adjuster.setFigure(fig);
+    adjuster.setAdjustCenterPoints(true);
+    adjuster.setAdjustEndPoints(true);
+    adjuster.setAdjustOrientation(false);
+    adjuster.doAdjustments();
+
+    var changed = [];
+    for (var s = 0; s < stock.length; s++) {
+        if (Math.abs(stock[s][0].getValue() - stock[s][1]) > 1e-5) { changed.push(stock[s][0]); }
+    }
+    var freeze = new DzERCFreeze();
+    freeze.setControllerNode(fig);
+    freeze.setControllerProperty(morph);
+    freeze.setRestoreFigure(true);
+    freeze.setApplyController(true);
+    freeze.setRestoreRigging(true);
+    freeze.setPropertiesToFreeze(changed);
+    freeze.doFreeze();
+    log.push("ERC Freeze: " + changed.length + " joint values follow the morph");
+
+    morph.setValue(0);
+    for (var r = 0; r < stock.length; r++) {
+        if (Math.abs(stock[r][0].getValue() - stock[r][1]) > 1e-6) { stock[r][0].setValue(stock[r][1]); }
+    }
+
+    // The check: at 1, the figure's mesh is the shape it was made from.
+    var shape = readShape(args.shape);
+    morph.setValue(1);
+    var obj = fig.getObject();
+    obj.forceCacheUpdate(fig, false);
+    var mesh = obj.getCachedGeom();
+    if (mesh.getNumVertices() !== shape.length) {
+        throw new Error("the built figure has " + mesh.getNumVertices() + " vertices, the shape " + shape.length);
+    }
+    var worst = 0, worstAt = -1;
+    for (var v = 0; v < shape.length; v++) {
+        var p = mesh.getVertex(v);
+        var d = Math.sqrt(Math.pow(p.x - shape[v][0], 2) + Math.pow(p.y - shape[v][1], 2) + Math.pow(p.z - shape[v][2], 2));
+        if (d > worst) { worst = d; worstAt = v; }
+    }
+    if (worst > args.tolerance) {
+        throw new Error("the built morph lands " + worst.toFixed(4) + " cm from the shape at vertex " + worstAt +
+                        " (more than " + args.tolerance + " cm)");
+    }
+    morph.setValue(0);
+
+    var io = App.getAssetIOMgr();
+    var filter = io.getFilter(io.findFilter("DzMorphSupportAssetFilter"));
+    var settings = new DzFileIOSettings();
+    filter.getDefaultOptions(settings);
+    settings.setStringValue("RootLabel", fig.getLabel());
+    settings.setStringValue("BaseDataPath", args.library);
+    settings.setStringValue("VendorName", "Exchange");
+    settings.setStringValue("ProductName", args.product);
+    settings.setBoolValue("CompressOutput", false);
+    settings.setBoolValue("RunSilent", true);
+    settings.setSettingsValue("NodeNames").setSettingsValue(fig.name).setStringValue("0", modifier.name);
+    var error = io.doSaveWithOptions(filter, settings, false, args.library + "/DzMorphSupportAssetFilter", args.library, "");
+    var code = error && error.valueOf ? error.valueOf() : 0;
+    if (code !== 0) { throw new Error("saving the morph failed (" + code + ")"); }
+    return { morph: modifier.name, deltas: modifier.getDeltas().getNumDeltas(), frozen: changed.length,
+             largest_difference: worst, log: log };
+}

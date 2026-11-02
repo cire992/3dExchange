@@ -5,7 +5,6 @@ prerequisites), and pointing Daz files at another figure (`core.rewrite_daz_path
 import datetime as dt
 import gzip
 import json
-import sys
 
 import pytest
 
@@ -60,7 +59,9 @@ def package(tmp_path, process_id, *, variants='variants = ["genesis_9"]', prereq
     write(folder / "process.toml", MANIFEST.format(id=process_id, variants=variants,
                                                    prerequisite=prerequisite).encode())
     trust(install(folder))
-    return load_registry()
+    registry = load_registry()
+    registry.packages.pop("daz_character_to_g8f")  # the built-in G8 path takes the same characters
+    return registry
 
 
 @pytest.fixture
@@ -141,32 +142,6 @@ def test_a_content_prerequisite_needs_an_app_and_paths():
         parse_manifest(with_prerequisite(tool="daz_studio"), "x")
     parsed = parse_manifest(with_prerequisite(tool="daz_studio", paths=[EXCHANGE_G8F]), "x")
     assert parsed.prerequisites[0].kind == "content" and parsed.prerequisites[0].paths == (EXCHANGE_G8F,)
-
-
-@pytest.fixture
-def daz_settings():
-    """Daz Studio's main instance settings, in the tests' registry key (conftest): set the content
-    directories with ``set([...])``. Removed afterwards."""
-    if sys.platform != "win32":
-        pytest.skip("Daz Studio keeps its settings in the Windows registry")
-    import winreg
-
-    from exchange.bridges import daz
-
-    base = daz.REGISTRY_KEY
-
-    def set_dirs(folders):
-        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"{base}\Studio4") as key:
-            winreg.SetValueEx(key, "NumContentDirs", 0, winreg.REG_DWORD, len(folders))
-            for i, folder in enumerate(folders):
-                winreg.SetValueEx(key, f"ContentDir{i}", 0, winreg.REG_SZ, str(folder))
-
-    yield set_dirs
-    for key in (rf"{base}\Studio4", base, base.rsplit("\\", 1)[0]):
-        try:
-            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, key)
-        except OSError:
-            pass
 
 
 def test_content_is_looked_for_in_daz_studios_content_directories(tmp_path, daz_settings):

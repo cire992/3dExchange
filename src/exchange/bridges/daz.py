@@ -64,7 +64,7 @@ def content_directories() -> list[Path]:
         return []
     import winreg
 
-    found, i = {}, 0
+    found, count, i = {}, None, 0
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, rf"{REGISTRY_KEY}\{MAIN_INSTANCE}") as main:
             while True:
@@ -75,10 +75,12 @@ def content_directories() -> list[Path]:
                 match = re.fullmatch(r"ContentDir(\d+)", name)
                 if match and isinstance(value, str) and value.strip():
                     found[int(match.group(1))] = Path(value.strip())
+                elif name == "NumContentDirs" and isinstance(value, int):
+                    count = value
                 i += 1
     except OSError:
         return []
-    return [found[k] for k in sorted(found)]
+    return [found[k] for k in sorted(found) if count is None or k < count]  # entries past the count are stale
 
 
 def sync_instance_settings() -> list[str]:
