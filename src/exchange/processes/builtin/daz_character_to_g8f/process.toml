@@ -1,19 +1,22 @@
-# A Genesis 9 character's shape as a Genesis 8 Female morph (R6), installed in a Daz content
-# directory: dial it to 1 on the regular Genesis 8 Female to give her the character's shape.
+# A Genesis 9 character as Genesis 8 Female: its shape as a morph (R6) and its skin's maps (R7),
+# installed in a Daz content directory. Dial the morph to 1 on the regular Genesis 8 Female to give
+# her the character's shape.
 #
-# 1. Daz Studio loads the character and writes its shape, and the Exchange G8F copy's mesh, as OBJ.
+# 1. Daz Studio loads the character and writes its shape, and the Exchange G8F copy's mesh, as OBJ,
+#    and its skin: each surface's channels and maps (layered images flattened).
 # 2. Blender runs Daz Generations (Chokaphi's add-on, the user's own copy) from the G9 shape onto G8F.
-# 3. Daz Studio builds the morph on the Exchange G8F copy (Morph Loader, Adjust Rigging, ERC Freeze),
-#    checks that at 1 it lands on step 2's mesh, and saves it.
-# 4. The morph's paths are pointed from the copy at the regular Genesis 8 Female.
+# 3. Blender bakes the skin's maps onto G8F's four tiles with the Texture Converter G9 to G8F template.
+# 4. Daz Studio builds the morph on the Exchange G8F copy (Morph Loader, Adjust Rigging, ERC Freeze),
+#    checks that at 1 it lands on step 2's mesh, and saves it beside the baked maps.
+# 5. The morph's paths are pointed from the copy at the regular Genesis 8 Female.
 # The files it needs outside Exchange are listed in docs/PROCESS_FILES.md.
 
 [process]
 id = "daz_character_to_g8f"
-name = "Character to Genesis 8 Female (shape)"
-version = "1.0.0"
+name = "Character to Genesis 8 Female"
+version = "1.1.0"
 author = "Exchange"
-description = "Turns a Genesis 9 character's shape into a morph for Genesis 8 Female."
+description = "Turns a Genesis 9 character's shape into a morph for Genesis 8 Female, and bakes its skin onto her maps."
 format_version = 1
 
 [input]
@@ -36,6 +39,15 @@ help = "Daz Generations' conversion: v3 moves the eyes and mouth as a unit and a
 type = "choice"
 choices = ["v3", "v2", "v1"]
 default = "v3"
+
+[[parameter]]
+id = "resolution"
+label = "Map size (px)"
+help = "The largest a baked map may be; each is as large as its largest source map, up to this"
+type = "int"
+default = 4096
+min = 256
+max = 8192
 
 [[parameter]]
 id = "tolerance"
@@ -62,7 +74,7 @@ kind = "tool"
 tool = "blender"
 paths = ["C:/Program Files/Blender Foundation/Blender */blender.exe",
          "C:/Program Files (x86)/Steam/steamapps/common/Blender/blender.exe"]
-hint = "Blender 3.0 or newer, for Daz Generations"
+hint = "Blender 3.2 or newer, for Daz Generations and the Texture Converter"
 
 [[prerequisite]]
 id = "daz_generations"
@@ -70,6 +82,13 @@ label = "Daz Generations"
 kind = "tool"
 tool = "daz_generations"
 hint = "the add-on's archive, Daz_Generations 1.1.0.zip; it is never installed into your Blender"
+
+[[prerequisite]]
+id = "texture_converter_g9_g8f"
+label = "Texture Converter G9 to G8F"
+kind = "tool"
+tool = "texture_converter_g9_g8f"
+hint = "the template's archive, Texture Converter G9 to G8F_V2.02.zip (Blender 3.2 or newer)"
 
 [[prerequisite]]
 id = "exchange_g8f"
@@ -89,6 +108,11 @@ params = { target_figure = "/People/Genesis 8 Female/Genesis 8 Basic Female Exch
 id = "convert"
 operation = "g8f_ops.convert_shape"
 params = { method = "{method}" }
+
+[[step]]
+id = "bake"
+operation = "g8f_ops.bake_skin"
+params = { resolution = "{resolution}" }
 
 [[step]]
 id = "build"
